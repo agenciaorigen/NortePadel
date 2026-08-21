@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Norte Padel</title>
+<meta name="theme-color" content="#0ea5a4" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <img src="icons/icon-192.png" alt="Norte Padel" />
+  <h1>Norte Padel</h1>
+  <button id="btnNotif" title="Notificaciones">🔔 <span id="notifCount"></span></button>
+</header>
+
+<main>
+
+  <!-- RANKING -->
+  <section id="view-ranking" class="view active">
+    <div class="card">
+      <h2>Ranking general</h2>
+      <table id="tablaRanking">
+        <thead><tr><th>#</th><th>Jugador</th><th>Nivel</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
+    </div>
+
+    <div class="card">
+      <h3>Próximos torneos y flyers</h3>
+      <div class="flyer-grid" id="flyerMini"></div>
+    </div>
+  </section>
+
+  <!-- TORNEOS -->
+  <section id="view-torneos" class="view">
+    <div class="card">
+      <h2>Crear torneo</h2>
+      <label>Nombre</label>
+      <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
+      <label>Complejo sede</label>
+      <select id="tComplejo"></select>
+      <div class="row">
+        <div>
+          <label>Categoría</label>
+          <input id="tCategoria" placeholder="Ej: 5ta Caballeros" />
+        </div>
+        <div>
+          <label>Duración partido (min)</label>
+          <input id="tDuracion" type="number" value="90" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Fecha inicio</label>
+          <input id="tFechaInicio" type="date" />
+        </div>
+        <div>
+          <label>Fecha fin</label>
+          <input id="tFechaFin" type="date" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Puntos 1º</label>
+          <input id="tPuntos1" type="number" value="100" />
+        </div>
+        <div>
+          <label>Puntos 2º</label>
+          <input id="tPuntos2" type="number" value="60" />
+        </div>
+      </div>
+      <button class="primary" id="btnCrearTorneo">Crear torneo</button>
+    </div>
+
+    <div class="card">
+      <h2>Torneos</h2>
+      <div id="listaTorneos"></div>
+    </div>
+  </section>
+
+  <!-- DETALLE TORNEO (se muestra al elegir uno) -->
+  <section id="view-torneo-detalle" class="view">
+    <div class="card">
+      <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
+      <h2 id="dtNombre"></h2>
+      <p class="badge" id="dtEstado"></p>
+      <p class="match-meta" id="dtInfo"></p>
+    </div>
+
+    <div class="card">
+      <h3>Canchas asignadas a este torneo</h3>
+      <div id="dtCanchas"></div>
+      <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
+      <select id="dtSelectCancha"></select>
+      <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
+    </div>
+
+    <div class="card">
+      <h3>Inscriptos</h3>
+      <div id="dtInscriptos"></div>
+      <label>Inscribir jugador</label>
+      <select id="dtSelectJugador"></select>
+      <button class="secondary small" id="btnInscribir">Inscribir</button>
+    </div>
+
+    <div class="card">
+      <h3>Parejas</h3>
+      <div id="dtParejas"></div>
+      <button class="secondary small" id="btnArmarParejas">Armar parejas automáticamente</button>
+    </div>
+
+    <div class="card">
+      <h3>Partidos</h3>
+      <button class="primary" id="btnArmarPartidos">Armar partidos automáticamente</button>
+      <div id="dtPartidos" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- JUGADORES -->
+  <section id="view-jugadores" class="view">
+    <div class="card">
+      <h2 id="regTitulo">Registrarme como jugador</h2>
+      <div class="row">
+        <div><label>Nombre</label><input id="jNombre" /></div>
+        <div><label>Apellido</label><input id="jApellido" /></div>
+      </div>
+      <div class="row">
+        <div><label>Email</label><input id="jEmail" type="email" /></div>
+        <div><label>Teléfono</label><input id="jTelefono" /></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Nivel</label>
+          <select id="jNivel">
+            <option value="principiante">Principiante</option>
+            <option value="intermedio" selected>Intermedio</option>
+            <option value="avanzado">Avanzado</option>
+          </select>
+        </div>
+        <div>
+          <label>Lado preferido</label>
+          <select id="jLado">
+            <option value="indistinto" selected>Indistinto</option>
+            <option value="drive">Drive</option>
+            <option value="reves">Revés</option>
+          </select>
+        </div>
+      </div>
+
+      <label>¿Qué días y horarios podés jugar?</label>
+      <div id="disponibilidadForm"></div>
+
+      <button class="primary" id="btnRegistrarJugador">Guardar</button>
+      <p class="match-meta" id="miPerfilInfo"></p>
+    </div>
+
+    <div class="card">
+      <h2>Jugadores registrados</h2>
+      <div id="listaJugadores"></div>
+    </div>
+  </section>
+
+  <!-- COMPLEJOS -->
+  <section id="view-complejos" class="view">
+    <div class="card">
+      <h2>Nuevo complejo</h2>
+      <label>Nombre</label>
+      <input id="cNombre" placeholder="Ej: Norte Padel Club" />
+      <label>Dirección</label>
+      <input id="cDireccion" />
+      <button class="primary" id="btnCrearComplejo">Crear complejo</button>
+    </div>
+
+    <div class="card">
+      <h2>Complejos y canchas</h2>
+      <div id="listaComplejos"></div>
+    </div>
+  </section>
+
+  <!-- FLYERS -->
+  <section id="view-flyers" class="view">
+    <div class="card">
+      <h2>Subir flyer de torneo</h2>
+      <label>Título</label>
+      <input id="fTitulo" placeholder="Ej: Apertura Norte 2026" />
+      <label>Torneo relacionado (opcional)</label>
+      <select id="fTorneo"><option value="">— Ninguno —</option></select>
+      <label>Imagen del flyer</label>
+      <input id="fArchivo" type="file" accept="image/*" />
+      <button class="primary" id="btnSubirFlyer">Subir flyer</button>
+    </div>
+    <div class="card">
+      <h2>Próximos torneos</h2>
+      <div class="flyer-grid" id="listaFlyers"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button data-view="ranking" class="tab active"><span class="icon">🏆</span>Ranking</button>
+  <button data-view="torneos" class="tab"><span class="icon">📅</span>Torneos</button>
+  <button data-view="jugadores" class="tab"><span class="icon">🙋</span>Jugadores</button>
+  <button data-view="complejos" class="tab"><span class="icon">🏟️</span>Complejos</button>
+  <button data-view="flyers" class="tab"><span class="icon">🖼️</span>Flyers</button>
+</nav>
+
+<div id="toast" class="toast" style="display:none"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="matching.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
