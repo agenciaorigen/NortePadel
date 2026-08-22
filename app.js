@@ -1268,7 +1268,7 @@ function mostrarNotificacionLocal(mensaje) {
   toast("🔔 " + mensaje);
   if ("Notification" in window && Notification.permission === "granted") {
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-      navigator.serviceWorker.ready.then((reg) => reg.showNotification("Norte Padel", { body: mensaje, icon: "icons/icon-192.png" }));
+      navigator.serviceWorker.ready.then((reg) => reg.showNotification("Norte Padel", { body: mensaje, icon: "icon-192.png" }));
     } else {
       new Notification("Norte Padel", { body: mensaje });
     }

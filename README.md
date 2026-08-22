@@ -89,7 +89,9 @@ norte-padel/
 ├── schema.sql          → script para crear toda la base de datos, roles y seguridad en Supabase
 ├── hero-cancha.jpg      → foto de fondo del encabezado de Inicio
 ├── energia-pelota.jpg    → foto de fondo de la banda "Sentí la verdadera energía del pádel"
-└── icons/               → íconos de la app
+├── icon-192.png          → ícono de la app
+├── icon-512.png          → ícono de la app (versión grande)
+└── icon-512-maskable.png → ícono de la app (versión "maskable", para Android)
 ```
 
-> Subí TODOS estos archivos sueltos al mismo nivel (no los metas en subcarpetas nuevas) — si al arrastrar la carpeta a GitHub o Netlify alguna herramienta no respeta las subcarpetas, es más seguro tener todo plano como está acá.
+> Todos los archivos van sueltos, al mismo nivel — ya no hay ninguna subcarpeta (ni `icons/` ni `fotos/`). Es a propósito: al subir arrastrando a GitHub o Netlify, si arrastrás archivos sueltos en vez de una carpeta completa, las subcarpetas a veces no se crean y las imágenes quedan rotas. Con todo plano, ese problema no puede pasar — subís los archivos que sean (todos juntos, sin armar carpetas) y listo.

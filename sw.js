@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v3";
+const CACHE = "norte-padel-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,9 +7,11 @@ const APP_SHELL = [
   "./app.js",
   "./matching.js",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-512-maskable.png"
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-512-maskable.png",
+  "./hero-cancha.jpg",
+  "./energia-pelota.jpg"
 ];
 
 self.addEventListener("install", (event) => {
@@ -49,8 +51,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Norte Padel", {
       body: data.body,
-      icon: "icons/icon-192.png",
-      badge: "icons/icon-192.png"
+      icon: "icon-192.png",
+      badge: "icon-192.png"
     })
   );
 });
