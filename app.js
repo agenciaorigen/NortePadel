@@ -520,10 +520,12 @@ async function cargarFlyers() {
   const { data } = await sb.from("flyers").select("*").order("created_at", { ascending: false }).limit(20);
   const grid = document.getElementById("listaFlyers");
   const mini = document.getElementById("flyerMini");
+  const sidebar = document.getElementById("sidebarFlyer");
   grid.innerHTML = "";
   mini.innerHTML = "";
   if (!data || data.length === 0) {
     grid.innerHTML = '<p class="empty">Todavía no hay flyers subidos.</p>';
+    if (sidebar) sidebar.innerHTML = '<p class="empty" style="padding:0">Sin torneos próximos.</p>';
     return;
   }
   data.forEach((f) => {
@@ -531,6 +533,10 @@ async function cargarFlyers() {
     grid.innerHTML += img;
     if (mini.children.length < 4) mini.innerHTML += img;
   });
+  if (sidebar) {
+    const ultimo = data[0];
+    sidebar.innerHTML = `<img src="${ultimo.url}" alt="${ultimo.titulo}" style="width:100%;border-radius:10px;border:1px solid var(--border)" /><div class="match-meta" style="margin-top:6px">${ultimo.titulo}</div>`;
+  }
 }
 
 document.getElementById("btnSubirFlyer").addEventListener("click", async () => {
@@ -551,6 +557,58 @@ document.getElementById("btnSubirFlyer").addEventListener("click", async () => {
   document.getElementById("fTitulo").value = "";
   document.getElementById("fArchivo").value = "";
   cargarFlyers();
+});
+
+// ============================================================
+// SPONSORS / PUBLICIDAD
+// ============================================================
+function renderSponsorItem(s) {
+  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" />`;
+  return s.link_url
+    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}">${contenido}</a>`
+    : `<span class="sponsor-item" title="${s.nombre}">${contenido}</span>`;
+}
+
+async function cargarSponsors() {
+  const { data } = await sb.from("sponsors").select("*").eq("activo", true).order("orden");
+  const admin = document.getElementById("listaSponsors");
+  const inlineCard = document.getElementById("sponsorsInlineCard");
+  const inline = document.getElementById("sponsorsInline");
+  const sidebarCard = document.getElementById("sidebarSponsorsCard");
+  const sidebar = document.getElementById("sidebarSponsors");
+
+  if (admin) admin.innerHTML = (data && data.length > 0) ? data.map(renderSponsorItem).join("") : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
+
+  if (data && data.length > 0) {
+    if (inline) inline.innerHTML = data.map(renderSponsorItem).join("");
+    if (inlineCard) inlineCard.style.display = "block";
+    if (sidebar) sidebar.innerHTML = data.map(renderSponsorItem).join("");
+    if (sidebarCard) sidebarCard.style.display = "block";
+  } else {
+    if (inlineCard) inlineCard.style.display = "none";
+    if (sidebarCard) sidebarCard.style.display = "none";
+  }
+}
+
+document.getElementById("btnSubirSponsor").addEventListener("click", async () => {
+  const nombre = document.getElementById("spNombre").value.trim();
+  const archivo = document.getElementById("spArchivo").files[0];
+  if (!nombre || !archivo) { toast("Poné un nombre y elegí un logo"); return; }
+
+  const path = `${Date.now()}-${archivo.name}`;
+  const { error: upErr } = await sb.storage.from("sponsors").upload(path, archivo);
+  if (upErr) { toast("Error subiendo logo: " + upErr.message); return; }
+
+  const { data: pub } = sb.storage.from("sponsors").getPublicUrl(path);
+  const linkUrl = document.getElementById("spLink").value.trim() || null;
+  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl });
+  if (error) { toast("Error: " + error.message); return; }
+
+  toast("Auspiciante agregado");
+  document.getElementById("spNombre").value = "";
+  document.getElementById("spLink").value = "";
+  document.getElementById("spArchivo").value = "";
+  cargarSponsors();
 });
 
 // ============================================================
@@ -623,7 +681,7 @@ if ("serviceWorker" in navigator) {
 // INIT
 // ============================================================
 async function init() {
-  await Promise.all([cargarComplejos(), cargarJugadores(), cargarTorneos(), cargarFlyers(), cargarRanking()]);
+  await Promise.all([cargarComplejos(), cargarJugadores(), cargarTorneos(), cargarFlyers(), cargarSponsors(), cargarRanking()]);
   suscribirseARankingRealtime();
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();

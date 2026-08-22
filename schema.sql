@@ -121,6 +121,17 @@ create table if not exists flyers (
   created_at timestamptz not null default now()
 );
 
+-- ---------- SPONSORS / PUBLICIDAD ----------
+create table if not exists sponsors (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  logo_url text not null,
+  link_url text,
+  orden int not null default 0,
+  activo boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- SUSCRIPCIONES A NOTIFICACIONES PUSH ----------
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),
@@ -249,6 +260,7 @@ alter table parejas enable row level security;
 alter table inscripciones enable row level security;
 alter table partidos enable row level security;
 alter table flyers enable row level security;
+alter table sponsors enable row level security;
 alter table push_subscriptions enable row level security;
 alter table notificaciones enable row level security;
 
@@ -256,7 +268,7 @@ do $$
 declare
   tbl text;
 begin
-  foreach tbl in array array['complejos','canchas','jugadores','disponibilidad','torneos','torneo_canchas','parejas','inscripciones','partidos','flyers','push_subscriptions','notificaciones']
+  foreach tbl in array array['complejos','canchas','jugadores','disponibilidad','torneos','torneo_canchas','parejas','inscripciones','partidos','flyers','sponsors','push_subscriptions','notificaciones']
   loop
     execute format('drop policy if exists "public_select" on %I', tbl);
     execute format('create policy "public_select" on %I for select using (true)', tbl);
@@ -284,3 +296,18 @@ create policy "flyers_public_read" on storage.objects
 drop policy if exists "flyers_public_write" on storage.objects;
 create policy "flyers_public_write" on storage.objects
   for insert with check (bucket_id = 'flyers');
+
+-- ============================================================
+-- STORAGE: bucket público para logos de sponsors/publicidad
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('sponsors', 'sponsors', true)
+on conflict (id) do nothing;
+
+drop policy if exists "sponsors_public_read" on storage.objects;
+create policy "sponsors_public_read" on storage.objects
+  for select using (bucket_id = 'sponsors');
+
+drop policy if exists "sponsors_public_write" on storage.objects;
+create policy "sponsors_public_write" on storage.objects
+  for insert with check (bucket_id = 'sponsors');

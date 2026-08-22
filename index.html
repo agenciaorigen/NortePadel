@@ -24,6 +24,7 @@
   </button>
 </header>
 
+<div class="app-body">
 <main>
 
   <!-- RANKING -->
@@ -41,6 +42,11 @@
     <div class="card">
       <h3>Próximos torneos y flyers</h3>
       <div class="flyer-grid" id="flyerMini"></div>
+    </div>
+
+    <div class="card" id="sponsorsInlineCard" style="display:none">
+      <h3>Con el apoyo de</h3>
+      <div class="sponsor-strip" id="sponsorsInline"></div>
     </div>
   </section>
 
@@ -224,9 +230,35 @@
       <h2>Próximos torneos</h2>
       <div class="flyer-grid" id="listaFlyers"></div>
     </div>
+
+    <div class="card">
+      <h2>Auspiciantes / Publicidad</h2>
+      <p class="match-meta" style="margin-bottom:6px">Los logos aparecen en la portada de Ranking y, en pantallas grandes, en la columna lateral de toda la app.</p>
+      <label>Nombre del auspiciante</label>
+      <input id="spNombre" placeholder="Ej: Wilson Padel" />
+      <label>Link (opcional, a donde va si tocan el logo)</label>
+      <input id="spLink" placeholder="https://..." />
+      <label>Logo</label>
+      <input id="spArchivo" type="file" accept="image/*" />
+      <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
+
+      <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
+    </div>
   </section>
 
 </main>
+
+<aside id="sidebarAds">
+  <div class="card">
+    <h3>Próximo torneo</h3>
+    <div id="sidebarFlyer"></div>
+  </div>
+  <div class="card" id="sidebarSponsorsCard" style="display:none">
+    <h3>Sponsors</h3>
+    <div class="sponsor-strip vertical" id="sidebarSponsors"></div>
+  </div>
+</aside>
+</div>
 
 <nav class="tabbar">
   <button data-view="ranking" class="tab active">

@@ -242,3 +242,72 @@ nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
 }
 .sets-input { display: flex; gap: 6px; }
 .sets-input input { text-align: center; }
+
+/* ---------- Sponsors / publicidad ---------- */
+.sponsor-strip { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px; align-items: center; }
+.sponsor-strip.vertical { flex-direction: column; align-items: stretch; overflow-x: visible; }
+.sponsor-strip a, .sponsor-strip span.sponsor-item {
+  flex-shrink: 0;
+  display: block;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+}
+.sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { flex-shrink: 1; text-align: center; }
+.sponsor-strip img { height: 34px; max-width: 120px; object-fit: contain; display: block; filter: grayscale(100%); opacity: .75; transition: filter .15s, opacity .15s; }
+.sponsor-strip a:hover img { filter: grayscale(0%); opacity: 1; }
+
+/* ============================================================
+   ESCRITORIO: nav lateral + columna de publicidad fija
+   ============================================================ */
+#sidebarAds { display: none; }
+
+@media (min-width: 960px) {
+  body { padding-bottom: 0; padding-left: 92px; }
+
+  header.topbar { padding: 16px 28px; }
+  header.topbar h1 { font-size: 19px; }
+
+  nav.tabbar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0; right: auto;
+    width: 92px;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding-top: 96px;
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+  nav.tabbar button { flex: none; padding: 12px 4px; }
+  nav.tabbar .icon svg { width: 21px; height: 21px; }
+
+  .app-body {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 32px 60px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 28px;
+    align-items: start;
+  }
+  main { padding: 0; max-width: none; margin: 0; }
+
+  #sidebarAds {
+    display: block;
+    position: sticky;
+    top: 90px;
+  }
+
+  /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
+  #listaJugadores, #listaComplejos, #listaTorneos, #dtPartidos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-content: start;
+  }
+  .flyer-grid { grid-template-columns: repeat(3, 1fr); }
+
+  .card { padding: 22px; }
+}
