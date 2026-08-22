@@ -182,6 +182,165 @@ tr:first-child td { font-weight: 700; }
 .avatar-placeholder { display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .avatar-grande { width: 88px; height: 88px; border: 2px solid var(--accent); font-size: 30px; margin-bottom: 8px; }
 
+/* ---------- Hero Inicio ---------- */
+.hero-club {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 28px 20px 26px;
+  margin-bottom: 16px;
+  background:
+    linear-gradient(0deg, rgba(5,7,10,.9), rgba(5,7,10,.35) 60%),
+    radial-gradient(120% 100% at 15% -10%, rgba(180,255,57,.28), transparent 55%),
+    url('fotos/hero-cancha.jpg') center/cover no-repeat,
+    #05070a;
+  border: 1px solid var(--border);
+}
+.hero-club::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: .35;
+  pointer-events: none;
+}
+.hero-club-titulo {
+  position: relative;
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: -.01em;
+  max-width: 80%;
+}
+.hero-club-titulo span { color: var(--accent); }
+.hero-club-sub { position: relative; color: var(--muted); font-size: 14px; margin: 0 0 18px; max-width: 34ch; }
+.hero-club-cta {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: var(--accent-ink);
+  border: none; border-radius: 30px;
+  padding: 12px 20px; font-weight: 700; font-size: 14px;
+  cursor: pointer;
+}
+.hero-club-cta span { transition: transform .15s; }
+.hero-club-cta:hover span { transform: translateX(3px); }
+.hero-club-widget {
+  position: absolute; top: 18px; right: 18px;
+  background: rgba(10,13,18,.85);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 12px;
+  display: flex; flex-direction: column; align-items: flex-end;
+  text-align: right;
+}
+.hero-club-widget-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.hero-club-widget strong { font-size: 18px; color: var(--accent); line-height: 1.3; }
+.hero-club-widget-sub { font-size: 11px; color: var(--muted); }
+
+/* ---------- Banda con leyenda en movimiento ---------- */
+.marquee-banda {
+  overflow: hidden;
+  background: var(--accent);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  padding: 8px 0;
+}
+.marquee-track {
+  display: flex; gap: 14px; width: max-content;
+  color: var(--accent-ink);
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  animation: marquee-scroll 16s linear infinite;
+}
+.marquee-dot { opacity: .5; }
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
+/* ---------- Banda de energía (foto real del club) ---------- */
+.energia-banda {
+  position: relative;
+  min-height: 200px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: url('fotos/energia-pelota.jpg') center/cover no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 32px 20px;
+  border: 1px solid var(--border);
+}
+.energia-banda::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(5,7,10,.55), rgba(5,7,10,.85));
+}
+.energia-texto { position: relative; z-index: 1; max-width: 34ch; }
+.energia-texto h3 {
+  font-size: 22px; font-weight: 800; margin: 0 0 8px;
+  text-transform: uppercase; letter-spacing: .01em;
+}
+.energia-texto p { font-size: 13px; color: #dfe4ee; margin: 0; }
+
+/* ---------- Tarjeta destacada (jugador del mes) ---------- */
+.destacado-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 150px;
+  display: flex; align-items: flex-end;
+  padding: 16px;
+  background: var(--gradient);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.destacado-card::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,.05) 65%);
+}
+.destacado-tag {
+  position: absolute; top: 14px; left: 14px;
+  background: rgba(10,13,18,.75);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px; font-weight: 700;
+}
+.destacado-info { position: relative; z-index: 1; }
+.destacado-info strong { display: block; font-size: 18px; }
+.destacado-info span { font-size: 12px; color: #dfe4ee; }
+
+/* ---------- Flyer destacado (próximo torneo) ---------- */
+.flyer-destacado {
+  position: relative;
+  min-height: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center top;
+  display: flex; align-items: flex-end;
+  padding: 16px;
+}
+.flyer-destacado::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,.8), transparent 45%);
+}
+.flyer-destacado-info { position: relative; z-index: 1; }
+.flyer-destacado-info strong { display: block; font-size: 17px; }
+.flyer-destacado-info span { font-size: 12px; color: #dfe4ee; }
+
 .campeones-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
 .campeon-card {
   flex-shrink: 0; width: 140px; text-align: center;
@@ -247,13 +406,6 @@ tr:first-child td { font-weight: 700; }
 body.is-admin .admin-only { display: block; }
 
 header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ---------- Jugador del mes ---------- */
-#jugadorDelMesCard {
-  background: linear-gradient(135deg, rgba(255,45,149,.14), rgba(106,61,255,.14));
-  border: 1px solid rgba(255,45,149,.35);
-}
-#jugadorDelMesCard h3 { color: #ff8fc7; }
 
 /* ---------- Buscador de pareja ---------- */
 .suggest-list { position: relative; }

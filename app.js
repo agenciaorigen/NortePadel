@@ -45,6 +45,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnAdminPanel").addEventListener("click", () => cambiarVista("admin"));
+document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
 
 // agrupa categorías tipo "6ta Damas" / "6ta Caballeros" por género; lo que no matchea
 // (categorías genéricas viejas, sin género) cae en "Otras" para no perderlas de vista
@@ -289,6 +290,7 @@ async function manejarCambioSesion(session) {
   actualizarContadorNotificaciones();
   if (isAdmin) cargarJugadoresAdmin();
   cargarEnVivo();
+  cargarHeroPosicion();
   if (torneoActualId) refrescarDetalleTorneo();
 }
 sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
@@ -296,7 +298,6 @@ sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
 // ============================================================
 // RANKING (segmentado por categoría, vía función pública)
 // ============================================================
-let rankingMostrarTodos = false;
 let generoRankingActual = localStorage.getItem("np_genero_ranking") || null;
 async function cargarRanking() {
   const { data } = await sb.rpc("jugadores_publicos");
@@ -328,7 +329,6 @@ async function cargarRanking() {
       generoRankingActual = btn.dataset.genero;
       localStorage.setItem("np_genero_ranking", generoRankingActual);
       categoriaRankingActual = null; // que elija la primera categoría de ese género
-      rankingMostrarTodos = false;
       cargarRanking();
     });
   });
@@ -346,48 +346,33 @@ async function cargarRanking() {
     btn.addEventListener("click", () => {
       categoriaRankingActual = btn.dataset.categoria;
       localStorage.setItem("np_categoria_ranking", categoriaRankingActual);
-      rankingMostrarTodos = false;
       cargarRanking();
     });
   });
 
   const completa = todos.filter((j) => j.categoria === categoriaRankingActual)
     .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
-  const TOP = 10;
-  const data2 = rankingMostrarTodos ? completa : completa.slice(0, TOP);
 
   const tbody = document.querySelector("#tablaRanking tbody");
   tbody.innerHTML = "";
-  if (data2.length === 0) {
+  if (completa.length === 0) {
     document.getElementById("rankingVacio").style.display = "block";
-    document.getElementById("btnVerRankingCompleto").style.display = "none";
     return;
   }
   document.getElementById("rankingVacio").style.display = "none";
-  data2.forEach((j, idx) => {
+  completa.forEach((j, idx) => {
     const posicion = idx + 1;
+    const enTop5 = posicion <= 5;
     const tr = document.createElement("tr");
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, 30)}<span>${j.nombre} ${j.apellido}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, enTop5 ? 44 : 30)}<span>${j.nombre} ${j.apellido}</span></div></td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
     tbody.appendChild(tr);
   });
-
-  const btnVerTodos = document.getElementById("btnVerRankingCompleto");
-  if (completa.length > TOP) {
-    btnVerTodos.style.display = "block";
-    btnVerTodos.textContent = rankingMostrarTodos ? "Ver solo el top 10" : `Ver ranking completo (${completa.length})`;
-  } else {
-    btnVerTodos.style.display = "none";
-  }
 }
-document.getElementById("btnVerRankingCompleto").addEventListener("click", () => {
-  rankingMostrarTodos = !rankingMostrarTodos;
-  cargarRanking();
-});
 
 // ============================================================
 // INICIO: próximos torneos con flyer + jugador del mes
@@ -397,9 +382,11 @@ async function cargarInicio() {
   const { data } = await sb.from("torneos").select("*").not("flyer_url", "is", null).order("fecha_inicio", { ascending: true });
   const proximos = (data || []).filter((t) => !t.fecha_fin || t.fecha_fin >= hoy);
 
+  const destacado = document.getElementById("flyerDestacado");
   const grid = document.getElementById("flyerMini");
   const sidebar = document.getElementById("sidebarFlyer");
   const vacio = document.getElementById("inicioSinTorneos");
+  destacado.innerHTML = "";
   grid.innerHTML = "";
 
   if (proximos.length === 0) {
@@ -408,7 +395,19 @@ async function cargarInicio() {
     return;
   }
   vacio.style.display = "none";
-  proximos.forEach((t) => {
+
+  // el primero, más grande y destacado; el resto, en la grilla chica de siempre
+  const [primero, ...resto] = proximos;
+  destacado.innerHTML = `
+    <div class="flyer-destacado" style="background-image:url('${primero.flyer_url}')">
+      <div class="flyer-destacado-info">
+        <strong>${primero.nombre}</strong>
+        <span>📅 ${primero.fecha_inicio}</span>
+      </div>
+    </div>`;
+  destacado.querySelector(".flyer-destacado").addEventListener("click", () => abrirTorneo(primero.id));
+
+  resto.forEach((t) => {
     const div = document.createElement("div");
     div.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" style="cursor:pointer" /><div class="match-meta">${t.nombre}</div>`;
     div.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
@@ -434,15 +433,29 @@ async function cargarJugadorDelMes() {
   const card = document.getElementById("jugadorDelMesCard");
   if (!row) { card.style.display = "none"; return; }
   card.style.display = "block";
+  const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}')"` : "";
   document.getElementById("jugadorDelMesContenido").innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px">
-      ${avatarHtml(row.foto_url, 56)}
-      <div>
-        <div class="match-teams">${row.nombre} ${row.apellido} <span class="badge">${row.categoria}</span></div>
-        ${row.motivo ? `<div class="match-meta">${row.motivo}</div>` : ""}
+    <div class="destacado-card" ${fondo}>
+      <div class="destacado-tag">⭐ Jugador del mes</div>
+      <div class="destacado-info">
+        <strong>${row.nombre} ${row.apellido}</strong>
+        <span>${row.categoria}${row.motivo ? " · " + row.motivo : ""}</span>
       </div>
     </div>
   `;
+}
+
+async function cargarHeroPosicion() {
+  const card = document.getElementById("heroPosicionCard");
+  if (!miJugador) { card.style.display = "none"; return; }
+  const { data } = await sb.rpc("jugadores_publicos");
+  const delGrupo = (data || []).filter((j) => j.categoria === miJugador.categoria)
+    .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
+  const pos = delGrupo.findIndex((j) => j.id === miJugador.id);
+  if (pos === -1) { card.style.display = "none"; return; }
+  document.getElementById("heroPosicionValor").textContent = `#${pos + 1}`;
+  document.getElementById("heroPosicionSub").textContent = miJugador.categoria;
+  card.style.display = "flex";
 }
 
 async function cargarCampeones() {

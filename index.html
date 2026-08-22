@@ -49,8 +49,33 @@
 
   <!-- INICIO -->
   <section id="view-inicio" class="view active">
-    <div class="card" id="jugadorDelMesCard" style="display:none">
-      <h3>⭐ Jugador del mes</h3>
+
+    <div class="hero-club">
+      <div class="hero-club-widget" id="heroPosicionCard" style="display:none">
+        <span class="hero-club-widget-label">Tu posición</span>
+        <strong id="heroPosicionValor">—</strong>
+        <span class="hero-club-widget-sub" id="heroPosicionSub"></span>
+      </div>
+      <h2 class="hero-club-titulo">Movimiento.<br /><span>Disciplina.</span><br />Resultado.</h2>
+      <p class="hero-club-sub">El circuito de pádel de Norte Padel: ranking en vivo, torneos todo el año.</p>
+      <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
+    </div>
+
+    <div class="marquee-banda" aria-hidden="true">
+      <div class="marquee-track">
+        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
+        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
+      </div>
+    </div>
+
+    <div class="energia-banda">
+      <div class="energia-texto">
+        <h3>Sentí la verdadera energía del pádel</h3>
+        <p>Torneos, ranking en vivo y una comunidad que juega todo el año.</p>
+      </div>
+    </div>
+
+    <div id="jugadorDelMesCard" style="display:none">
       <div id="jugadorDelMesContenido"></div>
     </div>
 
@@ -61,6 +86,7 @@
 
     <div class="card">
       <h2>Próximos torneos</h2>
+      <div id="flyerDestacado"></div>
       <div class="flyer-grid" id="flyerMini"></div>
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </div>
@@ -184,7 +210,6 @@
         <tbody></tbody>
       </table>
       <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
-      <button class="secondary small" id="btnVerRankingCompleto" style="display:none;margin-top:10px;width:100%">Ver ranking completo</button>
     </div>
   </section>
 
