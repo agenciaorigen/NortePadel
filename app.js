@@ -7,18 +7,16 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// ---------- estado local ----------
+// ---------- estado ----------
+let currentUser = null;   // usuario de Supabase Auth, o null si no hay sesión
+let miJugador = null;     // fila de "jugadores" ligada al usuario logueado
+let isAdmin = false;
+let editandoPerfil = false;
 let torneoActualId = null;
+let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || null;
 let cacheComplejos = [];
-let cacheJugadores = [];
 let cacheCanchas = [];
-
-// ---------- identidad simple del jugador en este dispositivo ----------
-function miJugadorId() { return localStorage.getItem("np_jugador_id") || null; }
-function setMiJugador(id, nombre) {
-  localStorage.setItem("np_jugador_id", id);
-  localStorage.setItem("np_jugador_nombre", nombre);
-}
+let cacheJugadoresAdmin = [];
 
 // ---------- utilidades UI ----------
 function toast(msg) {
@@ -40,72 +38,62 @@ function cambiarVista(nombre) {
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => cambiarVista(btn.dataset.view));
 });
+document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
+document.getElementById("btnAdminPanel").addEventListener("click", () => cambiarVista("admin"));
 
-// ============================================================
-// RANKING (segmentado por categoría)
-// ============================================================
-let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || null;
-
-async function cargarCategoriasDisponibles() {
-  const { data } = await sb.from("jugadores").select("categoria").eq("activo", true);
-  const categorias = [...new Set((data || []).map((j) => j.categoria).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
-  return categorias;
-}
-
-async function cargarRanking() {
-  const categorias = await cargarCategoriasDisponibles();
-  const cont = document.getElementById("categoriaPills");
-
-  if (categorias.length === 0) {
-    cont.innerHTML = "";
-    document.querySelector("#tablaRanking tbody").innerHTML = "";
-    document.getElementById("rankingVacio").style.display = "block";
-    return;
-  }
-
-  if (!categoriaRankingActual || !categorias.includes(categoriaRankingActual)) {
-    categoriaRankingActual = categorias[0];
-  }
-
-  cont.innerHTML = categorias.map((c) =>
-    `<button class="pill ${c === categoriaRankingActual ? "active" : ""}" data-categoria="${c}">${c}</button>`
-  ).join("");
-  cont.querySelectorAll(".pill").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      categoriaRankingActual = btn.dataset.categoria;
-      localStorage.setItem("np_categoria_ranking", categoriaRankingActual);
-      cargarRanking();
-    });
+function llenarSelect(select, items, labelFn) {
+  if (!select) return;
+  const valorPrevio = select.value;
+  select.innerHTML = "";
+  items.forEach((it) => {
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = labelFn(it);
+    select.appendChild(opt);
   });
-
-  const { data } = await sb.from("jugadores").select("*")
-    .eq("activo", true).eq("categoria", categoriaRankingActual)
-    .order("puntos_ranking", { ascending: false });
-
-  const tbody = document.querySelector("#tablaRanking tbody");
-  tbody.innerHTML = "";
-  if (!data || data.length === 0) {
-    document.getElementById("rankingVacio").style.display = "block";
-    return;
-  }
-  document.getElementById("rankingVacio").style.display = "none";
-  data.forEach((j, idx) => {
-    const posicion = idx + 1;
-    const tr = document.createElement("tr");
-    const posClass = posicion <= 3 ? `pos-${posicion}` : "";
-    tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td>${j.nombre} ${j.apellido}</td>
-      <td><strong>${j.puntos_ranking}</strong></td>
-      <td>${j.partidos_jugados}</td>
-      <td>${j.partidos_ganados}</td>`;
-    tbody.appendChild(tr);
-  });
+  if (valorPrevio) select.value = valorPrevio;
 }
 
 // ============================================================
-// JUGADORES + DISPONIBILIDAD
+// AUTENTICACIÓN Y PERFIL
 // ============================================================
+function traducirErrorAuth(error) {
+  const msg = error?.message || "";
+  if (msg.includes("Invalid login credentials")) return "Email o contraseña incorrectos.";
+  if (msg.includes("User already registered")) return "Ya existe una cuenta con ese email. Probá iniciar sesión.";
+  if (msg.includes("Password should be")) return "La contraseña es muy corta (mínimo 6 caracteres).";
+  return msg || "Ocurrió un error.";
+}
+
+document.getElementById("btnLogin").addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
+  toast("¡Bienvenido de nuevo! 🎾");
+});
+
+document.getElementById("btnSignup").addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
+  const { error } = await sb.auth.signUp({ email, password });
+  if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
+  toast("Cuenta creada. Ahora completá tu perfil de jugador 🎾");
+});
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  toast("Cerraste sesión");
+  cambiarVista("inicio");
+});
+
+document.getElementById("btnEditarPerfil").addEventListener("click", () => {
+  editandoPerfil = true;
+  renderVistaPerfil();
+});
+
 function renderDisponibilidadForm() {
   const cont = document.getElementById("disponibilidadForm");
   cont.innerHTML = "";
@@ -121,74 +109,239 @@ function renderDisponibilidadForm() {
     cont.appendChild(row);
   });
 }
-renderDisponibilidadForm();
 
-async function cargarJugadores() {
-  const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
-  cacheJugadores = data || [];
-  const cont = document.getElementById("listaJugadores");
-  cont.innerHTML = "";
-  if (cacheJugadores.length === 0) {
-    cont.innerHTML = `<p class="empty">Todavía no hay jugadores registrados.</p>`;
-  }
-  cacheJugadores.forEach((j) => {
-    const div = document.createElement("div");
-    div.className = "match-card";
-    div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria}</span></div>
-      <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>`;
-    cont.appendChild(div);
+async function precargarFormularioPerfil(j) {
+  document.getElementById("jNombre").value = j.nombre || "";
+  document.getElementById("jApellido").value = j.apellido || "";
+  document.getElementById("jCategoria").value = j.categoria || "6ta";
+  document.getElementById("jTelefono").value = j.telefono || "";
+  document.getElementById("jLado").value = j.lado_preferido || "indistinto";
+  document.getElementById("jNivel").value = j.nivel || "intermedio";
+
+  renderDisponibilidadForm();
+  const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id);
+  (disp || []).forEach((d) => {
+    const chk = document.querySelector(`.chkDia[data-dia="${d.dia_semana}"]`);
+    const desde = document.querySelector(`.horaDesde[data-dia="${d.dia_semana}"]`);
+    const hasta = document.querySelector(`.horaHasta[data-dia="${d.dia_semana}"]`);
+    if (chk) chk.checked = true;
+    if (desde) desde.value = String(d.hora_desde).slice(0, 5);
+    if (hasta) hasta.value = String(d.hora_hasta).slice(0, 5);
   });
-  llenarSelect(document.getElementById("dtSelectJugador"), cacheJugadores, (j) => `${j.nombre} ${j.apellido}`);
-
-  const mi = miJugadorId();
-  if (mi) {
-    const yo = cacheJugadores.find((j) => j.id === mi);
-    document.getElementById("miPerfilInfo").textContent = yo
-      ? `Ya estás registrado como ${yo.nombre} ${yo.apellido}.`
-      : "";
-  }
 }
 
-document.getElementById("btnRegistrarJugador").addEventListener("click", async () => {
+function renderVistaPerfil() {
+  const authCard = document.getElementById("authCard");
+  const completarCard = document.getElementById("completarPerfilCard");
+  const miCard = document.getElementById("miPerfilCard");
+  document.getElementById("authError").textContent = "";
+
+  if (!currentUser) {
+    authCard.style.display = "block";
+    completarCard.style.display = "none";
+    miCard.style.display = "none";
+    return;
+  }
+  authCard.style.display = "none";
+
+  if (!miJugador || editandoPerfil) {
+    completarCard.style.display = "block";
+    miCard.style.display = "none";
+    if (miJugador) precargarFormularioPerfil(miJugador);
+    else renderDisponibilidadForm();
+  } else {
+    completarCard.style.display = "none";
+    miCard.style.display = "block";
+    document.getElementById("miPerfilResumen").textContent =
+      `${miJugador.nombre} ${miJugador.apellido} · Categoría ${miJugador.categoria} · ${miJugador.puntos_ranking} pts`;
+  }
+}
+renderDisponibilidadForm();
+
+document.getElementById("btnGuardarPerfil").addEventListener("click", async () => {
+  if (!currentUser) { toast("Iniciá sesión primero"); return; }
   const nombre = document.getElementById("jNombre").value.trim();
   const apellido = document.getElementById("jApellido").value.trim();
-  const email = document.getElementById("jEmail").value.trim();
   if (!nombre || !apellido) { toast("Completá nombre y apellido"); return; }
 
-  const jugador = {
+  const datos = {
     nombre, apellido,
-    email: email || null,
+    auth_user_id: currentUser.id,
+    email: currentUser.email,
     telefono: document.getElementById("jTelefono").value.trim() || null,
-    nivel: document.getElementById("jNivel").value,
     categoria: document.getElementById("jCategoria").value.trim() || "6ta",
-    lado_preferido: document.getElementById("jLado").value
+    lado_preferido: document.getElementById("jLado").value,
+    nivel: document.getElementById("jNivel").value
   };
 
-  const { data, error } = await sb.from("jugadores").insert(jugador).select().single();
-  if (error) { toast("Error al registrar: " + error.message); return; }
+  let jugadorId;
+  if (miJugador) {
+    const { error } = await sb.from("jugadores").update(datos).eq("id", miJugador.id);
+    if (error) { toast("Error: " + error.message); return; }
+    jugadorId = miJugador.id;
+  } else {
+    const { data, error } = await sb.from("jugadores").insert(datos).select().single();
+    if (error) { toast("Error: " + error.message); return; }
+    jugadorId = data.id;
+  }
 
+  await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId);
   const disponibilidades = [];
   document.querySelectorAll(".chkDia:checked").forEach((chk) => {
     const dia = chk.dataset.dia;
     const desde = document.querySelector(`.horaDesde[data-dia="${dia}"]`).value;
     const hasta = document.querySelector(`.horaHasta[data-dia="${dia}"]`).value;
-    if (desde && hasta) {
-      disponibilidades.push({ jugador_id: data.id, dia_semana: Number(dia), hora_desde: desde, hora_hasta: hasta });
-    }
+    if (desde && hasta) disponibilidades.push({ jugador_id: jugadorId, dia_semana: Number(dia), hora_desde: desde, hora_hasta: hasta });
   });
-  if (disponibilidades.length > 0) {
-    await sb.from("disponibilidad").insert(disponibilidades);
+  if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
+
+  const { data: perfil } = await sb.from("jugadores").select("*").eq("id", jugadorId).single();
+  miJugador = perfil;
+  editandoPerfil = false;
+  toast("¡Perfil guardado! 🎾");
+  pedirPermisoNotificaciones();
+  renderVistaPerfil();
+  suscribirseANotificacionesRealtime();
+  actualizarContadorNotificaciones();
+  cargarRanking();
+  if (torneoActualId) renderInscribirme();
+});
+
+async function manejarCambioSesion(session) {
+  currentUser = session?.user || null;
+  miJugador = null;
+  isAdmin = false;
+
+  if (currentUser) {
+    const { data: perfil } = await sb.from("jugadores").select("*").eq("auth_user_id", currentUser.id).maybeSingle();
+    miJugador = perfil || null;
+    const { data: adminRow } = await sb.from("admins").select("user_id").eq("user_id", currentUser.id).maybeSingle();
+    isAdmin = !!adminRow;
   }
 
-  setMiJugador(data.id, `${data.nombre} ${data.apellido}`);
-  toast("¡Registrado! Ya formás parte de Norte Padel 🎾");
-  pedirPermisoNotificaciones();
-  cargarJugadores();
-  cargarRanking();
+  document.body.classList.toggle("is-admin", isAdmin);
+  document.getElementById("btnAdminPanel").style.display = isAdmin ? "flex" : "none";
+  document.getElementById("perfilNombreCorto").textContent = miJugador ? miJugador.nombre : "";
+
+  renderVistaPerfil();
+  suscribirseANotificacionesRealtime();
+  actualizarContadorNotificaciones();
+  if (isAdmin) cargarJugadoresAdmin();
+  if (torneoActualId) refrescarDetalleTorneo();
+}
+sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
+
+// ============================================================
+// RANKING (segmentado por categoría, vía función pública)
+// ============================================================
+async function cargarRanking() {
+  const { data } = await sb.rpc("jugadores_publicos");
+  const todos = data || [];
+  const categorias = [...new Set(todos.map((j) => j.categoria).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+
+  const cont = document.getElementById("categoriaPills");
+  if (categorias.length === 0) {
+    cont.innerHTML = "";
+    document.querySelector("#tablaRanking tbody").innerHTML = "";
+    document.getElementById("rankingVacio").style.display = "block";
+    return;
+  }
+  if (!categoriaRankingActual || !categorias.includes(categoriaRankingActual)) {
+    categoriaRankingActual = categorias[0];
+  }
+
+  cont.innerHTML = categorias.map((c) =>
+    `<button class="pill ${c === categoriaRankingActual ? "active" : ""}" data-categoria="${c}">${c}</button>`
+  ).join("");
+  cont.querySelectorAll(".pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      categoriaRankingActual = btn.dataset.categoria;
+      localStorage.setItem("np_categoria_ranking", categoriaRankingActual);
+      cargarRanking();
+    });
+  });
+
+  const data2 = todos.filter((j) => j.categoria === categoriaRankingActual)
+    .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
+
+  const tbody = document.querySelector("#tablaRanking tbody");
+  tbody.innerHTML = "";
+  if (data2.length === 0) {
+    document.getElementById("rankingVacio").style.display = "block";
+    return;
+  }
+  document.getElementById("rankingVacio").style.display = "none";
+  data2.forEach((j, idx) => {
+    const posicion = idx + 1;
+    const tr = document.createElement("tr");
+    const posClass = posicion <= 3 ? `pos-${posicion}` : "";
+    tr.innerHTML = `<td class="${posClass}">${posicion}</td>
+      <td>${j.nombre} ${j.apellido}</td>
+      <td><strong>${j.puntos_ranking}</strong></td>
+      <td>${j.partidos_jugados}</td>
+      <td>${j.partidos_ganados}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============================================================
+// INICIO: próximos torneos con flyer + jugador del mes
+// ============================================================
+async function cargarInicio() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { data } = await sb.from("torneos").select("*").not("flyer_url", "is", null).order("fecha_inicio", { ascending: true });
+  const proximos = (data || []).filter((t) => !t.fecha_fin || t.fecha_fin >= hoy);
+
+  const grid = document.getElementById("flyerMini");
+  const sidebar = document.getElementById("sidebarFlyer");
+  const vacio = document.getElementById("inicioSinTorneos");
+  grid.innerHTML = "";
+
+  if (proximos.length === 0) {
+    vacio.style.display = "block";
+    if (sidebar) sidebar.innerHTML = '<p class="empty" style="padding:0">Sin torneos próximos.</p>';
+    return;
+  }
+  vacio.style.display = "none";
+  proximos.forEach((t) => {
+    const div = document.createElement("div");
+    div.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" style="cursor:pointer" /><div class="match-meta">${t.nombre}</div>`;
+    div.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
+    grid.appendChild(div);
+  });
+  if (sidebar) {
+    const t = proximos[0];
+    sidebar.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" style="width:100%;border-radius:10px;border:1px solid var(--border);cursor:pointer" /><div class="match-meta" style="margin-top:6px">${t.nombre}</div>`;
+    sidebar.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
+  }
+}
+
+async function cargarJugadorDelMes() {
+  const { data } = await sb.rpc("jugador_del_mes_publico");
+  const row = (data && data[0]) || null;
+  const card = document.getElementById("jugadorDelMesCard");
+  if (!row) { card.style.display = "none"; return; }
+  card.style.display = "block";
+  document.getElementById("jugadorDelMesContenido").innerHTML = `
+    <div class="match-teams">${row.nombre} ${row.apellido} <span class="badge">${row.categoria}</span></div>
+    ${row.motivo ? `<div class="match-meta">${row.motivo}</div>` : ""}
+  `;
+}
+
+document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
+  const jugadorId = document.getElementById("jdmSelect").value;
+  if (!jugadorId) { toast("Elegí un jugador"); return; }
+  const motivo = document.getElementById("jdmMotivo").value.trim() || null;
+  const { error } = await sb.from("jugador_del_mes").insert({ jugador_id: jugadorId, motivo });
+  if (error) { toast("Error: " + error.message); return; }
+  toast("Jugador del mes actualizado");
+  document.getElementById("jdmMotivo").value = "";
+  cargarJugadorDelMes();
 });
 
 // ============================================================
-// COMPLEJOS Y CANCHAS
+// COMPLEJOS Y CANCHAS (admin)
 // ============================================================
 async function cargarComplejos() {
   const { data: complejos } = await sb.from("complejos").select("*").order("nombre");
@@ -207,7 +360,7 @@ async function cargarComplejos() {
       <div class="match-meta">${c.direccion || ""}</div>
       <div style="margin-top:8px">${canchasDelComplejo.map((k) => `<span class="badge" style="margin-right:6px">${k.nombre}</span>`).join("") || '<span class="match-meta">Sin canchas cargadas</span>'}</div>
       <div class="row" style="margin-top:10px">
-        <input placeholder="Nombre de cancha (ej: Cancha 1)" class="inputCancha" data-complejo="${c.id}" />
+        <input placeholder="Nombre de cancha (ej: Cancha 3)" class="inputCancha" data-complejo="${c.id}" />
         <button class="secondary small btnAgregarCancha" data-complejo="${c.id}">Agregar cancha</button>
       </div>
     `;
@@ -234,25 +387,43 @@ document.getElementById("btnCrearComplejo").addEventListener("click", async () =
   const nombre = document.getElementById("cNombre").value.trim();
   if (!nombre) { toast("Poné un nombre de complejo"); return; }
   const direccion = document.getElementById("cDireccion").value.trim() || null;
-  const { error } = await sb.from("complejos").insert({ nombre, direccion });
+  const cantidad = Math.max(0, Number(document.getElementById("cCantidadCanchas").value) || 0);
+
+  const { data, error } = await sb.from("complejos").insert({ nombre, direccion }).select().single();
   if (error) { toast("Error: " + error.message); return; }
+
+  if (cantidad > 0) {
+    const canchas = Array.from({ length: cantidad }, (_, i) => ({ complejo_id: data.id, nombre: `Cancha ${i + 1}` }));
+    await sb.from("canchas").insert(canchas);
+  }
+
   document.getElementById("cNombre").value = "";
   document.getElementById("cDireccion").value = "";
-  toast("Complejo creado");
+  toast("Complejo creado" + (cantidad > 0 ? ` con ${cantidad} cancha(s)` : ""));
   cargarComplejos();
 });
 
-function llenarSelect(select, items, labelFn) {
-  if (!select) return;
-  const valorPrevio = select.value;
-  select.innerHTML = "";
-  items.forEach((it) => {
-    const opt = document.createElement("option");
-    opt.value = it.id;
-    opt.textContent = labelFn(it);
-    select.appendChild(opt);
-  });
-  if (valorPrevio) select.value = valorPrevio;
+// ============================================================
+// JUGADORES (listado admin, para inscribir manualmente y jugador del mes)
+// ============================================================
+async function cargarJugadoresAdmin() {
+  if (!isAdmin) return;
+  const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
+  cacheJugadoresAdmin = data || [];
+  const cont = document.getElementById("listaJugadoresAdmin");
+  if (cont) {
+    cont.innerHTML = "";
+    if (cacheJugadoresAdmin.length === 0) cont.innerHTML = '<p class="empty">Todavía no hay jugadores registrados.</p>';
+    cacheJugadoresAdmin.forEach((j) => {
+      const div = document.createElement("div");
+      div.className = "match-card";
+      div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria}</span></div>
+        <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>`;
+      cont.appendChild(div);
+    });
+  }
+  llenarSelect(document.getElementById("dtSelectJugador"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
+  llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
 }
 
 // ============================================================
@@ -277,20 +448,24 @@ async function cargarTorneos() {
     div.addEventListener("click", () => abrirTorneo(t.id));
     cont.appendChild(div);
   });
-
-  llenarSelect(document.getElementById("fTorneo"), data, (t) => t.nombre);
-  const selFT = document.getElementById("fTorneo");
-  const optNone = document.createElement("option");
-  optNone.value = ""; optNone.textContent = "— Ninguno —";
-  selFT.insertBefore(optNone, selFT.firstChild);
-  selFT.value = "";
 }
 
 document.getElementById("btnCrearTorneo").addEventListener("click", async () => {
+  if (!isAdmin) { toast("Solo un administrador puede crear torneos"); return; }
   const nombre = document.getElementById("tNombre").value.trim();
   const complejoId = document.getElementById("tComplejo").value;
   const fechaInicio = document.getElementById("tFechaInicio").value;
   if (!nombre || !fechaInicio) { toast("Completá al menos nombre y fecha de inicio"); return; }
+
+  let flyerUrl = null;
+  const archivo = document.getElementById("tFlyerArchivo").files[0];
+  if (archivo) {
+    const path = `${Date.now()}-${archivo.name}`;
+    const { error: upErr } = await sb.storage.from("flyers").upload(path, archivo);
+    if (upErr) { toast("Error subiendo el flyer: " + upErr.message); return; }
+    const { data: pub } = sb.storage.from("flyers").getPublicUrl(path);
+    flyerUrl = pub.publicUrl;
+  }
 
   const torneo = {
     nombre,
@@ -299,12 +474,12 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     fecha_inicio: fechaInicio,
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
     puntos_primero: Number(document.getElementById("tPuntos1").value) || 100,
-    puntos_segundo: Number(document.getElementById("tPuntos2").value) || 60
+    puntos_segundo: Number(document.getElementById("tPuntos2").value) || 60,
+    flyer_url: flyerUrl
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
 
-  // si el torneo tiene complejo, sus canchas quedan habilitadas por defecto
   if (complejoId) {
     const canchasDelComplejo = cacheCanchas.filter((c) => c.complejo_id === complejoId);
     if (canchasDelComplejo.length > 0) {
@@ -314,7 +489,9 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
 
   toast("Torneo creado");
   document.getElementById("tNombre").value = "";
+  document.getElementById("tFlyerArchivo").value = "";
   cargarTorneos();
+  cargarInicio();
   abrirTorneo(data.id);
 });
 
@@ -325,6 +502,46 @@ async function abrirTorneo(id) {
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
 
+async function renderInscribirme() {
+  const estado = document.getElementById("inscripcionEstado");
+  const btn = document.getElementById("btnInscribirme");
+
+  if (!currentUser) {
+    estado.textContent = "Iniciá sesión para poder inscribirte.";
+    btn.textContent = "Iniciar sesión";
+    btn.disabled = false;
+    btn.onclick = () => cambiarVista("perfil");
+    return;
+  }
+  if (!miJugador) {
+    estado.textContent = "Completá tu perfil de jugador antes de inscribirte.";
+    btn.textContent = "Completar perfil";
+    btn.disabled = false;
+    btn.onclick = () => cambiarVista("perfil");
+    return;
+  }
+
+  const { data } = await sb.from("inscripciones").select("id").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle();
+  if (data) {
+    estado.textContent = "✅ Ya estás inscripto en este torneo.";
+    btn.textContent = "Ya estás anotado";
+    btn.disabled = true;
+    btn.onclick = null;
+  } else {
+    estado.textContent = "";
+    btn.textContent = "Inscribirme";
+    btn.disabled = false;
+    btn.onclick = async () => {
+      const { error } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: miJugador.id });
+      if (error) { toast("Error: " + error.message); return; }
+      toast("¡Listo, quedaste inscripto! 🎾");
+      avisarActualizacionEnVivo();
+      renderInscribirme();
+      refrescarDetalleTorneo();
+    };
+  }
+}
+
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
   const { data: t } = await sb.from("torneos").select("*, complejos(nombre)").eq("id", torneoActualId).single();
@@ -333,8 +550,12 @@ async function refrescarDetalleTorneo() {
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").textContent = t.estado;
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${t.categoria} · ${t.fecha_inicio} a ${t.fecha_fin}`;
+  const flyerImg = document.getElementById("dtFlyer");
+  if (t.flyer_url) { flyerImg.src = t.flyer_url; flyerImg.style.display = "block"; }
+  else flyerImg.style.display = "none";
 
-  // canchas del torneo
+  await renderInscribirme();
+
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(nombre, complejo_id)").eq("torneo_id", torneoActualId);
   document.getElementById("dtCanchas").innerHTML = (tc || []).map((c) =>
     `<span class="badge orange" style="margin-right:6px">${c.canchas?.nombre || "?"}</span>`
@@ -344,24 +565,20 @@ async function refrescarDetalleTorneo() {
     return `${c.nombre} (${complejo ? complejo.nombre : "?"})`;
   });
 
-  // inscriptos
-  const { data: insc } = await sb.from("inscripciones").select("*, jugadores(nombre, apellido, puntos_ranking)").eq("torneo_id", torneoActualId);
+  const { data: insc } = await sb.rpc("inscriptos_publicos", { p_torneo_id: torneoActualId });
   document.getElementById("dtInscriptos").innerHTML = (insc || []).map((i) =>
-    `<span class="badge" style="margin-right:6px">${i.jugadores?.nombre} ${i.jugadores?.apellido}</span>`
+    `<span class="badge" style="margin-right:6px">${i.nombre} ${i.apellido}</span>`
   ).join("") || '<p class="empty">Sin inscriptos todavía.</p>';
 
-  // parejas
-  const { data: parejas } = await sb.from("parejas").select("*, j1:jugador1_id(nombre,apellido), j2:jugador2_id(nombre,apellido)").eq("torneo_id", torneoActualId);
+  const { data: parejas } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId });
   document.getElementById("dtParejas").innerHTML = (parejas || []).map((p) =>
-    `<div class="match-meta">🎾 ${p.j1?.nombre} ${p.j1?.apellido} / ${p.j2?.nombre} ${p.j2?.apellido}</div>`
+    `<div class="match-meta">🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre}</div>`
   ).join("") || '<p class="empty">Todavía no hay parejas armadas.</p>';
 
-  // partidos
-  const { data: partidos } = await sb.from("partidos")
-    .select("*, pareja1:pareja1_id(id,jugador1_id,jugador2_id,j1:jugador1_id(nombre,apellido),j2:jugador2_id(nombre,apellido)), pareja2:pareja2_id(id,jugador1_id,jugador2_id,j1:jugador1_id(nombre,apellido),j2:jugador2_id(nombre,apellido)), canchas(nombre)")
-    .eq("torneo_id", torneoActualId)
-    .order("horario");
+  const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId });
   renderPartidos(partidos || [], tc || []);
+
+  if (isAdmin && cacheJugadoresAdmin.length === 0) cargarJugadoresAdmin();
 }
 
 document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", async () => {
@@ -379,6 +596,7 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   const { error } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: jugadorId });
   if (error) { toast("Ese jugador ya está inscripto u ocurrió un error"); return; }
   toast("Jugador inscripto");
+  avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
 
@@ -396,6 +614,7 @@ document.getElementById("btnArmarParejas").addEventListener("click", async () =>
   if (error) { toast("Error: " + error.message); return; }
 
   toast(`Se armaron ${parejas.length} parejas` + (sobrante ? ` (quedó ${sobrante.nombre} sin par)` : ""));
+  avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
 
@@ -437,15 +656,11 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   }
 
   toast(`Se programaron ${partidosGenerados.length} partidos` + (sinHorario.length ? `, ${sinHorario.length} quedaron sin horario común` : ""));
+  avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
 
 // ---------- render de partidos + carga de resultados ----------
-function nombresPareja(p) {
-  if (!p) return "?";
-  return `${p.j1?.nombre || ""} ${p.j1?.apellido || ""} / ${p.j2?.nombre || ""} ${p.j2?.apellido || ""}`;
-}
-
 function renderPartidos(partidos, canchasTorneo) {
   const cont = document.getElementById("dtPartidos");
   cont.innerHTML = "";
@@ -458,11 +673,12 @@ function renderPartidos(partidos, canchasTorneo) {
     div.className = "match-card";
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
-      <div class="match-teams">${nombresPareja(p.pareja1)}</div>
+      <div class="match-teams">${p.pareja1_nombre}</div>
       <div class="match-meta" style="text-align:center">vs</div>
-      <div class="match-teams">${nombresPareja(p.pareja2)}</div>
-      <div class="match-meta">📍 ${p.canchas?.nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span></div>
-      ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : `
+      <div class="match-teams">${p.pareja2_nombre}</div>
+      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span></div>
+      ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
+      ${isAdmin && p.estado !== "jugado" ? `
       <div class="match-actions">
         <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
         <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}">Cargar resultado</button>
@@ -472,7 +688,7 @@ function renderPartidos(partidos, canchasTorneo) {
           ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
         </select>
         <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
-      </div>`}
+      </div>` : ""}
     `;
     cont.appendChild(div);
   });
@@ -496,6 +712,7 @@ function renderPartidos(partidos, canchasTorneo) {
       }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       toast("Resultado cargado, ranking actualizado ✅");
+      avisarActualizacionEnVivo();
       refrescarDetalleTorneo();
       cargarRanking();
     });
@@ -508,56 +725,11 @@ function renderPartidos(partidos, canchasTorneo) {
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       toast("Cancha reasignada");
+      avisarActualizacionEnVivo();
       refrescarDetalleTorneo();
     });
   });
 }
-
-// ============================================================
-// FLYERS
-// ============================================================
-async function cargarFlyers() {
-  const { data } = await sb.from("flyers").select("*").order("created_at", { ascending: false }).limit(20);
-  const grid = document.getElementById("listaFlyers");
-  const mini = document.getElementById("flyerMini");
-  const sidebar = document.getElementById("sidebarFlyer");
-  grid.innerHTML = "";
-  mini.innerHTML = "";
-  if (!data || data.length === 0) {
-    grid.innerHTML = '<p class="empty">Todavía no hay flyers subidos.</p>';
-    if (sidebar) sidebar.innerHTML = '<p class="empty" style="padding:0">Sin torneos próximos.</p>';
-    return;
-  }
-  data.forEach((f) => {
-    const img = `<div><img src="${f.url}" alt="${f.titulo}" /><div class="match-meta">${f.titulo}</div></div>`;
-    grid.innerHTML += img;
-    if (mini.children.length < 4) mini.innerHTML += img;
-  });
-  if (sidebar) {
-    const ultimo = data[0];
-    sidebar.innerHTML = `<img src="${ultimo.url}" alt="${ultimo.titulo}" style="width:100%;border-radius:10px;border:1px solid var(--border)" /><div class="match-meta" style="margin-top:6px">${ultimo.titulo}</div>`;
-  }
-}
-
-document.getElementById("btnSubirFlyer").addEventListener("click", async () => {
-  const titulo = document.getElementById("fTitulo").value.trim();
-  const archivo = document.getElementById("fArchivo").files[0];
-  if (!titulo || !archivo) { toast("Poné un título y elegí una imagen"); return; }
-
-  const path = `${Date.now()}-${archivo.name}`;
-  const { error: upErr } = await sb.storage.from("flyers").upload(path, archivo);
-  if (upErr) { toast("Error subiendo imagen: " + upErr.message); return; }
-
-  const { data: pub } = sb.storage.from("flyers").getPublicUrl(path);
-  const torneoId = document.getElementById("fTorneo").value || null;
-  const { error } = await sb.from("flyers").insert({ titulo, url: pub.publicUrl, torneo_id: torneoId });
-  if (error) { toast("Error: " + error.message); return; }
-
-  toast("Flyer subido");
-  document.getElementById("fTitulo").value = "";
-  document.getElementById("fArchivo").value = "";
-  cargarFlyers();
-});
 
 // ============================================================
 // SPONSORS / PUBLICIDAD
@@ -633,41 +805,45 @@ function mostrarNotificacionLocal(mensaje) {
 }
 
 async function actualizarContadorNotificaciones() {
-  const mi = miJugadorId();
-  if (!mi) return;
-  const { count } = await sb.from("notificaciones").select("*", { count: "exact", head: true }).eq("jugador_id", mi).eq("leido", false);
+  if (!miJugador) { document.getElementById("notifCount").textContent = ""; return; }
+  const { count } = await sb.from("notificaciones").select("*", { count: "exact", head: true }).eq("jugador_id", miJugador.id).eq("leido", false);
   document.getElementById("notifCount").textContent = count ? `(${count})` : "";
 }
 
 document.getElementById("btnNotif").addEventListener("click", async () => {
-  const mi = miJugadorId();
-  if (!mi) { toast("Registrate primero como jugador para recibir notificaciones"); cambiarVista("jugadores"); return; }
-  const { data } = await sb.from("notificaciones").select("*").eq("jugador_id", mi).order("created_at", { ascending: false }).limit(10);
+  if (!miJugador) { toast("Iniciá sesión para ver tus notificaciones"); cambiarVista("perfil"); return; }
+  const { data } = await sb.from("notificaciones").select("*").eq("jugador_id", miJugador.id).order("created_at", { ascending: false }).limit(10);
   if (!data || data.length === 0) { toast("No tenés notificaciones"); return; }
   toast(data[0].mensaje);
-  await sb.from("notificaciones").update({ leido: true }).eq("jugador_id", mi).eq("leido", false);
+  await sb.from("notificaciones").update({ leido: true }).eq("jugador_id", miJugador.id).eq("leido", false);
   actualizarContadorNotificaciones();
 });
 
+let canalNotificaciones = null;
 function suscribirseANotificacionesRealtime() {
-  const mi = miJugadorId();
-  if (!mi) return;
-  sb.channel("notificaciones-" + mi)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "notificaciones", filter: `jugador_id=eq.${mi}` }, (payload) => {
+  if (canalNotificaciones) { sb.removeChannel(canalNotificaciones); canalNotificaciones = null; }
+  if (!miJugador) return;
+  canalNotificaciones = sb.channel("notificaciones-" + miJugador.id)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "notificaciones", filter: `jugador_id=eq.${miJugador.id}` }, (payload) => {
       mostrarNotificacionLocal(payload.new.mensaje);
       actualizarContadorNotificaciones();
     })
     .subscribe();
 }
 
-// ranking en vivo: cualquier cambio en jugadores refresca la tabla
-function suscribirseARankingRealtime() {
-  sb.channel("ranking-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "jugadores" }, () => cargarRanking())
-    .on("postgres_changes", { event: "*", schema: "public", table: "partidos" }, () => {
-      if (torneoActualId) refrescarDetalleTorneo();
-    })
-    .subscribe();
+// Canal de "algo cambió" para que el ranking y el detalle del torneo se
+// actualicen solos en las pantallas de otros usuarios (broadcast liviano,
+// no depende de RLS por fila como los cambios de tabla directos).
+const canalEnVivo = sb.channel("norte-padel-en-vivo");
+canalEnVivo
+  .on("broadcast", { event: "actualizado" }, () => {
+    cargarRanking();
+    if (torneoActualId) refrescarDetalleTorneo();
+  })
+  .subscribe();
+
+function avisarActualizacionEnVivo() {
+  canalEnVivo.send({ type: "broadcast", event: "actualizado", payload: {} });
 }
 
 // ============================================================
@@ -681,9 +857,15 @@ if ("serviceWorker" in navigator) {
 // INIT
 // ============================================================
 async function init() {
-  await Promise.all([cargarComplejos(), cargarJugadores(), cargarTorneos(), cargarFlyers(), cargarSponsors(), cargarRanking()]);
-  suscribirseARankingRealtime();
-  suscribirseANotificacionesRealtime();
-  actualizarContadorNotificaciones();
+  const { data: { session } } = await sb.auth.getSession();
+  await Promise.all([
+    cargarComplejos(),
+    cargarTorneos(),
+    cargarInicio(),
+    cargarJugadorDelMes(),
+    cargarSponsors(),
+    cargarRanking(),
+    manejarCambioSesion(session)
+  ]);
 }
 init();

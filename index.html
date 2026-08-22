@@ -22,26 +22,29 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
     <span id="notifCount"></span>
   </button>
+  <button id="btnAdminPanel" title="Panel de administrador" aria-label="Administración" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.6a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.1.68.3.94.56"/></svg>
+  </button>
+  <button id="btnPerfil" title="Mi perfil" aria-label="Mi perfil">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="8" r="3.3"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg>
+    <span id="perfilNombreCorto"></span>
+  </button>
 </header>
 
 <div class="app-body">
 <main>
 
-  <!-- RANKING -->
-  <section id="view-ranking" class="view active">
-    <div class="card">
-      <h2>Ranking por categoría</h2>
-      <div class="pill-row" id="categoriaPills"></div>
-      <table id="tablaRanking">
-        <thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
+  <!-- INICIO -->
+  <section id="view-inicio" class="view active">
+    <div class="card" id="jugadorDelMesCard" style="display:none">
+      <h3>⭐ Jugador del mes</h3>
+      <div id="jugadorDelMesContenido"></div>
     </div>
 
     <div class="card">
-      <h3>Próximos torneos y flyers</h3>
+      <h2>Próximos torneos</h2>
       <div class="flyer-grid" id="flyerMini"></div>
+      <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </div>
 
     <div class="card" id="sponsorsInlineCard" style="display:none">
@@ -52,7 +55,7 @@
 
   <!-- TORNEOS -->
   <section id="view-torneos" class="view">
-    <div class="card">
+    <div class="card admin-only" id="crearTorneoCard">
       <h2>Crear torneo</h2>
       <label>Nombre</label>
       <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
@@ -88,6 +91,8 @@
           <input id="tPuntos2" type="number" value="60" />
         </div>
       </div>
+      <label>Flyer del torneo (opcional)</label>
+      <input id="tFlyerArchivo" type="file" accept="image/*" />
       <button class="primary" id="btnCrearTorneo">Crear torneo</button>
     </div>
 
@@ -101,51 +106,83 @@
   <section id="view-torneo-detalle" class="view">
     <div class="card">
       <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
-      <h2 id="dtNombre"></h2>
+      <img id="dtFlyer" style="display:none;width:100%;border-radius:12px;margin-top:12px;border:1px solid var(--border)" />
+      <h2 id="dtNombre" style="margin-top:12px"></h2>
       <p class="badge" id="dtEstado"></p>
       <p class="match-meta" id="dtInfo"></p>
     </div>
 
+    <div class="card" id="inscribirseCard">
+      <h3>Anotarme</h3>
+      <p class="match-meta" id="inscripcionEstado"></p>
+      <button class="gradient" id="btnInscribirme">Inscribirme</button>
+      <p class="match-meta" style="margin-top:8px">Vamos a usar los días y horarios que configuraste en tu perfil.</p>
+    </div>
+
     <div class="card">
-      <h3>Canchas asignadas a este torneo</h3>
+      <h3>Canchas</h3>
       <div id="dtCanchas"></div>
-      <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
-      <select id="dtSelectCancha"></select>
-      <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
+      <div class="admin-only">
+        <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
+        <select id="dtSelectCancha"></select>
+        <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
+      </div>
     </div>
 
     <div class="card">
       <h3>Inscriptos</h3>
       <div id="dtInscriptos"></div>
-      <label>Inscribir jugador</label>
-      <select id="dtSelectJugador"></select>
-      <button class="secondary small" id="btnInscribir">Inscribir</button>
+      <div class="admin-only">
+        <label>Inscribir jugador manualmente</label>
+        <select id="dtSelectJugador"></select>
+        <button class="secondary small" id="btnInscribir">Inscribir</button>
+      </div>
     </div>
 
     <div class="card">
       <h3>Parejas</h3>
       <div id="dtParejas"></div>
-      <button class="secondary small" id="btnArmarParejas">Armar parejas automáticamente</button>
+      <button class="secondary small admin-only" id="btnArmarParejas">Armar parejas automáticamente</button>
     </div>
 
     <div class="card">
       <h3>Partidos</h3>
-      <button class="primary" id="btnArmarPartidos">Armar partidos automáticamente</button>
+      <button class="primary admin-only" id="btnArmarPartidos">Armar partidos automáticamente</button>
       <div id="dtPartidos" style="margin-top:12px"></div>
     </div>
   </section>
 
-  <!-- JUGADORES -->
-  <section id="view-jugadores" class="view">
+  <!-- RANKING -->
+  <section id="view-ranking" class="view">
     <div class="card">
-      <h2 id="regTitulo">Registrarme como jugador</h2>
+      <h2>Ranking por categoría</h2>
+      <div class="pill-row" id="categoriaPills"></div>
+      <table id="tablaRanking">
+        <thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
+    </div>
+  </section>
+
+  <!-- MI PERFIL (login / registro / edición) -->
+  <section id="view-perfil" class="view">
+    <div class="card" id="authCard">
+      <h2 id="authTitulo">Ingresar</h2>
+      <label>Email</label>
+      <input id="authEmail" type="email" autocomplete="email" />
+      <label>Contraseña</label>
+      <input id="authPassword" type="password" autocomplete="current-password" />
+      <button class="primary" id="btnLogin">Ingresar</button>
+      <button class="secondary" id="btnSignup" style="margin-top:10px;width:100%">Crear cuenta nueva</button>
+      <p class="match-meta" id="authError"></p>
+    </div>
+
+    <div class="card" id="completarPerfilCard" style="display:none">
+      <h2>Completá tu perfil de jugador</h2>
       <div class="row">
         <div><label>Nombre</label><input id="jNombre" /></div>
         <div><label>Apellido</label><input id="jApellido" /></div>
-      </div>
-      <div class="row">
-        <div><label>Email</label><input id="jEmail" type="email" /></div>
-        <div><label>Teléfono</label><input id="jTelefono" /></div>
       </div>
       <div class="row">
         <div>
@@ -164,6 +201,12 @@
           </datalist>
         </div>
         <div>
+          <label>Teléfono</label>
+          <input id="jTelefono" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
           <label>Lado preferido</label>
           <select id="jLado">
             <option value="indistinto" selected>Indistinto</option>
@@ -171,8 +214,6 @@
             <option value="reves">Revés</option>
           </select>
         </div>
-      </div>
-      <div class="row">
         <div>
           <label>Nivel</label>
           <select id="jNivel">
@@ -181,30 +222,32 @@
             <option value="avanzado">Avanzado</option>
           </select>
         </div>
-        <div></div>
       </div>
 
       <label>¿Qué días y horarios podés jugar?</label>
       <div id="disponibilidadForm"></div>
 
-      <button class="primary" id="btnRegistrarJugador">Guardar</button>
-      <p class="match-meta" id="miPerfilInfo"></p>
+      <button class="primary" id="btnGuardarPerfil">Guardar perfil</button>
     </div>
 
-    <div class="card">
-      <h2>Jugadores registrados</h2>
-      <div id="listaJugadores"></div>
+    <div class="card" id="miPerfilCard" style="display:none">
+      <h2>Mi perfil</h2>
+      <p class="match-meta" id="miPerfilResumen"></p>
+      <button class="secondary small" id="btnEditarPerfil">Editar mis datos y horarios</button>
+      <button class="secondary small danger" id="btnLogout" style="margin-top:10px">Cerrar sesión</button>
     </div>
   </section>
 
-  <!-- COMPLEJOS -->
-  <section id="view-complejos" class="view">
+  <!-- ADMIN -->
+  <section id="view-admin" class="view">
     <div class="card">
       <h2>Nuevo complejo</h2>
       <label>Nombre</label>
       <input id="cNombre" placeholder="Ej: Norte Padel Club" />
       <label>Dirección</label>
       <input id="cDireccion" />
+      <label>¿Cuántas canchas tiene?</label>
+      <input id="cCantidadCanchas" type="number" min="0" value="2" />
       <button class="primary" id="btnCrearComplejo">Crear complejo</button>
     </div>
 
@@ -212,28 +255,19 @@
       <h2>Complejos y canchas</h2>
       <div id="listaComplejos"></div>
     </div>
-  </section>
 
-  <!-- FLYERS -->
-  <section id="view-flyers" class="view">
     <div class="card">
-      <h2>Subir flyer de torneo</h2>
-      <label>Título</label>
-      <input id="fTitulo" placeholder="Ej: Apertura Norte 2026" />
-      <label>Torneo relacionado (opcional)</label>
-      <select id="fTorneo"><option value="">— Ninguno —</option></select>
-      <label>Imagen del flyer</label>
-      <input id="fArchivo" type="file" accept="image/*" />
-      <button class="primary" id="btnSubirFlyer">Subir flyer</button>
-    </div>
-    <div class="card">
-      <h2>Próximos torneos</h2>
-      <div class="flyer-grid" id="listaFlyers"></div>
+      <h2>Jugador del mes</h2>
+      <label>Jugador</label>
+      <select id="jdmSelect"></select>
+      <label>Motivo (opcional)</label>
+      <input id="jdmMotivo" placeholder="Ej: campeón del último torneo" />
+      <button class="secondary small" id="btnDestacarJugador" style="margin-top:10px">Destacar en Inicio</button>
     </div>
 
     <div class="card">
       <h2>Auspiciantes / Publicidad</h2>
-      <p class="match-meta" style="margin-bottom:6px">Los logos aparecen en la portada de Ranking y, en pantallas grandes, en la columna lateral de toda la app.</p>
+      <p class="match-meta" style="margin-bottom:6px">Los logos aparecen en Inicio y, en pantallas grandes, en la columna lateral de toda la app.</p>
       <label>Nombre del auspiciante</label>
       <input id="spNombre" placeholder="Ej: Wilson Padel" />
       <label>Link (opcional, a donde va si tocan el logo)</label>
@@ -241,8 +275,12 @@
       <label>Logo</label>
       <input id="spArchivo" type="file" accept="image/*" />
       <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
-
       <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Jugadores registrados</h2>
+      <div id="listaJugadoresAdmin"></div>
     </div>
   </section>
 
@@ -261,25 +299,17 @@
 </div>
 
 <nav class="tabbar">
-  <button data-view="ranking" class="tab active">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
-    Ranking
+  <button data-view="inicio" class="tab active">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h12v-9"/></svg></span>
+    Inicio
   </button>
   <button data-view="torneos" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>
     Torneos
   </button>
-  <button data-view="jugadores" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c0-3.6 2.9-6.3 6.5-6.3s6.5 2.7 6.5 6.3"/></svg></span>
-    Jugadores
-  </button>
-  <button data-view="complejos" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-6 6.5-11A6.5 6.5 0 0 0 5.5 10c0 5 6.5 11 6.5 11z"/><circle cx="12" cy="10" r="2.2"/></svg></span>
-    Complejos
-  </button>
-  <button data-view="flyers" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="16" height="15" rx="2"/><path d="M4 16l4.5-4.5L12 15l3-3 5 5"/></svg></span>
-    Flyers
+  <button data-view="ranking" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
+    Ranking
   </button>
 </nav>
 

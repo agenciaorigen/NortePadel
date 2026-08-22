@@ -27,6 +27,7 @@ create table if not exists canchas (
 -- ---------- JUGADORES ----------
 create table if not exists jugadores (
   id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique references auth.users(id) on delete cascade,
   nombre text not null,
   apellido text not null,
   email text unique,
@@ -41,8 +42,32 @@ create table if not exists jugadores (
   created_at timestamptz not null default now()
 );
 
--- por si la tabla ya existía de una instalación anterior sin esta columna
+-- por si la tabla ya existía de una instalación anterior sin estas columnas
 alter table jugadores add column if not exists categoria text not null default '6ta';
+alter table jugadores add column if not exists auth_user_id uuid unique references auth.users(id) on delete cascade;
+
+-- ---------- ADMINISTRADORES ----------
+-- Quienes pueden crear torneos, complejos, cargar resultados, etc.
+-- Para convertir a alguien en admin: que primero se registre normal en la app
+-- (Mi perfil > crear cuenta) y después correr, con su email real:
+--   insert into admins (user_id) select id from auth.users where email = 'tu-email@ejemplo.com';
+create table if not exists admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create or replace function is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from admins where user_id = auth.uid());
+$$;
+
+-- ---------- JUGADOR DEL MES ----------
+create table if not exists jugador_del_mes (
+  id uuid primary key default gen_random_uuid(),
+  jugador_id uuid not null references jugadores(id) on delete cascade,
+  motivo text,
+  created_at timestamptz not null default now()
+);
 
 -- ---------- DISPONIBILIDAD HORARIA DEL JUGADOR ----------
 -- dia_semana: 0=domingo ... 6=sábado
@@ -67,8 +92,11 @@ create table if not exists torneos (
   puntos_primero int not null default 100,
   puntos_segundo int not null default 60,
   puntos_participacion int not null default 10,
+  flyer_url text,
   created_at timestamptz not null default now()
 );
+
+alter table torneos add column if not exists flyer_url text;
 
 -- Canchas habilitadas para cada torneo (permite reasignar por clima u otro motivo)
 create table if not exists torneo_canchas (
@@ -245,10 +273,79 @@ where activo = true
 order by categoria, puntos_ranking desc;
 
 -- ============================================================
+-- FUNCIONES PÚBLICAS DE SOLO LECTURA
+-- Corren con permisos elevados (security definer) para poder mostrar
+-- nombres de jugadores en el ranking, planteles y partidos sin exponer
+-- email/teléfono a cualquiera con la clave anon. Así la tabla jugadores
+-- puede quedar bloqueada por RLS y estas funciones son la única forma
+-- de leer datos de jugadores desde afuera.
+-- ============================================================
+create or replace function jugadores_publicos() returns table (
+  id uuid, nombre text, apellido text, categoria text, nivel text,
+  puntos_ranking int, partidos_jugados int, partidos_ganados int
+) language sql stable security definer set search_path = public as $$
+  select id, nombre, apellido, categoria, nivel, puntos_ranking, partidos_jugados, partidos_ganados
+  from jugadores where activo = true;
+$$;
+
+create or replace function inscriptos_publicos(p_torneo_id uuid) returns table (
+  jugador_id uuid, nombre text, apellido text, categoria text
+) language sql stable security definer set search_path = public as $$
+  select j.id, j.nombre, j.apellido, j.categoria
+  from inscripciones i join jugadores j on j.id = i.jugador_id
+  where i.torneo_id = p_torneo_id
+  order by j.apellido;
+$$;
+
+create or replace function parejas_publicas(p_torneo_id uuid) returns table (
+  id uuid, jugador1_id uuid, jugador2_id uuid, jugador1_nombre text, jugador2_nombre text
+) language sql stable security definer set search_path = public as $$
+  select p.id, p.jugador1_id, p.jugador2_id,
+    j1.nombre || ' ' || j1.apellido, j2.nombre || ' ' || j2.apellido
+  from parejas p
+  join jugadores j1 on j1.id = p.jugador1_id
+  join jugadores j2 on j2.id = p.jugador2_id
+  where p.torneo_id = p_torneo_id;
+$$;
+
+create or replace function partidos_publicos(p_torneo_id uuid) returns table (
+  id uuid, ronda text, horario timestamptz, estado text, sets jsonb,
+  cancha_id uuid, cancha_nombre text,
+  pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
+  pareja1_nombre text, pareja2_nombre text
+) language sql stable security definer set search_path = public as $$
+  select pa.id, pa.ronda, pa.horario, pa.estado, pa.sets,
+    pa.cancha_id, c.nombre,
+    pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
+    coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),
+    coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, '?')
+  from partidos pa
+  left join canchas c on c.id = pa.cancha_id
+  left join parejas p1 on p1.id = pa.pareja1_id
+  left join jugadores j1a on j1a.id = p1.jugador1_id
+  left join jugadores j1b on j1b.id = p1.jugador2_id
+  left join parejas p2 on p2.id = pa.pareja2_id
+  left join jugadores j2a on j2a.id = p2.jugador1_id
+  left join jugadores j2b on j2b.id = p2.jugador2_id
+  where pa.torneo_id = p_torneo_id
+  order by pa.horario nulls last;
+$$;
+
+create or replace function jugador_del_mes_publico() returns table (
+  jugador_id uuid, nombre text, apellido text, categoria text, motivo text, created_at timestamptz
+) language sql stable security definer set search_path = public as $$
+  select j.id, j.nombre, j.apellido, j.categoria, m.motivo, m.created_at
+  from jugador_del_mes m join jugadores j on j.id = m.jugador_id
+  order by m.created_at desc limit 1;
+$$;
+
+-- ============================================================
 -- ROW LEVEL SECURITY
--- MVP: lectura pública para toda la app (ranking, flyers, torneos, etc.)
--- Escritura pública controlada a nivel de app (sin login de admin todavía).
--- Podés endurecer esto más adelante agregando Supabase Auth para el organizador.
+-- Lectura de listados públicos (ranking, torneos, complejos, sponsors)
+-- abierta para toda la app. La escritura (crear torneos/complejos,
+-- cargar resultados, subir flyers/sponsors) queda reservada a quienes
+-- estén en la tabla "admins". Cada jugador solo puede crear/editar su
+-- propia fila y su propia disponibilidad/inscripción.
 -- ============================================================
 alter table complejos enable row level security;
 alter table canchas enable row level security;
@@ -261,25 +358,114 @@ alter table inscripciones enable row level security;
 alter table partidos enable row level security;
 alter table flyers enable row level security;
 alter table sponsors enable row level security;
+alter table jugador_del_mes enable row level security;
 alter table push_subscriptions enable row level security;
 alter table notificaciones enable row level security;
+alter table admins enable row level security;
 
-do $$
-declare
-  tbl text;
-begin
-  foreach tbl in array array['complejos','canchas','jugadores','disponibilidad','torneos','torneo_canchas','parejas','inscripciones','partidos','flyers','sponsors','push_subscriptions','notificaciones']
-  loop
-    execute format('drop policy if exists "public_select" on %I', tbl);
-    execute format('create policy "public_select" on %I for select using (true)', tbl);
-    execute format('drop policy if exists "public_insert" on %I', tbl);
-    execute format('create policy "public_insert" on %I for insert with check (true)', tbl);
-    execute format('drop policy if exists "public_update" on %I', tbl);
-    execute format('create policy "public_update" on %I for update using (true) with check (true)', tbl);
-    execute format('drop policy if exists "public_delete" on %I', tbl);
-    execute format('create policy "public_delete" on %I for delete using (true)', tbl);
-  end loop;
-end $$;
+-- complejos / canchas: lectura pública, escritura solo admin
+drop policy if exists "complejos_select" on complejos;
+create policy "complejos_select" on complejos for select using (true);
+drop policy if exists "complejos_write" on complejos;
+create policy "complejos_write" on complejos for all using (is_admin()) with check (is_admin());
+
+drop policy if exists "canchas_select" on canchas;
+create policy "canchas_select" on canchas for select using (true);
+drop policy if exists "canchas_write" on canchas;
+create policy "canchas_write" on canchas for all using (is_admin()) with check (is_admin());
+
+-- jugadores: cada uno ve/edita su propia fila; admin ve/edita todas.
+-- Para mostrar nombres en público se usan las funciones *_publicos() de arriba.
+drop policy if exists "jugadores_select" on jugadores;
+create policy "jugadores_select" on jugadores for select using (auth_user_id = auth.uid() or is_admin());
+drop policy if exists "jugadores_insert" on jugadores;
+create policy "jugadores_insert" on jugadores for insert with check (auth_user_id = auth.uid() or is_admin());
+drop policy if exists "jugadores_update" on jugadores;
+create policy "jugadores_update" on jugadores for update using (auth_user_id = auth.uid() or is_admin()) with check (auth_user_id = auth.uid() or is_admin());
+drop policy if exists "jugadores_delete" on jugadores;
+create policy "jugadores_delete" on jugadores for delete using (is_admin());
+
+-- disponibilidad: dueño del perfil o admin
+drop policy if exists "disponibilidad_all" on disponibilidad;
+create policy "disponibilidad_all" on disponibilidad for all
+  using (exists (select 1 from jugadores j where j.id = disponibilidad.jugador_id and (j.auth_user_id = auth.uid() or is_admin())))
+  with check (exists (select 1 from jugadores j where j.id = disponibilidad.jugador_id and (j.auth_user_id = auth.uid() or is_admin())));
+
+-- torneos: lectura pública, escritura solo admin
+drop policy if exists "torneos_select" on torneos;
+create policy "torneos_select" on torneos for select using (true);
+drop policy if exists "torneos_write" on torneos;
+create policy "torneos_write" on torneos for all using (is_admin()) with check (is_admin());
+
+-- torneo_canchas: lectura pública (qué cancha juega cada torneo), escritura admin
+drop policy if exists "torneo_canchas_admin" on torneo_canchas;
+drop policy if exists "torneo_canchas_select" on torneo_canchas;
+create policy "torneo_canchas_select" on torneo_canchas for select using (true);
+drop policy if exists "torneo_canchas_insert" on torneo_canchas;
+create policy "torneo_canchas_insert" on torneo_canchas for insert with check (is_admin());
+drop policy if exists "torneo_canchas_update" on torneo_canchas;
+create policy "torneo_canchas_update" on torneo_canchas for update using (is_admin()) with check (is_admin());
+drop policy if exists "torneo_canchas_delete" on torneo_canchas;
+create policy "torneo_canchas_delete" on torneo_canchas for delete using (is_admin());
+
+-- parejas, partidos: herramientas de armado, solo admin
+-- (los datos públicos de partidos/parejas se muestran vía las funciones *_publicos())
+drop policy if exists "parejas_admin" on parejas;
+create policy "parejas_admin" on parejas for all using (is_admin()) with check (is_admin());
+drop policy if exists "partidos_admin" on partidos;
+create policy "partidos_admin" on partidos for all using (is_admin()) with check (is_admin());
+
+-- inscripciones: cada jugador ve/crea/borra la suya, admin todas
+drop policy if exists "inscripciones_select" on inscripciones;
+create policy "inscripciones_select" on inscripciones for select using (
+  is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "inscripciones_insert" on inscripciones;
+create policy "inscripciones_insert" on inscripciones for insert with check (
+  is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "inscripciones_delete" on inscripciones;
+create policy "inscripciones_delete" on inscripciones for delete using (
+  is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
+);
+
+-- flyers (legacy), sponsors, jugador_del_mes: lectura pública, escritura admin
+drop policy if exists "flyers_select" on flyers;
+create policy "flyers_select" on flyers for select using (true);
+drop policy if exists "flyers_write" on flyers;
+create policy "flyers_write" on flyers for all using (is_admin()) with check (is_admin());
+
+drop policy if exists "sponsors_select" on sponsors;
+create policy "sponsors_select" on sponsors for select using (true);
+drop policy if exists "sponsors_write" on sponsors;
+create policy "sponsors_write" on sponsors for all using (is_admin()) with check (is_admin());
+
+drop policy if exists "jugador_del_mes_select" on jugador_del_mes;
+create policy "jugador_del_mes_select" on jugador_del_mes for select using (true);
+drop policy if exists "jugador_del_mes_write" on jugador_del_mes;
+create policy "jugador_del_mes_write" on jugador_del_mes for all using (is_admin()) with check (is_admin());
+
+-- push_subscriptions, notificaciones: privadas del dueño (o admin)
+drop policy if exists "push_subscriptions_all" on push_subscriptions;
+create policy "push_subscriptions_all" on push_subscriptions for all
+  using (is_admin() or exists (select 1 from jugadores j where j.id = push_subscriptions.jugador_id and j.auth_user_id = auth.uid()))
+  with check (is_admin() or exists (select 1 from jugadores j where j.id = push_subscriptions.jugador_id and j.auth_user_id = auth.uid()));
+
+drop policy if exists "notificaciones_select" on notificaciones;
+create policy "notificaciones_select" on notificaciones for select using (
+  is_admin() or exists (select 1 from jugadores j where j.id = notificaciones.jugador_id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "notificaciones_update" on notificaciones;
+create policy "notificaciones_update" on notificaciones for update using (
+  is_admin() or exists (select 1 from jugadores j where j.id = notificaciones.jugador_id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "notificaciones_insert" on notificaciones;
+create policy "notificaciones_insert" on notificaciones for insert with check (is_admin());
+
+-- admins: cada usuario solo puede consultar si ÉL es admin (no se puede
+-- listar a los demás admins ni auto-asignarse el rol desde la app)
+drop policy if exists "admins_select_own" on admins;
+create policy "admins_select_own" on admins for select using (user_id = auth.uid());
 
 -- ============================================================
 -- STORAGE: bucket público para flyers
@@ -294,8 +480,9 @@ create policy "flyers_public_read" on storage.objects
   for select using (bucket_id = 'flyers');
 
 drop policy if exists "flyers_public_write" on storage.objects;
-create policy "flyers_public_write" on storage.objects
-  for insert with check (bucket_id = 'flyers');
+drop policy if exists "flyers_admin_write" on storage.objects;
+create policy "flyers_admin_write" on storage.objects
+  for insert with check (bucket_id = 'flyers' and public.is_admin());
 
 -- ============================================================
 -- STORAGE: bucket público para logos de sponsors/publicidad
@@ -309,5 +496,6 @@ create policy "sponsors_public_read" on storage.objects
   for select using (bucket_id = 'sponsors');
 
 drop policy if exists "sponsors_public_write" on storage.objects;
-create policy "sponsors_public_write" on storage.objects
-  for insert with check (bucket_id = 'sponsors');
+drop policy if exists "sponsors_admin_write" on storage.objects;
+create policy "sponsors_admin_write" on storage.objects
+  for insert with check (bucket_id = 'sponsors' and public.is_admin());

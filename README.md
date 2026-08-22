@@ -1,17 +1,18 @@
 # Norte Padel — App instalable (PWA)
 
-App para tu organización de torneos: ranking automático, registro de jugadores con horarios, armado automático de partidos, carga de resultados en vivo, complejos/canchas reasignables y flyers de torneos.
+App para tu organización de torneos: ranking automático por categoría, jugadores que se registran e inscriben solos, armado automático de partidos, resultados en vivo, complejos/canchas reasignables, flyers, jugador del mes y espacio de sponsors.
 
-Está hecha en HTML/CSS/JS puro (sin frameworks) + [Supabase](https://supabase.com) como base de datos en la nube. Así cualquier jugador que entra ve el mismo ranking y los mismos partidos en tiempo real, desde cualquier celular.
+Está hecha en HTML/CSS/JS puro (sin frameworks) + [Supabase](https://supabase.com) como base de datos y sistema de login en la nube. Así cualquier jugador que entra ve el mismo ranking y los mismos partidos en tiempo real, desde cualquier celular o computadora.
 
 ## 1. Crear el backend (10 minutos, gratis)
 
 1. Andá a [supabase.com](https://supabase.com), creá una cuenta gratis y un proyecto nuevo (elegí una región cercana, ej: São Paulo).
-2. Cuando el proyecto esté listo, andá a **SQL Editor > New query**, pegá **todo** el contenido del archivo `schema.sql` y ejecutalo. Esto crea todas las tablas, el ranking automático y el bucket de flyers.
-3. Andá a **Project Settings > API** y copiá:
+2. Cuando el proyecto esté listo, andá a **SQL Editor > New query**, pegá **todo** el contenido del archivo `schema.sql` y ejecutalo. Esto crea todas las tablas, el ranking automático, las reglas de seguridad y los buckets de flyers/sponsors.
+3. Andá a **Authentication > Providers > Email** y **desactivá "Confirm email"**. Así, cuando alguien crea una cuenta, entra directo sin tener que ir a confirmar por correo (podés reactivarlo más adelante si configurás un proveedor de email propio).
+4. Andá a **Project Settings > API** y copiá:
    - **Project URL**
    - **anon public key**
-4. Abrí el archivo `config.js` y pegalos ahí:
+5. Abrí el archivo `config.js` y pegalos ahí:
    ```js
    const SUPABASE_URL = "https://xxxxx.supabase.co";
    const SUPABASE_ANON_KEY = "eyJhbGciOi...";
@@ -25,40 +26,54 @@ Un PWA necesita HTTPS para poder instalarse y funcionar offline. La forma más s
 2. Te da una URL tipo `https://norte-padel.netlify.app`. Compartísela a los jugadores.
 3. Cualquiera que la abra desde el celular va a ver la opción **"Agregar a pantalla de inicio" / "Instalar app"** en el navegador (Chrome/Safari), y les queda como una app más.
 
-## 3. Cómo se usa
+## 3. Convertirte en administrador
 
-- **Complejos**: cargá primero tus complejos y, dentro de cada uno, sus canchas.
-- **Jugadores**: cada jugador se registra solo desde el celular (nombre, nivel, y en qué días/horarios puede jugar). Los datos quedan guardados en ese dispositivo para identificarlo (sin contraseña, pensado para un grupo cerrado de confianza).
-- **Torneos**: creás el torneo, elegís el complejo sede (sus canchas quedan habilitadas automáticamente) e inscribís jugadores.
-  - **"Armar parejas automáticamente"**: empareja jugadores por nivel de ranking.
-  - **"Armar partidos automáticamente"**: cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron) y asigna una cancha libre, evitando choques.
-  - Si cambia el clima o hay que mover un partido, desde el detalle del torneo podés **agregar otra cancha** (de otro complejo incluso) y **reasignar** cualquier partido con dos clics.
-- **Resultados en vivo**: durante el torneo, cargás el resultado (ej: `6-3,6-4`) y automáticamente:
-  - se define el ganador,
-  - se suman los puntos de ranking configurados para ese torneo,
-  - el ranking general se actualiza al instante para todos los que tengan la app abierta.
-- **Flyers**: subís la imagen del próximo torneo y aparece en la pestaña Flyers y en la portada del ranking.
-- **Notificaciones**: al registrarte, la app pide permiso de notificaciones del navegador. Cuando te asignan un horario de partido o se carga un resultado en el que jugaste, te llega un aviso mientras tenés la app abierta o instalada (funciona incluso con la pantalla apagada en Android si la instalaste). Esto es notificación "en vivo" vía conexión en tiempo real con la base de datos.
+Recién instalada, nadie es administrador todavía (ni siquiera vos) — es a propósito, para que nadie pueda auto-asignarse el rol desde la app. Para activarte:
 
-## 4. Notificaciones push reales (opcional, paso extra)
+1. Abrí la app y andá a **Mi perfil > Crear cuenta nueva** con tu email y una contraseña.
+2. En Supabase, andá a **SQL Editor** y corré (cambiando el email por el que usaste):
+   ```sql
+   insert into admins (user_id)
+   select id from auth.users where email = 'tu-email@ejemplo.com';
+   ```
+3. Volvé a la app y refrescá la página. Ahora vas a ver el ícono de engranaje ⚙️ en el encabezado: ese es tu panel de administrador.
 
-Lo de arriba funciona apenas la app está instalada/abierta reciente. Si además querés que llegue la notificación **aunque el celular tenga la app cerrada hace rato** (push real, como WhatsApp), hace falta un paso más avanzado: generar claves VAPID y crear una Supabase Edge Function que dispare el push cuando se inserta una fila en `notificaciones`. Si querés, te lo puedo armar en una segunda vuelta — requiere que tengas el proyecto de Supabase ya funcionando.
+Repetí el paso 2 con el email de cualquier otra persona que también organice torneos con vos.
 
-## 5. Seguridad — importante
+## 4. Cómo funciona para cada rol
 
-Para que el MVP funcione simple y rápido, la base de datos quedó con permisos abiertos de lectura/escritura (cualquiera con el link puede cargar datos), pensado para el grupo cerrado de tu organización. Si más adelante querés separar "jugador" de "organizador" (por ejemplo, que solo vos puedas crear torneos o mover partidos), se puede agregar login con contraseña de Supabase Auth y ajustar las políticas de seguridad (RLS) para que cada rol solo pueda hacer lo que corresponde. Avisame cuando lo necesites y lo sumamos.
+**Administradores** (el ícono ⚙️ en el encabezado):
+- Crean los **complejos**, con nombre, dirección y cuántas canchas tiene (las crea automáticamente con ese número; después podés agregar más una por una si hace falta).
+- Crean los **torneos** (desde la pestaña Torneos, ahí aparece el formulario) eligiendo el complejo sede, categoría, fechas y puntos — y pueden subir el flyer ahí mismo, que aparece automáticamente en Inicio.
+- Desde el detalle de un torneo: agregan/cambian canchas (por clima u otro motivo), inscriben jugadores manualmente si hace falta, arman las parejas y los partidos con un clic, cargan resultados y reasignan canchas.
+- Eligen al **jugador del mes** desde el panel de administrador.
+- Suben los logos de **auspiciantes/publicidad**.
+
+**Jugadores**: se registran ellos mismos (Mi perfil > Crear cuenta), completan su categoría, nivel y en qué días/horarios pueden jugar, y desde ahí ya está — para anotarse a un torneo entran a la pestaña Torneos, tocan el que quieren y tocan **"Inscribirme"**. Un solo toque: la app ya sabe con qué horarios cuentan porque los cargaron en su perfil. Pueden editar sus datos y horarios cuando quieran desde Mi perfil.
+
+## 5. El resto de las funciones
+
+- **Ranking por categoría**: en la pestaña Ranking, con pastillas para elegir la categoría (6ta, 5ta, Damas, etc.). Se actualiza solo al cargar cada resultado, incluso en las pantallas de otros jugadores en vivo.
+- **Armado automático**: "Armar parejas" empareja por nivel de ranking; "Armar partidos" cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron en su perfil) y asigna una cancha libre, evitando choques.
+- **Inicio**: muestra los flyers de los próximos torneos y, si hay uno cargado, el jugador del mes.
+- **Notificaciones**: cuando a alguien le asignan un horario de partido o se carga un resultado en el que jugó, le llega un aviso mientras tiene la app abierta o instalada. Push real con la app cerrada del todo (como WhatsApp) es un paso extra — avisame si lo querés y lo sumamos con claves VAPID y una Supabase Edge Function.
+- **Publicidad**: los logos de sponsors aparecen en Inicio y, en pantallas grandes, en una columna fija al costado de toda la app.
+
+## 6. Seguridad
+
+La base de datos quedó con permisos por rol de verdad (no solo ocultos en la interfaz): un jugador solo puede crear o editar su propia fila y su propia inscripción; crear torneos, complejos, cargar resultados o subir flyers/sponsors requiere estar en la tabla `admins`. Los emails y teléfonos de los jugadores no son visibles públicamente — el ranking y las listas públicas se arman con funciones que exponen solo nombre, categoría y puntos.
 
 ## Estructura de archivos
 
 ```
 norte-padel/
 ├── index.html      → estructura de la app
-├── style.css        → estilos (tema oscuro, mobile-first)
-├── app.js            → lógica: ranking, jugadores, torneos, partidos, flyers, notificaciones
+├── style.css        → estilos (tema oscuro, mobile-first + escritorio)
+├── app.js            → lógica: auth, ranking, torneos, partidos, admin, notificaciones
 ├── matching.js       → algoritmo de armado automático de parejas/partidos/horarios
 ├── config.js         → tus claves de Supabase (completar)
 ├── manifest.json      → metadata de instalación como app
 ├── sw.js               → service worker (offline + push)
-├── schema.sql          → script para crear toda la base de datos en Supabase
+├── schema.sql          → script para crear toda la base de datos, roles y seguridad en Supabase
 └── icons/               → íconos de la app
 ```
