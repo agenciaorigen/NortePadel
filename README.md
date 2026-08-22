@@ -71,10 +71,15 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 - **Foto de perfil**: cada jugador puede subir su propia foto desde "Mi perfil". Aparece en su avatar, en la tarjeta de "Jugador del mes" y en "Campeones" (Inicio). "Campeones" se arma solo: en cuanto se carga el resultado de una Final, la pareja ganadora aparece ahí, sin que el admin tenga que cargar nada aparte.
 - **Categorías separadas por género**: "6ta Damas" y "6ta Caballeros" son categorías distintas (con jugadores y ranking propios), no se mezclan.
 - **Cuentas importadas del ranking histórico**: los jugadores del circuito 2026 que ya tenían puntos antes de la app se importaron con una cuenta y clave provisoria (ver carpeta `norte-padel-import`). La primera vez que entran, la app los frena con una pantalla obligatoria para elegir su propia contraseña antes de poder usar el resto de la app.
+- **Perfil público de cada jugador**: tocando a cualquier jugador (en el Ranking, en "Jugador/a del mes" o en el nombre de un campeón en "Campeones") se abre su perfil con su foto más grande, su categoría, sus puntos, partidos jugados/ganados, efectividad, y la lista completa de los torneos que ganó (con quién los ganó y la fecha).
 
 ## 6. Seguridad
 
 La base de datos quedó con permisos por rol de verdad (no solo ocultos en la interfaz): un jugador solo puede crear o editar su propia fila y su propia inscripción; crear torneos, complejos, cargar resultados o subir flyers/sponsors requiere estar en la tabla `admins`. Los emails y teléfonos de los jugadores no son visibles públicamente — el ranking y las listas públicas se arman con funciones que exponen solo nombre, categoría y puntos. La categoría oficial (`categoria`) tampoco la puede cambiar un jugador directo aunque manipule la app: hay una regla en la base de datos que revierte cualquier intento y solo la deja pasar si la cambia un administrador. El panel de administrador (pestaña de configuración ⚙️) solo se ve y se puede abrir si estás en la tabla `admins` — para cualquier otra persona, ni el botón aparece.
+
+## 7. Velocidad
+
+La base de datos tiene índices en todas las columnas por las que se filtra seguido (categoría, torneo, jugador, estado del partido, etc.) — sin esto, cada pantalla iba a ir recorriendo la tabla entera a medida que crezca la cantidad de jugadores y partidos, en vez de ir directo a lo que necesita. En la app se sacaron pedidos duplicados que se estaban haciendo de más en cada carga (la pantalla "En vivo" y los datos de la sesión se estaban pidiendo dos veces sin darse cuenta) y se juntaron en uno solo los pedidos que no dependían entre sí, para no esperar a que termine uno para recién arrancar el otro. Las fotos que están más abajo en la pantalla (sponsors, próximos torneos, avatares del ranking) se cargan solas recién cuando el jugador llega a esa parte, para no tener que bajar todas las fotos de una si nunca las llega a ver.
 
 ## Estructura de archivos
 

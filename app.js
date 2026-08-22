@@ -284,9 +284,11 @@ async function manejarCambioSesion(session) {
   isAdmin = false;
 
   if (currentUser) {
-    const { data: perfil } = await sb.from("jugadores").select("*").eq("auth_user_id", currentUser.id).maybeSingle();
+    const [{ data: perfil }, { data: adminRow }] = await Promise.all([
+      sb.from("jugadores").select("*").eq("auth_user_id", currentUser.id).maybeSingle(),
+      sb.from("admins").select("user_id").eq("user_id", currentUser.id).maybeSingle()
+    ]);
     miJugador = perfil || null;
-    const { data: adminRow } = await sb.from("admins").select("user_id").eq("user_id", currentUser.id).maybeSingle();
     isAdmin = !!adminRow;
   }
 
@@ -381,9 +383,49 @@ async function cargarRanking() {
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", () => abrirPerfilJugador(j.id));
     tbody.appendChild(tr);
   });
 }
+
+// ============================================================
+// PERFIL PÚBLICO DE JUGADOR (foto grande, stats, torneos ganados)
+// ============================================================
+let vistaAntesDePerfilJugador = "ranking";
+async function abrirPerfilJugador(jugadorId) {
+  const vistaActual = document.querySelector(".view.active");
+  if (vistaActual && vistaActual.id !== "view-perfil-jugador") {
+    vistaAntesDePerfilJugador = vistaActual.id.replace("view-", "");
+  }
+  cambiarVista("perfil-jugador");
+
+  const [{ data: jugadores }, { data: torneosGanados }] = await Promise.all([
+    sb.rpc("jugadores_publicos"),
+    sb.rpc("torneos_ganados_publico", { p_jugador_id: jugadorId })
+  ]);
+  const j = (jugadores || []).find((x) => x.id === jugadorId);
+  if (!j) { toast("No se encontró el jugador"); cambiarVista(vistaAntesDePerfilJugador); return; }
+
+  document.getElementById("pjFoto").innerHTML = avatarHtml(j.foto_url, 96);
+  document.getElementById("pjNombre").textContent = `${j.nombre} ${j.apellido}`;
+  document.getElementById("pjCategoria").textContent = j.categoria;
+  document.getElementById("pjPuntos").textContent = j.puntos_ranking;
+  document.getElementById("pjJugados").textContent = j.partidos_jugados;
+  document.getElementById("pjGanados").textContent = j.partidos_ganados;
+  document.getElementById("pjEfectividad").textContent =
+    j.partidos_jugados > 0 ? Math.round((j.partidos_ganados / j.partidos_jugados) * 100) + "%" : "—";
+
+  const cont = document.getElementById("pjTorneosGanados");
+  cont.innerHTML = (torneosGanados || []).length > 0
+    ? torneosGanados.map((t) => `
+      <div class="pj-torneo-item">
+        <div><strong>🏆 ${t.torneo_nombre}</strong><div class="match-meta">con ${t.companero_nombre} ${t.companero_apellido}${t.categoria ? " · " + t.categoria : ""}</div></div>
+        <span class="match-meta">${t.fecha || ""}</span>
+      </div>`).join("")
+    : '<p class="empty">Todavía no ganó ningún torneo.</p>';
+}
+document.getElementById("btnVolverPerfilJugador").addEventListener("click", () => cambiarVista(vistaAntesDePerfilJugador));
 
 // ============================================================
 // INICIO: próximos torneos con flyer + jugador del mes
@@ -420,7 +462,7 @@ async function cargarInicio() {
 
   resto.forEach((t) => {
     const div = document.createElement("div");
-    div.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" style="cursor:pointer" /><div class="match-meta">${t.nombre}</div>`;
+    div.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" loading="lazy" style="cursor:pointer" /><div class="match-meta">${t.nombre}</div>`;
     div.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
     grid.appendChild(div);
   });
@@ -434,7 +476,7 @@ async function cargarInicio() {
 function avatarHtml(fotoUrl, size) {
   const s = size || 44;
   return fotoUrl
-    ? `<img class="avatar" src="${fotoUrl}" alt="" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
+    ? `<img class="avatar" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
     : `<div class="avatar avatar-placeholder" style="width:${s}px;height:${s}px">🎾</div>`;
 }
 
@@ -456,9 +498,9 @@ async function cargarJugadorDelMes() {
           </div>
         </div>`;
     }
-    const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}')"` : "";
+    const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}');cursor:pointer"` : `style="cursor:pointer"`;
     return `
-      <div class="destacado-card" ${fondo}>
+      <div class="destacado-card" data-jugador-id="${row.jugador_id}" ${fondo}>
         <div class="destacado-tag">⭐ ${TAG_DESTACADO[genero]}</div>
         <div class="destacado-stat">
           <strong>${row.puntos_ranking}</strong>
@@ -470,6 +512,10 @@ async function cargarJugadorDelMes() {
         </div>
       </div>`;
   }).join("");
+
+  document.querySelectorAll("#jugadorDelMesContenido .destacado-card[data-jugador-id]").forEach((card) => {
+    card.addEventListener("click", () => abrirPerfilJugador(card.dataset.jugadorId));
+  });
 }
 
 async function cargarHeroPosicion() {
@@ -493,10 +539,17 @@ async function cargarCampeones() {
   document.getElementById("campeonesContenido").innerHTML = data.map((c) => `
     <div class="campeon-card">
       <div class="campeon-avatares">${avatarHtml(c.jugador1_foto, 48)}${avatarHtml(c.jugador2_foto, 48)}</div>
-      <div class="campeon-nombres">${c.jugador1_nombre} ${c.jugador1_apellido} / ${c.jugador2_nombre} ${c.jugador2_apellido}</div>
+      <div class="campeon-nombres">
+        <span class="campeon-nombre-link" data-jugador-id="${c.jugador1_id}">${c.jugador1_nombre} ${c.jugador1_apellido}</span> /
+        <span class="campeon-nombre-link" data-jugador-id="${c.jugador2_id}">${c.jugador2_nombre} ${c.jugador2_apellido}</span>
+      </div>
       <div class="campeon-torneo">🏆 ${c.torneo_nombre}</div>
     </div>
   `).join("");
+
+  document.querySelectorAll("#campeonesContenido .campeon-nombre-link").forEach((el) => {
+    el.addEventListener("click", () => abrirPerfilJugador(el.dataset.jugadorId));
+  });
 }
 
 // ============================================================
@@ -514,10 +567,14 @@ async function cargarEnVivo() {
   if (enCurso) {
     let miPartidoHtml = "";
     if (miJugador) {
-      const { data: parejas } = await sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id });
+      // ninguno de los dos depende del otro (los dos solo necesitan enCurso.id):
+      // se piden juntos en vez de uno después del otro para no esperar el doble
+      const [{ data: parejas }, { data: partidos }] = await Promise.all([
+        sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id }),
+        sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id })
+      ]);
       const miPareja = (parejas || []).find((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
       if (miPareja) {
-        const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id });
         const miPartido = (partidos || []).find((p) => p.pareja1_id === miPareja.id || p.pareja2_id === miPareja.id);
         if (miPartido) {
           const horario = miPartido.horario ? new Date(miPartido.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "a definir";
@@ -1255,12 +1312,20 @@ function renderPartidosLista(partidos, canchasTorneo) {
       const input = document.querySelector(`.setInput[data-p="${partidoId}"]`);
       const texto = input.value.trim();
       if (!texto) { toast("Cargá el resultado, ej: 6-3,6-4"); return; }
+      // valida el formato antes de mandarlo: si alguien tipea algo raro (ej "6:3" o
+      // deja una coma de más) no queremos guardar un resultado inventado sin darnos cuenta
+      if (!/^\d+-\d+(,\d+-\d+)*$/.test(texto)) {
+        toast("Formato de resultado inválido. Ejemplo: 6-3,6-4"); return;
+      }
       const sets = texto.split(",").map((s) => {
         const [a, b] = s.trim().split("-").map(Number);
         return { p1: a, p2: b };
       });
       const setsGanadosP1 = sets.filter((s) => s.p1 > s.p2).length;
       const setsGanadosP2 = sets.filter((s) => s.p2 > s.p1).length;
+      if (setsGanadosP1 === setsGanadosP2) {
+        toast("El resultado tiene que tener un ganador (no puede empatar en sets)"); return;
+      }
       const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
       const ronda = document.querySelector(`.selectRonda[data-p="${partidoId}"]`).value;
 
@@ -1293,7 +1358,7 @@ function renderPartidosLista(partidos, canchasTorneo) {
 // SPONSORS / PUBLICIDAD
 // ============================================================
 function renderSponsorItem(s, caption) {
-  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${s.nombre.replace(/'/g, "\\'")}'}))" />` +
+  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${s.nombre.replace(/'/g, "\\'")}'}))" />` +
     (caption ? `<span class="sponsor-caption">${caption}</span>` : "");
   return s.link_url
     ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}">${contenido}</a>`
@@ -1437,8 +1502,11 @@ if ("serviceWorker" in navigator) {
 // ============================================================
 // INIT
 // ============================================================
+// nota de velocidad: no hace falta pedir la sesión ni llamar a manejarCambioSesion()
+// acá — sb.auth.onAuthStateChange() ya se dispara solo, una vez, apenas se suscribe
+// (con la sesión que haya en ese momento), y manejarCambioSesion() ya llama a
+// cargarEnVivo(); pedirla de nuevo acá solo duplicaba esas llamadas en cada carga.
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
   await Promise.all([cargarCategorias(), cargarTorneos()]);
   await Promise.all([
     cargarComplejos(),
@@ -1447,9 +1515,7 @@ async function init() {
     cargarCampeones(),
     cargarSponsors(),
     cargarRanking(),
-    cargarEnVivo(),
-    cargarPuntosRonda(),
-    manejarCambioSesion(session)
+    cargarPuntosRonda()
   ]);
 }
 init();

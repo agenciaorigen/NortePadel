@@ -256,6 +256,36 @@ insert into puntos_ronda (ronda, puntos) values
 on conflict (ronda) do nothing;
 
 -- ============================================================
+-- ÍNDICES (velocidad)
+-- Postgres indexa automáticamente las primary key y las columnas unique,
+-- pero NO las foreign key ni las columnas por las que se filtra seguido
+-- (categoría, estado, etc.) — sin esto, cada pantalla hace una recorrida
+-- completa de la tabla a medida que crece la cantidad de jugadores/partidos.
+-- ============================================================
+create index if not exists idx_canchas_complejo on canchas(complejo_id);
+create index if not exists idx_jugadores_categoria on jugadores(categoria);
+create index if not exists idx_jugadores_activo on jugadores(activo);
+create index if not exists idx_jugador_del_mes_jugador on jugador_del_mes(jugador_id);
+create index if not exists idx_disponibilidad_jugador on disponibilidad(jugador_id);
+create index if not exists idx_torneos_complejo on torneos(complejo_id);
+create index if not exists idx_torneo_canchas_torneo on torneo_canchas(torneo_id);
+create index if not exists idx_torneo_categorias_torneo on torneo_categorias(torneo_id);
+create index if not exists idx_parejas_torneo on parejas(torneo_id);
+create index if not exists idx_parejas_jugador1 on parejas(jugador1_id);
+create index if not exists idx_parejas_jugador2 on parejas(jugador2_id);
+create index if not exists idx_inscripciones_torneo on inscripciones(torneo_id);
+create index if not exists idx_inscripciones_jugador on inscripciones(jugador_id);
+create index if not exists idx_partidos_torneo on partidos(torneo_id);
+create index if not exists idx_partidos_pareja1 on partidos(pareja1_id);
+create index if not exists idx_partidos_pareja2 on partidos(pareja2_id);
+create index if not exists idx_partidos_ganador_pareja on partidos(ganador_pareja_id);
+create index if not exists idx_partidos_estado on partidos(estado);
+create index if not exists idx_flyers_torneo on flyers(torneo_id);
+create index if not exists idx_sponsors_torneo on sponsors(torneo_id);
+create index if not exists idx_push_subscriptions_jugador on push_subscriptions(jugador_id);
+create index if not exists idx_notificaciones_jugador on notificaciones(jugador_id);
+
+-- ============================================================
 -- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
 -- ============================================================
 create or replace function actualizar_ranking() returns trigger as $$
@@ -488,12 +518,12 @@ $$;
 drop function if exists campeones_publico();
 create or replace function campeones_publico() returns table (
   torneo_id uuid, torneo_nombre text, fecha date,
-  jugador1_nombre text, jugador1_apellido text, jugador1_foto text,
-  jugador2_nombre text, jugador2_apellido text, jugador2_foto text
+  jugador1_id uuid, jugador1_nombre text, jugador1_apellido text, jugador1_foto text,
+  jugador2_id uuid, jugador2_nombre text, jugador2_apellido text, jugador2_foto text
 ) language sql stable security definer set search_path = public as $$
   select t.id, t.nombre, coalesce(t.fecha_fin, t.fecha_inicio),
-    j1.nombre, j1.apellido, j1.foto_url,
-    j2.nombre, j2.apellido, j2.foto_url
+    j1.id, j1.nombre, j1.apellido, j1.foto_url,
+    j2.id, j2.nombre, j2.apellido, j2.foto_url
   from partidos pt
   join torneos t on t.id = pt.torneo_id
   join parejas p on p.id = pt.ganador_pareja_id
@@ -502,6 +532,25 @@ create or replace function campeones_publico() returns table (
   where pt.ronda = 'Final' and pt.estado = 'jugado' and pt.ganador_pareja_id is not null
   order by coalesce(t.fecha_fin, t.fecha_inicio) desc
   limit 8;
+$$;
+
+-- todos los torneos que ganó un jugador puntual (para su perfil público, sin el límite de 8 de arriba)
+drop function if exists torneos_ganados_publico(uuid);
+create or replace function torneos_ganados_publico(p_jugador_id uuid) returns table (
+  torneo_id uuid, torneo_nombre text, fecha date, categoria text,
+  companero_nombre text, companero_apellido text
+) language sql stable security definer set search_path = public as $$
+  select t.id, t.nombre, coalesce(t.fecha_fin, t.fecha_inicio), t.categoria,
+    case when p.jugador1_id = p_jugador_id then j2.nombre else j1.nombre end,
+    case when p.jugador1_id = p_jugador_id then j2.apellido else j1.apellido end
+  from partidos pt
+  join torneos t on t.id = pt.torneo_id
+  join parejas p on p.id = pt.ganador_pareja_id
+  join jugadores j1 on j1.id = p.jugador1_id
+  join jugadores j2 on j2.id = p.jugador2_id
+  where pt.ronda = 'Final' and pt.estado = 'jugado' and pt.ganador_pareja_id is not null
+    and (p.jugador1_id = p_jugador_id or p.jugador2_id = p_jugador_id)
+  order by coalesce(t.fecha_fin, t.fecha_inicio) desc;
 $$;
 
 -- ============================================================
