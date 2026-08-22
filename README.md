@@ -87,5 +87,9 @@ norte-padel/
 ├── manifest.json      → metadata de instalación como app
 ├── sw.js               → service worker (offline + push)
 ├── schema.sql          → script para crear toda la base de datos, roles y seguridad en Supabase
+├── hero-cancha.jpg      → foto de fondo del encabezado de Inicio
+├── energia-pelota.jpg    → foto de fondo de la banda "Sentí la verdadera energía del pádel"
 └── icons/               → íconos de la app
 ```
+
+> Subí TODOS estos archivos sueltos al mismo nivel (no los metas en subcarpetas nuevas) — si al arrastrar la carpeta a GitHub o Netlify alguna herramienta no respeta las subcarpetas, es más seguro tener todo plano como está acá.

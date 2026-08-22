@@ -192,7 +192,7 @@ tr:first-child td { font-weight: 700; }
   background:
     linear-gradient(0deg, rgba(5,7,10,.9), rgba(5,7,10,.35) 60%),
     radial-gradient(120% 100% at 15% -10%, rgba(180,255,57,.28), transparent 55%),
-    url('fotos/hero-cancha.jpg') center/cover no-repeat,
+    url('hero-cancha.jpg') center/cover no-repeat,
     #05070a;
   border: 1px solid var(--border);
 }
@@ -269,7 +269,7 @@ tr:first-child td { font-weight: 700; }
   border-radius: 16px;
   overflow: hidden;
   margin-bottom: 16px;
-  background: url('fotos/energia-pelota.jpg') center/cover no-repeat;
+  background: url('energia-pelota.jpg') center/cover no-repeat;
   display: flex; align-items: center; justify-content: center;
   text-align: center;
   padding: 32px 20px;
