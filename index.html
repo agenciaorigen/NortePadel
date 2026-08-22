@@ -242,6 +242,7 @@
         <div>
           <label>Categoría</label>
           <select id="jCategoria"></select>
+          <p class="match-meta" id="categoriaPendienteNotice" style="display:none"></p>
         </div>
         <div>
           <label>Teléfono</label>
@@ -295,6 +296,12 @@
         <input id="catNueva" placeholder="Ej: Suma12" />
         <button class="secondary small" id="btnAgregarCategoria">Agregar</button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Solicitudes de categoría</h2>
+      <p class="match-meta" style="margin-bottom:6px">Jugadores que pidieron cambiar de categoría. Al aprobar, pasan a jugar (y sumar puntos) en la nueva.</p>
+      <div id="listaSolicitudesCategoria"></div>
     </div>
 
     <div class="card">
