@@ -18,10 +18,27 @@
 
 body {
   margin: 0;
+  position: relative;
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   padding-bottom: 70px;
+}
+/* fondo de toda la app: la foto de la cancha, difuminada y bien oscurecida (en vez del negro/azul liso) */
+body::before {
+  content: "";
+  position: fixed; inset: -12px;
+  background: url('destacados-fondo.jpg') center/cover no-repeat;
+  filter: blur(6px) brightness(.32) saturate(1.05);
+  transform: scale(1.08);
+  z-index: -2;
+}
+body::after {
+  content: "";
+  position: fixed; inset: 0;
+  background: var(--bg);
+  opacity: .55;
+  z-index: -1;
 }
 
 h1, h2, h3, button { font-family: "Poppins", "Inter", -apple-system, sans-serif; }
@@ -288,7 +305,7 @@ tr:first-child td { font-weight: 700; }
 }
 .energia-texto p { font-size: 13px; color: #dfe4ee; margin: 0; }
 
-/* ---------- Banda de "Jugadores del mes" (foto de cancha difuminada de fondo) ---------- */
+/* ---------- Banda de "Jugadores del mes" (deja ver el fondo general de la app) ---------- */
 .destacados-band {
   position: relative;
   border-radius: 20px;
@@ -296,19 +313,7 @@ tr:first-child td { font-weight: 700; }
   padding: 16px 14px 18px;
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  background: #05070a;
-}
-.destacados-band::before {
-  content: "";
-  position: absolute; inset: -12px;
-  background: url('destacados-fondo.jpg') center/cover no-repeat;
-  filter: blur(6px) brightness(.55) saturate(1.1);
-  transform: scale(1.08);
-}
-.destacados-band::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(5,7,10,.55), rgba(5,7,10,.8));
+  background: rgba(10,13,18,.5);
 }
 .destacados-overline {
   position: relative; z-index: 1;
