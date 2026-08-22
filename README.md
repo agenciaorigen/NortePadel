@@ -8,6 +8,8 @@ Está hecha en HTML/CSS/JS puro (sin frameworks) + [Supabase](https://supabase.c
 
 1. Andá a [supabase.com](https://supabase.com), creá una cuenta gratis y un proyecto nuevo (elegí una región cercana, ej: São Paulo).
 2. Cuando el proyecto esté listo, andá a **SQL Editor > New query**, pegá **todo** el contenido del archivo `schema.sql` y ejecutalo. Esto crea todas las tablas, el ranking automático, las reglas de seguridad y los buckets de flyers/sponsors.
+
+   > Si ya habías corrido una versión anterior de `schema.sql`, volvé a pegar y ejecutar el archivo completo igual: es seguro correrlo de nuevo (no borra datos existentes) y así sumás las funciones nuevas, como la de anotarse con pareja.
 3. Andá a **Authentication > Providers > Email** y **desactivá "Confirm email"**. Así, cuando alguien crea una cuenta, entra directo sin tener que ir a confirmar por correo (podés reactivarlo más adelante si configurás un proveedor de email propio).
 4. Andá a **Project Settings > API** y copiá:
    - **Project URL**
@@ -49,14 +51,15 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 - Eligen al **jugador del mes** desde el panel de administrador.
 - Suben los logos de **auspiciantes/publicidad**.
 
-**Jugadores**: se registran ellos mismos (Mi perfil > Crear cuenta), completan su categoría, nivel y en qué días/horarios pueden jugar, y desde ahí ya está — para anotarse a un torneo entran a la pestaña Torneos, tocan el que quieren y tocan **"Inscribirme"**. Un solo toque: la app ya sabe con qué horarios cuentan porque los cargaron en su perfil. Pueden editar sus datos y horarios cuando quieran desde Mi perfil.
+**Jugadores**: se registran ellos mismos (Mi perfil > Crear cuenta), completan su categoría, nivel y en qué días/horarios pueden jugar, y desde ahí ya está. Para anotarse a un torneo entran a la pestaña Torneos, tocan el que quieren y primero ven **quiénes ya se anotaron**. Ahí mismo pueden tocar **"Inscribirme"**: si van a jugar con alguien, buscan su nombre (aparece mientras escriben) y los anota a los **dos juntos** de una sola vez, incluso si su pareja todavía no había entrado a la app — le queda una notificación avisándole que ya está anotada. Si van solos, con tocar el botón alcanza. La app ya sabe con qué horarios cuentan porque los cargaron en su perfil. Pueden editar sus datos y horarios cuando quieran desde Mi perfil.
 
 ## 5. El resto de las funciones
 
+- **En vivo** (nueva pestaña, con un punto que titila cuando hay torneo en curso): si no hay ningún torneo corriendo en este momento, muestra fecha y sede del próximo. Si hay uno en curso, muestra el estado "EN VIVO" y, a cada jugador logueado, su propio horario y cancha asignados apenas están cargados (o un aviso de que todavía no le tocó). Desde ahí el administrador entra directo a cargar resultados a medida que se van jugando los partidos, y esos resultados impactan al toque en el ranking de todos.
 - **Ranking por categoría**: en la pestaña Ranking, con pastillas para elegir la categoría (6ta, 5ta, Damas, etc.). Se actualiza solo al cargar cada resultado, incluso en las pantallas de otros jugadores en vivo.
-- **Armado automático**: "Armar parejas" empareja por nivel de ranking; "Armar partidos" cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron en su perfil) y asigna una cancha libre, evitando choques.
+- **Armado automático**: "Armar parejas" empareja por nivel de ranking a quienes no eligieron pareja propia; "Armar partidos" cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron en su perfil) y asigna una cancha libre, evitando choques.
 - **Inicio**: muestra los flyers de los próximos torneos y, si hay uno cargado, el jugador del mes.
-- **Notificaciones**: cuando a alguien le asignan un horario de partido o se carga un resultado en el que jugó, le llega un aviso mientras tiene la app abierta o instalada. Push real con la app cerrada del todo (como WhatsApp) es un paso extra — avisame si lo querés y lo sumamos con claves VAPID y una Supabase Edge Function.
+- **Notificaciones**: cuando a alguien le asignan un horario de partido, se carga un resultado en el que jugó, o una pareja lo anota a un torneo, le llega un aviso mientras tiene la app abierta o instalada. Push real con la app cerrada del todo (como WhatsApp) es un paso extra — avisame si lo querés y lo sumamos con claves VAPID y una Supabase Edge Function.
 - **Publicidad**: los logos de sponsors aparecen en Inicio y, en pantallas grandes, en una columna fija al costado de toda la app.
 
 ## 6. Seguridad

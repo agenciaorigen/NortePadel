@@ -53,6 +53,13 @@
     </div>
   </section>
 
+  <!-- EN VIVO -->
+  <section id="view-envivo" class="view">
+    <div class="card" id="enVivoCard">
+      <div id="enVivoContenido"></div>
+    </div>
+  </section>
+
   <!-- TORNEOS -->
   <section id="view-torneos" class="view">
     <div class="card admin-only" id="crearTorneoCard">
@@ -112,10 +119,26 @@
       <p class="match-meta" id="dtInfo"></p>
     </div>
 
+    <div class="card">
+      <h3>Quiénes se anotaron</h3>
+      <div id="dtInscriptos"></div>
+      <div class="admin-only">
+        <label>Inscribir jugador manualmente</label>
+        <select id="dtSelectJugador"></select>
+        <button class="secondary small" id="btnInscribir">Inscribir</button>
+      </div>
+    </div>
+
     <div class="card" id="inscribirseCard">
       <h3>Anotarme</h3>
       <p class="match-meta" id="inscripcionEstado"></p>
-      <button class="gradient" id="btnInscribirme">Inscribirme</button>
+      <div id="buscarParejaWrap">
+        <label>¿Con quién vas a jugar? (buscala/lo y anotamos a los dos)</label>
+        <input id="buscarPareja" placeholder="Escribí el nombre de tu pareja" autocomplete="off" />
+        <div id="sugerenciasPareja" class="suggest-list"></div>
+        <p class="match-meta" id="parejaSeleccionadaTxt"></p>
+      </div>
+      <button class="gradient" id="btnInscribirme" style="margin-top:12px">Inscribirme</button>
       <p class="match-meta" style="margin-top:8px">Vamos a usar los días y horarios que configuraste en tu perfil.</p>
     </div>
 
@@ -126,16 +149,6 @@
         <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
         <select id="dtSelectCancha"></select>
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Inscriptos</h3>
-      <div id="dtInscriptos"></div>
-      <div class="admin-only">
-        <label>Inscribir jugador manualmente</label>
-        <select id="dtSelectJugador"></select>
-        <button class="secondary small" id="btnInscribir">Inscribir</button>
       </div>
     </div>
 
@@ -302,6 +315,13 @@
   <button data-view="inicio" class="tab active">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h12v-9"/></svg></span>
     Inicio
+  </button>
+  <button data-view="envivo" class="tab">
+    <span class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 8.8a5.7 5.7 0 0 0 0 6.4"/><path d="M16.2 8.8a5.7 5.7 0 0 1 0 6.4"/><path d="M4.8 5.8a10 10 0 0 0 0 12.4"/><path d="M19.2 5.8a10 10 0 0 1 0 12.4"/></svg>
+      <span id="enVivoDot" style="display:none"></span>
+    </span>
+    En vivo
   </button>
   <button data-view="torneos" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>

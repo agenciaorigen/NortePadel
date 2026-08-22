@@ -227,6 +227,7 @@ async function manejarCambioSesion(session) {
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
   if (isAdmin) cargarJugadoresAdmin();
+  cargarEnVivo();
   if (torneoActualId) refrescarDetalleTorneo();
 }
 sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
@@ -329,6 +330,64 @@ async function cargarJugadorDelMes() {
   `;
 }
 
+// ============================================================
+// EN VIVO: torneo actual (o el próximo) + mi partido asignado
+// ============================================================
+async function cargarEnVivo() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { data: torneos } = await sb.from("torneos").select("*, complejos(nombre, direccion)").order("fecha_inicio");
+  const enCurso = (torneos || []).find((t) => t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy);
+  const proximo = (torneos || []).filter((t) => t.fecha_inicio > hoy).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
+
+  document.getElementById("enVivoDot").style.display = enCurso ? "block" : "none";
+  const cont = document.getElementById("enVivoContenido");
+
+  if (enCurso) {
+    let miPartidoHtml = "";
+    if (miJugador) {
+      const { data: parejas } = await sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id });
+      const miPareja = (parejas || []).find((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
+      if (miPareja) {
+        const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id });
+        const miPartido = (partidos || []).find((p) => p.pareja1_id === miPareja.id || p.pareja2_id === miPareja.id);
+        if (miPartido) {
+          const horario = miPartido.horario ? new Date(miPartido.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "a definir";
+          const rival = miPartido.pareja1_id === miPareja.id ? miPartido.pareja2_nombre : miPartido.pareja1_nombre;
+          miPartidoHtml = `<div class="match-card" style="border-color:var(--accent);margin-top:14px">
+            <h3 style="color:var(--accent);margin-bottom:6px">Tu partido</h3>
+            <div class="match-meta">🕒 ${horario} · 📍 ${miPartido.cancha_nombre || "cancha a definir"}</div>
+            <div class="match-meta">vs ${rival}</div>
+            <span class="badge" style="margin-top:6px;display:inline-block">${miPartido.estado}</span>
+          </div>`;
+        } else {
+          miPartidoHtml = `<p class="match-meta" style="margin-top:12px">Todavía no tenés un horario asignado en este torneo.</p>`;
+        }
+      } else {
+        miPartidoHtml = `<p class="match-meta" style="margin-top:12px">Todavía no estás anotado en este torneo. Andá a Torneos para inscribirte.</p>`;
+      }
+    }
+    cont.innerHTML = `
+      <span class="badge live"><span class="live-dot"></span>EN VIVO</span>
+      <h2 style="margin-top:10px">${enCurso.nombre}</h2>
+      <p class="match-meta">${enCurso.complejos?.nombre || "sin complejo"} · ${enCurso.fecha_inicio} a ${enCurso.fecha_fin}</p>
+      ${miPartidoHtml}
+      <button class="gradient" id="btnVerTorneoEnVivo" style="margin-top:14px">Ver partidos y resultados</button>
+    `;
+    document.getElementById("btnVerTorneoEnVivo").addEventListener("click", () => abrirTorneo(enCurso.id));
+  } else if (proximo) {
+    const direccion = proximo.complejos?.direccion ? ` (${proximo.complejos.direccion})` : "";
+    cont.innerHTML = `
+      <p class="match-meta">No hay ningún torneo en curso ahora mismo.</p>
+      <h2 style="margin-top:10px">Próximo: ${proximo.nombre}</h2>
+      <p class="match-meta">📅 ${proximo.fecha_inicio} · 📍 ${proximo.complejos?.nombre || "a confirmar"}${direccion}</p>
+      <button class="secondary small" id="btnVerProximo" style="margin-top:12px">Ver torneo</button>
+    `;
+    document.getElementById("btnVerProximo").addEventListener("click", () => abrirTorneo(proximo.id));
+  } else {
+    cont.innerHTML = '<p class="empty">Todavía no hay torneos programados.</p>';
+  }
+}
+
 document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
   const jugadorId = document.getElementById("jdmSelect").value;
   if (!jugadorId) { toast("Elegí un jugador"); return; }
@@ -429,6 +488,11 @@ async function cargarJugadoresAdmin() {
 // ============================================================
 // TORNEOS
 // ============================================================
+function estaEnVivo(t) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  return t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy;
+}
+
 async function cargarTorneos() {
   const { data } = await sb.from("torneos").select("*, complejos(nombre)").order("fecha_inicio", { ascending: false });
   const cont = document.getElementById("listaTorneos");
@@ -441,8 +505,9 @@ async function cargarTorneos() {
     const div = document.createElement("div");
     div.className = "match-card";
     div.style.cursor = "pointer";
+    const badge = estaEnVivo(t) ? `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>` : `<span class="badge">${t.estado}</span>`;
     div.innerHTML = `
-      <div class="match-teams">${t.nombre} <span class="badge">${t.estado}</span></div>
+      <div class="match-teams">${t.nombre} ${badge}</div>
       <div class="match-meta">${t.complejos?.nombre || "sin complejo"} · ${t.categoria} · desde ${t.fecha_inicio}</div>
     `;
     div.addEventListener("click", () => abrirTorneo(t.id));
@@ -502,12 +567,43 @@ async function abrirTorneo(id) {
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
 
+// ---------- buscador de pareja al inscribirse ----------
+let parejaSeleccionada = null;
+let jugadoresParaBuscar = [];
+
+document.getElementById("buscarPareja").addEventListener("input", (e) => {
+  parejaSeleccionada = null;
+  document.getElementById("parejaSeleccionadaTxt").textContent = "";
+  const q = e.target.value.trim().toLowerCase();
+  const sugerencias = document.getElementById("sugerenciasPareja");
+  if (!q) { sugerencias.innerHTML = ""; return; }
+
+  const candidatos = jugadoresParaBuscar.filter((j) =>
+    j.id !== miJugador?.id && `${j.nombre} ${j.apellido}`.toLowerCase().includes(q)
+  ).slice(0, 6);
+
+  sugerencias.innerHTML = candidatos.length > 0
+    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${j.nombre} ${j.apellido} <span class="badge" style="margin-left:6px">${j.categoria}</span></button>`).join("")
+    : '<div class="suggest-item" style="color:var(--muted);cursor:default">Sin resultados</div>';
+
+  sugerencias.querySelectorAll(".suggest-item[data-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      parejaSeleccionada = candidatos.find((c) => c.id === btn.dataset.id);
+      document.getElementById("buscarPareja").value = `${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido}`;
+      document.getElementById("parejaSeleccionadaTxt").textContent = `✓ Vas a jugar con ${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido}`;
+      sugerencias.innerHTML = "";
+    });
+  });
+});
+
 async function renderInscribirme() {
   const estado = document.getElementById("inscripcionEstado");
   const btn = document.getElementById("btnInscribirme");
+  const buscarWrap = document.getElementById("buscarParejaWrap");
 
   if (!currentUser) {
     estado.textContent = "Iniciá sesión para poder inscribirte.";
+    buscarWrap.style.display = "none";
     btn.textContent = "Iniciar sesión";
     btn.disabled = false;
     btn.onclick = () => cambiarVista("perfil");
@@ -515,26 +611,38 @@ async function renderInscribirme() {
   }
   if (!miJugador) {
     estado.textContent = "Completá tu perfil de jugador antes de inscribirte.";
+    buscarWrap.style.display = "none";
     btn.textContent = "Completar perfil";
     btn.disabled = false;
     btn.onclick = () => cambiarVista("perfil");
     return;
   }
 
+  const { data: jp } = await sb.rpc("jugadores_publicos");
+  jugadoresParaBuscar = jp || [];
+
   const { data } = await sb.from("inscripciones").select("id").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle();
   if (data) {
     estado.textContent = "✅ Ya estás inscripto en este torneo.";
+    buscarWrap.style.display = "none";
     btn.textContent = "Ya estás anotado";
     btn.disabled = true;
     btn.onclick = null;
   } else {
     estado.textContent = "";
+    buscarWrap.style.display = "block";
     btn.textContent = "Inscribirme";
     btn.disabled = false;
     btn.onclick = async () => {
-      const { error } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: miJugador.id });
+      const { error } = await sb.rpc("inscribirse_con_pareja", {
+        p_torneo_id: torneoActualId,
+        p_pareja_jugador_id: parejaSeleccionada ? parejaSeleccionada.id : null
+      });
       if (error) { toast("Error: " + error.message); return; }
-      toast("¡Listo, quedaste inscripto! 🎾");
+      toast(parejaSeleccionada ? "¡Listo, se anotaron los dos! 🎾" : "¡Listo, quedaste inscripto! 🎾");
+      parejaSeleccionada = null;
+      document.getElementById("buscarPareja").value = "";
+      document.getElementById("parejaSeleccionadaTxt").textContent = "";
       avisarActualizacionEnVivo();
       renderInscribirme();
       refrescarDetalleTorneo();
@@ -600,11 +708,13 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   refrescarDetalleTorneo();
 });
 
-// ---------- armar parejas automático ----------
+// ---------- armar parejas automático (solo con los que todavía no tienen pareja) ----------
 document.getElementById("btnArmarParejas").addEventListener("click", async () => {
   const { data: insc } = await sb.from("inscripciones").select("jugadores(*)").eq("torneo_id", torneoActualId);
-  const jugadoresInscritos = (insc || []).map((i) => i.jugadores).filter(Boolean);
-  if (jugadoresInscritos.length < 2) { toast("Necesitás al menos 2 jugadores inscriptos"); return; }
+  const { data: parejasExistentes } = await sb.from("parejas").select("jugador1_id, jugador2_id").eq("torneo_id", torneoActualId);
+  const yaEmparejados = new Set((parejasExistentes || []).flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+  const jugadoresInscritos = (insc || []).map((i) => i.jugadores).filter(Boolean).filter((j) => !yaEmparejados.has(j.id));
+  if (jugadoresInscritos.length < 2) { toast("No quedan jugadores sin pareja para emparejar"); return; }
 
   const { parejas, sobrante } = armarParejasAutomatico(jugadoresInscritos);
   if (parejas.length === 0) { toast("No se pudieron armar parejas"); return; }
@@ -838,6 +948,7 @@ const canalEnVivo = sb.channel("norte-padel-en-vivo");
 canalEnVivo
   .on("broadcast", { event: "actualizado" }, () => {
     cargarRanking();
+    cargarEnVivo();
     if (torneoActualId) refrescarDetalleTorneo();
   })
   .subscribe();
@@ -865,6 +976,7 @@ async function init() {
     cargarJugadorDelMes(),
     cargarSponsors(),
     cargarRanking(),
+    cargarEnVivo(),
     manejarCambioSesion(session)
   ]);
 }

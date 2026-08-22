@@ -187,6 +187,47 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 }
 #jugadorDelMesCard h3 { color: #ff8fc7; }
 
+/* ---------- Buscador de pareja ---------- */
+.suggest-list { position: relative; }
+.suggest-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #0a0e16;
+  border: 1px solid var(--border);
+  border-top: none;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.suggest-item:first-child { border-top: 1px solid var(--border); border-radius: 0 0 0 0; margin-top: -1px; }
+.suggest-item:hover { background: #111827; }
+.suggest-item:last-child { border-radius: 0 0 10px 10px; }
+
+/* ---------- En vivo ---------- */
+.badge.live {
+  background: rgba(255,45,149,.16);
+  color: #ff6fb8;
+  border: 1px solid rgba(255,45,149,.4);
+}
+.live-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #ff2d95; margin-right: 6px;
+  animation: pulse-live 1.4s infinite;
+}
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,45,149,.5); }
+  50% { opacity: .6; box-shadow: 0 0 0 5px rgba(255,45,149,0); }
+}
+nav.tabbar .icon { position: relative; }
+#enVivoDot {
+  position: absolute; top: -2px; right: -4px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ff2d95;
+  animation: pulse-live 1.4s infinite;
+}
+
 .day-picker {
   display: grid;
   grid-template-columns: 84px 1fr 12px 1fr;

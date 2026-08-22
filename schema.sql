@@ -331,6 +331,47 @@ create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   order by pa.horario nulls last;
 $$;
 
+-- ============================================================
+-- INSCRIBIRSE (solo o invitando a una pareja) — función controlada
+-- Permite que un jugador se anote a sí mismo y, si busca a otro jugador
+-- ya registrado, anote a los dos juntos y arme la pareja automáticamente.
+-- ============================================================
+create or replace function inscribirse_con_pareja(p_torneo_id uuid, p_pareja_jugador_id uuid default null)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_mi_id uuid;
+begin
+  select id into v_mi_id from jugadores where auth_user_id = auth.uid();
+  if v_mi_id is null then
+    raise exception 'Completá tu perfil de jugador antes de inscribirte';
+  end if;
+
+  insert into inscripciones (torneo_id, jugador_id)
+  values (p_torneo_id, v_mi_id)
+  on conflict (torneo_id, jugador_id) do nothing;
+
+  if p_pareja_jugador_id is not null and p_pareja_jugador_id <> v_mi_id then
+    insert into inscripciones (torneo_id, jugador_id)
+    values (p_torneo_id, p_pareja_jugador_id)
+    on conflict (torneo_id, jugador_id) do nothing;
+
+    -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
+    if not exists (
+      select 1 from parejas
+      where torneo_id = p_torneo_id
+        and (jugador1_id in (v_mi_id, p_pareja_jugador_id) or jugador2_id in (v_mi_id, p_pareja_jugador_id))
+    ) then
+      insert into parejas (torneo_id, jugador1_id, jugador2_id) values (p_torneo_id, v_mi_id, p_pareja_jugador_id);
+    end if;
+
+    insert into notificaciones (jugador_id, mensaje)
+    select p_pareja_jugador_id,
+      (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te anotó como su pareja en un torneo. ¡Ya quedaste inscripto!';
+  end if;
+end;
+$$;
+
 create or replace function jugador_del_mes_publico() returns table (
   jugador_id uuid, nombre text, apellido text, categoria text, motivo text, created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
