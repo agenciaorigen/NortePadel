@@ -349,14 +349,14 @@ order by categoria, puntos_ranking desc;
 -- puede quedar bloqueada por RLS y estas funciones son la única forma
 -- de leer datos de jugadores desde afuera.
 -- ============================================================
--- si existía de una versión anterior con puntos_ranking como int, hay que tirarla:
--- Postgres no deja cambiarle el tipo de columna de salida a una función con "or replace"
+-- si existía de una versión anterior con otras columnas de salida, hay que tirarla:
+-- Postgres no deja cambiarle la firma a una función con "or replace"
 drop function if exists jugadores_publicos();
 create or replace function jugadores_publicos() returns table (
-  id uuid, nombre text, apellido text, categoria text, nivel text,
+  id uuid, nombre text, apellido text, categoria text, nivel text, foto_url text,
   puntos_ranking numeric(10,1), partidos_jugados int, partidos_ganados int
 ) language sql stable security definer set search_path = public as $$
-  select id, nombre, apellido, categoria, nivel, puntos_ranking, partidos_jugados, partidos_ganados
+  select id, nombre, apellido, categoria, nivel, foto_url, puntos_ranking, partidos_jugados, partidos_ganados
   from jugadores where activo = true;
 $$;
 

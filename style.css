@@ -193,6 +193,14 @@ tr:first-child td { font-weight: 700; }
 .campeon-nombres { font-size: 12px; font-weight: 600; line-height: 1.3; }
 .campeon-torneo { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
+/* ---------- Categorías agrupadas por género (perfil, crear torneo, admin) ---------- */
+.categorias-genero-grupo { margin-bottom: 10px; }
+.categorias-genero-grupo h4 {
+  font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; margin: 0 0 6px;
+}
+.categorias-genero-grupo .check-grid { margin: 0 0 4px; }
+
 /* ---------- Vista calendario (canchas × horarios) ---------- */
 .tabla-calendario { font-size: 12px; white-space: nowrap; }
 .tabla-calendario th, .tabla-calendario td { padding: 6px; vertical-align: top; }
@@ -420,15 +428,28 @@ nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
   main { padding: 0; max-width: none; margin: 0; }
 
   #sidebarAds {
-    display: block;
+    display: flex;
+    flex-direction: column;
     position: sticky;
     top: 90px;
+    /* alto atado al viewport (no al contenido de main, que puede ser muy largo) */
+    height: calc(100vh - 110px);
   }
 
   /* la columna de escritorio tiene mucho más aire que la tira horizontal de mobile:
      los logos de sponsors aprovechan el ancho en vez de quedar chicos con margen de sobra */
   .sponsor-strip img { height: 84px; max-width: 100%; }
   .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { padding: 16px; }
+
+  /* si hay pocos sponsors cargados, que ocupen todo el alto libre de la columna
+     en vez de quedar arriba con espacio vacío abajo */
+  #sidebarSponsorsCard { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #sidebarSponsorsCard .sponsor-strip.vertical { flex: 1; justify-content: center; gap: 22px; }
+  #sidebarSponsorsCard .sponsor-strip.vertical a,
+  #sidebarSponsorsCard .sponsor-strip.vertical span.sponsor-item {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+  }
+  #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 240px; }
 
   /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
   #listaJugadores, #listaComplejos, #listaTorneos, #dtPartidos {

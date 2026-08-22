@@ -46,6 +46,20 @@ document.querySelectorAll(".tab").forEach((btn) => {
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnAdminPanel").addEventListener("click", () => cambiarVista("admin"));
 
+// agrupa categorías tipo "6ta Damas" / "6ta Caballeros" por género; lo que no matchea
+// (categorías genéricas viejas, sin género) cae en "Otras" para no perderlas de vista
+function generoDeCategoria(nombre) {
+  if (nombre.endsWith(" Damas")) return "Damas";
+  if (nombre.endsWith(" Caballeros")) return "Caballeros";
+  return "Otras";
+}
+function agruparPorGenero(categorias) {
+  const grupos = { Damas: [], Caballeros: [], Otras: [] };
+  categorias.forEach((c) => grupos[generoDeCategoria(typeof c === "string" ? c : c.nombre)].push(c));
+  return grupos;
+}
+const ORDEN_GENEROS = ["Damas", "Caballeros", "Otras"];
+
 function llenarSelect(select, items, labelFn, valueFn) {
   if (!select) return;
   const valorPrevio = select.value;
@@ -282,41 +296,71 @@ sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
 // ============================================================
 // RANKING (segmentado por categoría, vía función pública)
 // ============================================================
+let rankingMostrarTodos = false;
+let generoRankingActual = localStorage.getItem("np_genero_ranking") || null;
 async function cargarRanking() {
   const { data } = await sb.rpc("jugadores_publicos");
   const todos = data || [];
   const categorias = [...new Set(todos.map((j) => j.categoria).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
 
+  const contGenero = document.getElementById("generoRankingPills");
   const cont = document.getElementById("categoriaPills");
   if (categorias.length === 0) {
+    contGenero.innerHTML = "";
     cont.innerHTML = "";
     document.querySelector("#tablaRanking tbody").innerHTML = "";
     document.getElementById("rankingVacio").style.display = "block";
     return;
   }
-  if (!categoriaRankingActual || !categorias.includes(categoriaRankingActual)) {
-    categoriaRankingActual = categorias[0];
+
+  // primer nivel: Damas / Caballeros (solo los géneros que efectivamente tienen categorías)
+  const grupos = agruparPorGenero(categorias);
+  const generosConDatos = ORDEN_GENEROS.filter((g) => grupos[g].length > 0);
+  if (!generoRankingActual || !generosConDatos.includes(generoRankingActual)) {
+    generoRankingActual = generosConDatos[0];
+  }
+  contGenero.innerHTML = generosConDatos.length > 1 ? generosConDatos.map((g) =>
+    `<button class="pill ${g === generoRankingActual ? "active" : ""}" data-genero="${g}">${g}</button>`
+  ).join("") : "";
+  contGenero.querySelectorAll(".pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      generoRankingActual = btn.dataset.genero;
+      localStorage.setItem("np_genero_ranking", generoRankingActual);
+      categoriaRankingActual = null; // que elija la primera categoría de ese género
+      rankingMostrarTodos = false;
+      cargarRanking();
+    });
+  });
+
+  // segundo nivel: categorías del género elegido
+  const categoriasDelGenero = grupos[generoRankingActual];
+  if (!categoriaRankingActual || !categoriasDelGenero.includes(categoriaRankingActual)) {
+    categoriaRankingActual = categoriasDelGenero[0];
   }
 
-  cont.innerHTML = categorias.map((c) =>
+  cont.innerHTML = categoriasDelGenero.map((c) =>
     `<button class="pill ${c === categoriaRankingActual ? "active" : ""}" data-categoria="${c}">${c}</button>`
   ).join("");
   cont.querySelectorAll(".pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       categoriaRankingActual = btn.dataset.categoria;
       localStorage.setItem("np_categoria_ranking", categoriaRankingActual);
+      rankingMostrarTodos = false;
       cargarRanking();
     });
   });
 
-  const data2 = todos.filter((j) => j.categoria === categoriaRankingActual)
+  const completa = todos.filter((j) => j.categoria === categoriaRankingActual)
     .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
+  const TOP = 10;
+  const data2 = rankingMostrarTodos ? completa : completa.slice(0, TOP);
 
   const tbody = document.querySelector("#tablaRanking tbody");
   tbody.innerHTML = "";
   if (data2.length === 0) {
     document.getElementById("rankingVacio").style.display = "block";
+    document.getElementById("btnVerRankingCompleto").style.display = "none";
     return;
   }
   document.getElementById("rankingVacio").style.display = "none";
@@ -325,13 +369,25 @@ async function cargarRanking() {
     const tr = document.createElement("tr");
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td>${j.nombre} ${j.apellido}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, 30)}<span>${j.nombre} ${j.apellido}</span></div></td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
     tbody.appendChild(tr);
   });
+
+  const btnVerTodos = document.getElementById("btnVerRankingCompleto");
+  if (completa.length > TOP) {
+    btnVerTodos.style.display = "block";
+    btnVerTodos.textContent = rankingMostrarTodos ? "Ver solo el top 10" : `Ver ranking completo (${completa.length})`;
+  } else {
+    btnVerTodos.style.display = "none";
+  }
 }
+document.getElementById("btnVerRankingCompleto").addEventListener("click", () => {
+  rankingMostrarTodos = !rankingMostrarTodos;
+  cargarRanking();
+});
 
 // ============================================================
 // INICIO: próximos torneos con flyer + jugador del mes
@@ -541,21 +597,40 @@ document.getElementById("btnCrearComplejo").addEventListener("click", async () =
 async function cargarCategorias() {
   const { data } = await sb.from("categorias").select("*").order("orden");
   cacheCategorias = data || [];
+  const grupos = agruparPorGenero(cacheCategorias);
+  const generosConDatos = ORDEN_GENEROS.filter((g) => grupos[g].length > 0);
 
-  llenarSelect(document.getElementById("jCategoria"), cacheCategorias, (c) => c.nombre, (c) => c.nombre);
+  const selectJugador = document.getElementById("jCategoria");
+  if (selectJugador) {
+    const valorPrevio = selectJugador.value;
+    selectJugador.innerHTML = generosConDatos.map((g) =>
+      `<optgroup label="${g}">${grupos[g].map((c) => `<option value="${c.nombre}">${c.nombre}</option>`).join("")}</optgroup>`
+    ).join("");
+    if (valorPrevio) selectJugador.value = valorPrevio;
+  }
 
   const formTorneo = document.getElementById("tCategoriasForm");
   if (formTorneo) {
-    formTorneo.innerHTML = cacheCategorias.map((c) =>
-      `<label><input type="checkbox" class="chkTorneoCategoria" value="${c.nombre}" /> ${c.nombre}</label>`
-    ).join("");
+    formTorneo.innerHTML = generosConDatos.map((g) => `
+      <div class="categorias-genero-grupo">
+        <h4>${g}</h4>
+        <div class="check-grid">
+          ${grupos[g].map((c) => `<label><input type="checkbox" class="chkTorneoCategoria" value="${c.nombre}" /> ${c.nombre}</label>`).join("")}
+        </div>
+      </div>
+    `).join("");
   }
 
   const listaAdmin = document.getElementById("listaCategoriasAdmin");
   if (listaAdmin) {
-    listaAdmin.innerHTML = cacheCategorias.map((c) =>
-      `<span class="pill removable">${c.nombre} <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button></span>`
-    ).join("");
+    listaAdmin.innerHTML = generosConDatos.map((g) => `
+      <div class="categorias-genero-grupo">
+        <h4>${g}</h4>
+        ${grupos[g].map((c) =>
+          `<span class="pill removable">${c.nombre} <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button></span>`
+        ).join("")}
+      </div>
+    `).join("");
     listaAdmin.querySelectorAll(".btnBorrarCategoria").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const { error } = await sb.from("categorias").delete().eq("id", btn.dataset.id);
@@ -1122,7 +1197,7 @@ async function cargarSponsors() {
     if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (inlineCard) inlineCard.style.display = "block";
     if (sidebar) sidebar.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
-    if (sidebarCard) sidebarCard.style.display = "block";
+    if (sidebarCard) sidebarCard.style.display = "flex";
   } else {
     if (inlineCard) inlineCard.style.display = "none";
     if (sidebarCard) sidebarCard.style.display = "none";
