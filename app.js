@@ -207,6 +207,25 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   if (torneoActualId) renderInscribirme();
 });
 
+document.getElementById("btnGuardarClaveNueva").addEventListener("click", async () => {
+  const c1 = document.getElementById("nuevaClave1").value;
+  const c2 = document.getElementById("nuevaClave2").value;
+  const err = document.getElementById("claveNuevaError");
+  err.textContent = "";
+  if (c1.length < 6) { err.textContent = "La contraseña debe tener al menos 6 caracteres."; return; }
+  if (c1 !== c2) { err.textContent = "Las dos contraseñas no coinciden."; return; }
+
+  const { error } = await sb.auth.updateUser({ password: c1 });
+  if (error) { err.textContent = error.message; return; }
+
+  await sb.from("jugadores").update({ debe_cambiar_clave: false }).eq("id", miJugador.id);
+  miJugador.debe_cambiar_clave = false;
+  document.getElementById("nuevaClave1").value = "";
+  document.getElementById("nuevaClave2").value = "";
+  document.getElementById("cambiarClaveOverlay").style.display = "none";
+  toast("¡Contraseña actualizada! 🔒");
+});
+
 async function manejarCambioSesion(session) {
   currentUser = session?.user || null;
   miJugador = null;
@@ -218,6 +237,8 @@ async function manejarCambioSesion(session) {
     const { data: adminRow } = await sb.from("admins").select("user_id").eq("user_id", currentUser.id).maybeSingle();
     isAdmin = !!adminRow;
   }
+
+  document.getElementById("cambiarClaveOverlay").style.display = miJugador?.debe_cambiar_clave ? "flex" : "none";
 
   document.body.classList.toggle("is-admin", isAdmin);
   document.getElementById("btnAdminPanel").style.display = isAdmin ? "flex" : "none";
@@ -509,6 +530,31 @@ document.getElementById("btnTodasCategorias").addEventListener("click", () => {
 });
 
 // ============================================================
+// PUNTOS POR RONDA (ranking por eliminación directa)
+// ============================================================
+const RONDAS_INPUT = {
+  "Campeón": "prCampeon", "Sub": "prSub", "Semifinal": "prSemifinal",
+  "Cuartos": "prCuartos", "Octavos": "prOctavos", "Dieciseisavos": "prDieciseisavos"
+};
+
+async function cargarPuntosRonda() {
+  const { data } = await sb.from("puntos_ronda").select("*");
+  (data || []).forEach((r) => {
+    const input = document.getElementById(RONDAS_INPUT[r.ronda]);
+    if (input) input.value = r.puntos;
+  });
+}
+
+document.getElementById("btnGuardarPuntosRonda").addEventListener("click", async () => {
+  const filas = Object.entries(RONDAS_INPUT).map(([ronda, inputId]) => ({
+    ronda, puntos: Number(document.getElementById(inputId).value) || 0
+  }));
+  const { error } = await sb.from("puntos_ronda").upsert(filas, { onConflict: "ronda" });
+  if (error) { toast("Error: " + error.message); return; }
+  toast("Puntos guardados");
+});
+
+// ============================================================
 // JUGADORES (listado admin, para inscribir manualmente y jugador del mes)
 // ============================================================
 async function cargarJugadoresAdmin() {
@@ -597,8 +643,6 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     complejo_id: complejoId || null,
     fecha_inicio: fechaInicio,
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
-    puntos_primero: Number(document.getElementById("tPuntos1").value) || 100,
-    puntos_segundo: Number(document.getElementById("tPuntos2").value) || 60,
     flyer_url: flyerUrl
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
@@ -850,9 +894,16 @@ function renderPartidos(partidos, canchasTorneo) {
       <div class="match-teams">${p.pareja1_nombre}</div>
       <div class="match-meta" style="text-align:center">vs</div>
       <div class="match-teams">${p.pareja2_nombre}</div>
-      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span></div>
+      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}</div>
       ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
+      <div class="match-actions">
+        <select class="selectRonda" data-p="${p.id}">
+          ${["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"].map((r) =>
+            `<option value="${r}" ${(p.ronda || "Fase de grupos") === r ? "selected" : ""}>${r}</option>`
+          ).join("")}
+        </select>
+      </div>
       <div class="match-actions">
         <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
         <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}">Cargar resultado</button>
@@ -880,9 +931,10 @@ function renderPartidos(partidos, canchasTorneo) {
       const setsGanadosP1 = sets.filter((s) => s.p1 > s.p2).length;
       const setsGanadosP2 = sets.filter((s) => s.p2 > s.p1).length;
       const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
+      const ronda = document.querySelector(`.selectRonda[data-p="${partidoId}"]`).value;
 
       const { error } = await sb.from("partidos").update({
-        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
+        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId, ronda
       }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       toast("Resultado cargado, ranking actualizado ✅");
@@ -1063,6 +1115,7 @@ async function init() {
     cargarSponsors(),
     cargarRanking(),
     cargarEnVivo(),
+    cargarPuntosRonda(),
     manejarCambioSesion(session)
   ]);
 }

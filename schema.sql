@@ -35,16 +35,21 @@ create table if not exists jugadores (
   nivel text default 'intermedio', -- principiante, intermedio, avanzado
   categoria text not null default '6ta', -- categoría de competencia (6ta, 5ta, 4ta, Damas, etc.)
   lado_preferido text, -- drive, reves, indistinto
-  puntos_ranking int not null default 0,
+  puntos_ranking numeric(10,1) not null default 0, -- decimal por los "ascenso" del circuito histórico (mitad de puntos)
   partidos_jugados int not null default 0,
   partidos_ganados int not null default 0,
   activo boolean not null default true,
+  debe_cambiar_clave boolean not null default false, -- true para cuentas importadas con clave provisoria
   created_at timestamptz not null default now()
 );
 
 -- por si la tabla ya existía de una instalación anterior sin estas columnas
 alter table jugadores add column if not exists categoria text not null default '6ta';
 alter table jugadores add column if not exists auth_user_id uuid unique references auth.users(id) on delete cascade;
+alter table jugadores add column if not exists debe_cambiar_clave boolean not null default false;
+-- por si la tabla venía con puntos_ranking como entero, de la importación histórica con medios puntos por ascenso
+alter table jugadores alter column puntos_ranking type numeric(10,1) using puntos_ranking::numeric(10,1);
+alter table jugadores alter column puntos_ranking set default 0;
 
 -- ---------- CATEGORIAS ----------
 -- Lista editable de categorías (6ta, 5ta, Suma12, etc.) que usan tanto
@@ -57,9 +62,15 @@ create table if not exists categorias (
   created_at timestamptz not null default now()
 );
 
+-- Categorías reales del circuito: Damas y Caballeros son escalafones separados
+-- (una "6ta Damas" y una "6ta Caballeros" son grupos de jugadores distintos).
+-- Se dejan también las genéricas viejas (no se borran, por si algún torneo ya las usa).
 insert into categorias (nombre, orden) values
-  ('8va', 1), ('7ma', 2), ('6ta', 3), ('5ta', 4), ('4ta', 5),
-  ('3ra', 6), ('2da', 7), ('1ra', 8), ('Damas', 9)
+  ('8va Damas', 1), ('7ma Damas', 2), ('6ta Damas', 3), ('5ta Damas', 4), ('4ta Damas', 5),
+  ('8va Caballeros', 10), ('7ma Caballeros', 11), ('6ta Caballeros', 12), ('5ta Caballeros', 13),
+  ('4ta Caballeros', 14), ('3ra Caballeros', 15),
+  ('8va', 20), ('7ma', 21), ('6ta', 22), ('5ta', 23), ('4ta', 24),
+  ('3ra', 25), ('2da', 26), ('1ra', 27), ('Damas', 28)
 on conflict (nombre) do nothing;
 
 -- ---------- ADMINISTRADORES ----------
@@ -206,37 +217,62 @@ create table if not exists notificaciones (
   created_at timestamptz not null default now()
 );
 
+-- ---------- PUNTOS POR RONDA (ranking por eliminación directa) ----------
+-- Cuando se carga el resultado de un partido de Semifinal/Cuartos/Octavos/Dieciseisavos,
+-- la pareja PERDEDORA suma los puntos de esa ronda (llegó hasta ahí y quedó eliminada).
+-- En la Final, el ganador suma "Campeón" y el perdedor suma "Sub". Los partidos que no son
+-- de una de estas rondas (ej: fase de grupos) no suman puntos de ranking, solo estadísticas
+-- de partidos jugados/ganados. El admin puede editar estos valores desde el panel de admin.
+create table if not exists puntos_ronda (
+  ronda text primary key,
+  puntos int not null
+);
+
+insert into puntos_ronda (ronda, puntos) values
+  ('Campeón', 1000), ('Sub', 750), ('Semifinal', 500),
+  ('Cuartos', 250), ('Octavos', 125), ('Dieciseisavos', 100)
+on conflict (ronda) do nothing;
+
 -- ============================================================
 -- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
 -- ============================================================
 create or replace function actualizar_ranking() returns trigger as $$
 declare
-  t torneos%rowtype;
   ganador parejas%rowtype;
   perdedor_id uuid;
   perdedor parejas%rowtype;
+  pts_ganador int := 0;
+  pts_perdedor int := 0;
 begin
   -- solo actuar cuando el partido pasa a "jugado" y tiene ganador
   if new.estado = 'jugado' and new.ganador_pareja_id is not null
      and (old.estado is distinct from 'jugado' or old.ganador_pareja_id is distinct from new.ganador_pareja_id) then
 
-    select * into t from torneos where id = new.torneo_id;
     select * into ganador from parejas where id = new.ganador_pareja_id;
 
     perdedor_id := case when new.pareja1_id = new.ganador_pareja_id then new.pareja2_id else new.pareja1_id end;
     select * into perdedor from parejas where id = perdedor_id;
 
+    -- puntos según la ronda: en la Final, ganador = Campeón y perdedor = Sub;
+    -- en las demás rondas de bracket, solo el perdedor suma (quedó eliminado ahí)
+    if new.ronda = 'Final' then
+      select puntos into pts_ganador from puntos_ronda where ronda = 'Campeón';
+      select puntos into pts_perdedor from puntos_ronda where ronda = 'Sub';
+    elsif new.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+      select puntos into pts_perdedor from puntos_ronda where ronda = new.ronda;
+    end if;
+
     -- puntos + partido jugado + partido ganado para la pareja ganadora
     update jugadores set
-      puntos_ranking = puntos_ranking + coalesce(t.puntos_primero,0),
+      puntos_ranking = puntos_ranking + coalesce(pts_ganador, 0),
       partidos_jugados = partidos_jugados + 1,
       partidos_ganados = partidos_ganados + 1
     where id in (ganador.jugador1_id, ganador.jugador2_id);
 
-    -- puntos de participación + partido jugado para la pareja perdedora
+    -- puntos + partido jugado para la pareja perdedora
     if perdedor.id is not null then
       update jugadores set
-        puntos_ranking = puntos_ranking + coalesce(t.puntos_segundo,0),
+        puntos_ranking = puntos_ranking + coalesce(pts_perdedor, 0),
         partidos_jugados = partidos_jugados + 1
       where id in (perdedor.jugador1_id, perdedor.jugador2_id);
     end if;
@@ -311,7 +347,7 @@ order by categoria, puntos_ranking desc;
 -- ============================================================
 create or replace function jugadores_publicos() returns table (
   id uuid, nombre text, apellido text, categoria text, nivel text,
-  puntos_ranking int, partidos_jugados int, partidos_ganados int
+  puntos_ranking numeric(10,1), partidos_jugados int, partidos_ganados int
 ) language sql stable security definer set search_path = public as $$
   select id, nombre, apellido, categoria, nivel, puntos_ranking, partidos_jugados, partidos_ganados
   from jugadores where activo = true;
@@ -420,6 +456,7 @@ $$;
 alter table complejos enable row level security;
 alter table canchas enable row level security;
 alter table categorias enable row level security;
+alter table puntos_ronda enable row level security;
 alter table jugadores enable row level security;
 alter table disponibilidad enable row level security;
 alter table torneos enable row level security;
@@ -451,6 +488,12 @@ drop policy if exists "categorias_select" on categorias;
 create policy "categorias_select" on categorias for select using (true);
 drop policy if exists "categorias_write" on categorias;
 create policy "categorias_write" on categorias for all using (is_admin()) with check (is_admin());
+
+-- puntos_ronda: lectura pública, solo admin edita los valores
+drop policy if exists "puntos_ronda_select" on puntos_ronda;
+create policy "puntos_ronda_select" on puntos_ronda for select using (true);
+drop policy if exists "puntos_ronda_write" on puntos_ronda;
+create policy "puntos_ronda_write" on puntos_ronda for all using (is_admin()) with check (is_admin());
 
 -- jugadores: cada uno ve/edita su propia fila; admin ve/edita todas.
 -- Para mostrar nombres en público se usan las funciones *_publicos() de arriba.

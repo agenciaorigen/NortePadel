@@ -15,6 +15,19 @@
 </head>
 <body>
 
+<div id="cambiarClaveOverlay" class="overlay-bloqueante" style="display:none">
+  <div class="card">
+    <h2>Cambiá tu contraseña</h2>
+    <p class="match-meta">Tu cuenta se creó con una clave provisoria. Elegí una nueva antes de seguir.</p>
+    <label>Nueva contraseña</label>
+    <input id="nuevaClave1" type="password" autocomplete="new-password" minlength="6" required />
+    <label>Repetila</label>
+    <input id="nuevaClave2" type="password" autocomplete="new-password" minlength="6" required />
+    <button class="primary" id="btnGuardarClaveNueva" style="margin-top:10px;width:100%">Guardar y continuar</button>
+    <p class="match-meta" id="claveNuevaError"></p>
+  </div>
+</div>
+
 <header class="topbar">
   <div class="logo-ring"><img src="icons/icon-192.png" alt="Norte Padel" /></div>
   <h1>NORTE <span>PADEL</span></h1>
@@ -80,16 +93,6 @@
         <div>
           <label>Fecha fin</label>
           <input id="tFechaFin" type="date" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>Puntos 1º</label>
-          <input id="tPuntos1" type="number" value="100" />
-        </div>
-        <div>
-          <label>Puntos 2º</label>
-          <input id="tPuntos2" type="number" value="60" />
         </div>
       </div>
       <label>Flyer del torneo (opcional)</label>
@@ -249,6 +252,24 @@
         <input id="catNueva" placeholder="Ej: Suma12" />
         <button class="secondary small" id="btnAgregarCategoria">Agregar</button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Puntos por ronda</h2>
+      <p class="match-meta" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedó eliminada. En la Final, el ganador suma "Campeón" y el perdedor suma "Sub".</p>
+      <div class="row">
+        <div><label>Campeón</label><input id="prCampeon" type="number" /></div>
+        <div><label>Sub</label><input id="prSub" type="number" /></div>
+      </div>
+      <div class="row">
+        <div><label>Semifinal</label><input id="prSemifinal" type="number" /></div>
+        <div><label>Cuartos</label><input id="prCuartos" type="number" /></div>
+      </div>
+      <div class="row">
+        <div><label>Octavos</label><input id="prOctavos" type="number" /></div>
+        <div><label>Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
+      </div>
+      <button class="secondary small" id="btnGuardarPuntosRonda" style="margin-top:10px">Guardar puntos</button>
     </div>
 
     <div class="card">

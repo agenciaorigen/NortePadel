@@ -47,8 +47,9 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 **Administradores** (el ícono ⚙️ en el encabezado):
 - Crean los **complejos**, con nombre, dirección y cuántas canchas tiene (las crea automáticamente con ese número; después podés agregar más una por una si hace falta).
 - Administran la lista de **categorías** (6ta, 5ta, Damas, Suma12, la que hagan falta): las agregan o las borran desde el panel de administrador, y esa lista es la que después aparece para elegir tanto en el perfil del jugador como al crear un torneo.
-- Crean los **torneos** (desde la pestaña Torneos, ahí aparece el formulario) eligiendo el complejo sede, **qué categorías compiten** (tildan una o varias, por ejemplo de 2da a 8va, o "seleccionar todas"), fechas y puntos — y pueden subir el flyer ahí mismo, que aparece automáticamente en Inicio.
-- Desde el detalle de un torneo: agregan/cambian canchas (por clima u otro motivo), inscriben jugadores manualmente si hace falta, arman las parejas y los partidos con un clic, cargan resultados y reasignan canchas.
+- Crean los **torneos** (desde la pestaña Torneos, ahí aparece el formulario) eligiendo el complejo sede, **qué categorías compiten** (tildan una o varias, por ejemplo de 2da a 8va, o "seleccionar todas") y fechas — y pueden subir el flyer ahí mismo, que aparece automáticamente en Inicio.
+- Desde el detalle de un torneo: agregan/cambian canchas (por clima u otro motivo), inscriben jugadores manualmente si hace falta, arman las parejas y los partidos con un clic, y cargan resultados eligiendo la **ronda** de cada partido (Dieciseisavos, Octavos, Cuartos, Semifinal, Final) para que sume los puntos que corresponden.
+- Definen los **puntos por ronda** desde el panel de administrador (por defecto: Campeón 1000, Sub 750, Semifinal 500, Cuartos 250, Octavos 125, Dieciseisavos 100) y los pueden cambiar cuando quieran.
 - Eligen al **jugador del mes** desde el panel de administrador.
 - Suben los logos de **auspiciantes/publicidad**, generales (aparecen en Inicio, la columna lateral y todos los torneos) o de un torneo puntual (aparecen solo en ese torneo).
 
@@ -58,12 +59,15 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 
 - **En vivo** (nueva pestaña, con un punto que titila cuando hay torneo en curso): si no hay ningún torneo corriendo en este momento, muestra fecha y sede del próximo. Si hay uno en curso, muestra el estado "EN VIVO" y, a cada jugador logueado, su propio horario y cancha asignados apenas están cargados (o un aviso de que todavía no le tocó). Desde ahí el administrador entra directo a cargar resultados a medida que se van jugando los partidos, y esos resultados impactan al toque en el ranking de todos.
 - **Categorías por torneo**: cada torneo puede abarcar una o varias categorías (ej: "de 2da a 8va"). Se elige al crearlo y se ve en la lista de torneos y en su detalle.
+- **Ranking por eliminación directa**: al cargar el resultado de un partido de bracket, la pareja que **pierde** suma los puntos de la ronda en la que quedó eliminada (llegó hasta ahí). En la Final, el ganador suma los puntos de "Campeón" y el perdedor los de "Sub". Un partido de fase de grupos (o sin ronda asignada) no reparte puntos de ranking, solo cuenta como partido jugado.
 - **Ranking por categoría**: en la pestaña Ranking, con pastillas para elegir la categoría (6ta, 5ta, Damas, etc.). Se actualiza solo al cargar cada resultado, incluso en las pantallas de otros jugadores en vivo.
 - **Armado automático**: "Armar parejas" empareja por nivel de ranking a quienes no eligieron pareja propia; "Armar partidos" cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron en su perfil) y asigna una cancha libre, evitando choques.
 - **Inicio**: muestra los flyers de los próximos torneos y, si hay uno cargado, el jugador del mes.
 - **Auspiciantes por torneo**: además de los generales (se ven en toda la app), un torneo puede tener sus propios auspiciantes — aparecen solo en el detalle de ese torneo, con el logo bien grande.
 - **Notificaciones**: cuando a alguien le asignan un horario de partido, se carga un resultado en el que jugó, o una pareja lo anota a un torneo, le llega un aviso mientras tiene la app abierta o instalada. Push real con la app cerrada del todo (como WhatsApp) es un paso extra — avisame si lo querés y lo sumamos con claves VAPID y una Supabase Edge Function.
 - **Publicidad**: los logos de sponsors aparecen en Inicio y, en pantallas grandes, en una columna fija al costado de toda la app.
+- **Categorías separadas por género**: "6ta Damas" y "6ta Caballeros" son categorías distintas (con jugadores y ranking propios), no se mezclan.
+- **Cuentas importadas del ranking histórico**: los jugadores del circuito 2026 que ya tenían puntos antes de la app se importaron con una cuenta y clave provisoria (ver carpeta `norte-padel-import`). La primera vez que entran, la app los frena con una pantalla obligatoria para elegir su propia contraseña antes de poder usar el resto de la app.
 
 ## 6. Seguridad
 

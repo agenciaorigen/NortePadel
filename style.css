@@ -306,6 +306,14 @@ nav.tabbar button.active { color: var(--accent); font-weight: 600; }
 nav.tabbar .icon { display: block; }
 nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
 
+.overlay-bloqueante {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(5, 7, 9, 0.92);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.overlay-bloqueante .card { max-width: 360px; width: 100%; }
+
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
 .toast {
   position: fixed;
