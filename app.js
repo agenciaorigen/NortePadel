@@ -517,6 +517,30 @@ async function cargarJugadorDelMes() {
   });
 }
 
+// tira rotativa de "ascendieron este mes" en Inicio; si son pocos igual da vueltas
+// despacio, y si son muchos alcanza para no amontonarlos todos en pantalla a la vez
+async function cargarAscendidos() {
+  const { data } = await sb.rpc("ascendidos_del_mes");
+  const card = document.getElementById("ascendidosCard");
+  if (!data || data.length === 0) { card.style.display = "none"; return; }
+  card.style.display = "block";
+
+  const item = (a) => `
+    <div class="ascendido-item" data-jugador-id="${a.jugador_id}">
+      ${avatarHtml(a.foto_url, 56)}
+      <strong>${a.nombre} ${a.apellido}</strong>
+      <span>→ ${a.categoria_nueva}</span>
+    </div>`;
+  const set = `<div class="ascendidos-set">${data.map(item).join("")}</div>`;
+  // el segundo juego es una copia para el loop infinito del carrusel (ver marquee-scroll);
+  // se oculta a lectores de pantalla para no repetir cada nombre dos veces
+  const track = document.getElementById("ascendidosContenido");
+  track.innerHTML = set + `<div class="ascendidos-set" aria-hidden="true">${data.map(item).join("")}</div>`;
+  track.querySelectorAll(".ascendido-item").forEach((el) => {
+    el.addEventListener("click", () => abrirPerfilJugador(el.dataset.jugadorId));
+  });
+}
+
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
   if (!miJugador) { card.style.display = "none"; return; }
@@ -863,6 +887,8 @@ function renderSolicitudesCategoria(jugadores) {
     div.querySelector(".btnAprobarCategoria").addEventListener("click", async () => {
       const { error } = await sb.from("jugadores").update({ categoria: j.categoria_pendiente, categoria_pendiente: null }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
+      // queda registrado para poder mostrar "ascendieron este mes" en Inicio
+      await sb.from("historial_categoria").insert({ jugador_id: j.id, categoria_anterior: j.categoria, categoria_nueva: j.categoria_pendiente });
       toast("Categoría aprobada");
       cargarJugadoresAdmin();
       cargarRanking();
@@ -1106,19 +1132,36 @@ async function refrescarDetalleTorneo() {
     return `${c.nombre} (${complejo ? complejo.nombre : "?"})`;
   });
 
-  const { data: insc } = await sb.rpc("inscriptos_publicos", { p_torneo_id: torneoActualId });
-  const contInscriptos = document.getElementById("dtInscriptos");
-  contInscriptos.innerHTML = (insc || []).map((i) =>
-    `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${isAdmin ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
-  ).join("") || '<p class="empty">Sin inscriptos todavía.</p>';
-  contInscriptos.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
-    btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
+  // "Quiénes se anotaron" se muestra siempre como parejas (nunca una lista de nombres
+  // sueltos repetida aparte) — a quien todavía no tiene con quién jugar se lo agrupa
+  // en un cartel aparte, en vez de mezclarlo con las parejas ya armadas.
+  const [{ data: insc }, { data: parejas }] = await Promise.all([
+    sb.rpc("inscriptos_publicos", { p_torneo_id: torneoActualId }),
+    sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId })
+  ]);
+  const enPareja = new Set((parejas || []).flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+  const sinPareja = (insc || []).filter((i) => !enPareja.has(i.jugador_id));
+
+  const contParejas = document.getElementById("dtParejas");
+  contParejas.innerHTML = (parejas || []).map((p) =>
+    `<div class="pareja-row">
+      <span>🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre}</span>
+      ${isAdmin ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" aria-label="Separar pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
+    </div>`
+  ).join("") || '<p class="empty">Todavía no hay parejas armadas.</p>';
+  contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
+    btn.addEventListener("click", async () => await borrarPareja(btn.dataset.id, btn.dataset.nombre));
   });
 
-  const { data: parejas } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId });
-  document.getElementById("dtParejas").innerHTML = (parejas || []).map((p) =>
-    `<div class="match-meta">🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre}</div>`
-  ).join("") || '<p class="empty">Todavía no hay parejas armadas.</p>';
+  const contSinPareja = document.getElementById("dtSinPareja");
+  contSinPareja.innerHTML = sinPareja.length === 0 ? "" : `
+    <p class="match-meta" style="margin:12px 0 6px">Todavía sin pareja:</p>
+    ${sinPareja.map((i) =>
+      `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${isAdmin ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
+    ).join("")}`;
+  contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
+    btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
+  });
 
   const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId });
   renderPartidos(partidos || [], tc || []);
@@ -1146,22 +1189,25 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
 });
 
 // ---------- sacar a alguien del torneo (ej: no pagó) — solo admin ----------
+// se usa solo con gente sin pareja todavía (a quien ya tiene pareja primero hay
+// que separarlo con borrarPareja, así nunca se borra a alguien "de arrastre")
 async function borrarInscripcion(jugadorId, nombreJugador) {
-  const { data: pareja } = await sb.from("parejas").select("id")
-    .eq("torneo_id", torneoActualId)
-    .or(`jugador1_id.eq.${jugadorId},jugador2_id.eq.${jugadorId}`)
-    .maybeSingle();
-  if (pareja) {
-    const { data: jugado } = await sb.from("partidos").select("id")
-      .eq("torneo_id", torneoActualId)
-      .or(`pareja1_id.eq.${pareja.id},pareja2_id.eq.${pareja.id}`)
-      .eq("estado", "jugado").maybeSingle();
-    if (jugado) { toast(`${nombreJugador} ya jugó partidos en este torneo — sacale la pareja o el partido a mano primero`); return; }
-    await sb.from("parejas").delete().eq("id", pareja.id); // esto borra también sus partidos pendientes (en cascada)
-  }
   const { error } = await sb.from("inscripciones").delete().eq("torneo_id", torneoActualId).eq("jugador_id", jugadorId);
   if (error) { toast("Error: " + error.message); return; }
   toast(`Se sacó a ${nombreJugador} del torneo`);
+  avisarActualizacionEnVivo();
+  refrescarDetalleTorneo();
+}
+
+async function borrarPareja(parejaId, nombrePareja) {
+  const { data: jugado } = await sb.from("partidos").select("id")
+    .eq("torneo_id", torneoActualId)
+    .or(`pareja1_id.eq.${parejaId},pareja2_id.eq.${parejaId}`)
+    .eq("estado", "jugado").maybeSingle();
+  if (jugado) { toast(`${nombrePareja} ya jugó partidos en este torneo — sacale el resultado a mano primero`); return; }
+  const { error } = await sb.from("parejas").delete().eq("id", parejaId); // borra también sus partidos pendientes (en cascada)
+  if (error) { toast("Error: " + error.message); return; }
+  toast(`Se separó la pareja ${nombrePareja} — quedan inscriptos pero sin pareja`);
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 }
@@ -1269,7 +1315,12 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
     canchas.forEach((c) => {
       const p = celda(h, c.id);
       html += "<td>" + (p
-        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">${p.pareja1_nombre}<span class="calendario-vs">V</span>${p.pareja2_nombre}${p.ronda && p.ronda !== "Fase de grupos" ? `<br><span class="badge orange">${p.ronda}</span>` : ""}</div>`
+        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">
+             <div class="calendario-equipo">${p.pareja1_nombre}</div>
+             <div class="calendario-vs">V</div>
+             <div class="calendario-equipo">${p.pareja2_nombre}</div>
+             ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : ""}
+           </div>`
         : "") + "</td>";
     });
     html += "</tr>";
@@ -1558,6 +1609,7 @@ async function init() {
     cargarInicio(),
     cargarJugadorDelMes(),
     cargarCampeones(),
+    cargarAscendidos(),
     cargarSponsors(),
     cargarRanking(),
     cargarPuntosRonda()

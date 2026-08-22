@@ -77,6 +77,13 @@
       <div class="destacados-grid" id="jugadorDelMesContenido"></div>
     </div>
 
+    <div class="card" id="ascendidosCard" style="display:none">
+      <h3>📈 Ascendieron este mes</h3>
+      <div class="ascendidos-wrap">
+        <div class="ascendidos-track" id="ascendidosContenido"></div>
+      </div>
+    </div>
+
     <div class="card" id="campeonesCard" style="display:none">
       <h3>🏆 Campeones</h3>
       <div class="campeones-strip" id="campeonesContenido"></div>
@@ -146,8 +153,10 @@
 
     <div class="card">
       <h3>Quiénes se anotaron</h3>
-      <div id="dtInscriptos"></div>
+      <div id="dtParejas"></div>
+      <div id="dtSinPareja"></div>
       <div class="admin-only">
+        <button class="secondary small" id="btnArmarParejas" style="margin-top:12px">Armar parejas automáticamente</button>
         <label>Inscribir jugador manualmente</label>
         <select id="dtSelectJugador"></select>
         <button class="secondary small" id="btnInscribir">Inscribir</button>
@@ -175,12 +184,6 @@
         <select id="dtSelectCancha"></select>
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
       </div>
-    </div>
-
-    <div class="card">
-      <h3>Parejas</h3>
-      <div id="dtParejas"></div>
-      <button class="secondary small admin-only" id="btnArmarParejas">Armar parejas automáticamente</button>
     </div>
 
     <div class="card partidos-poster">

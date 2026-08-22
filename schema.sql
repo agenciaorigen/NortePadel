@@ -255,6 +255,18 @@ insert into puntos_ronda (ronda, puntos) values
   ('Cuartos', 250), ('Octavos', 125), ('Dieciseisavos', 100)
 on conflict (ronda) do nothing;
 
+-- ---------- HISTORIAL DE CATEGORÍA (para mostrar "ascendidos" en Inicio) ----------
+-- Se carga una fila cada vez que el admin aprueba un pedido de cambio de categoría
+-- (ver "Solicitudes de categoría"). No hace falta guardar si fue ascenso o descenso:
+-- eso se calcula al leer, comparando el "orden" de las dos categorías.
+create table if not exists historial_categoria (
+  id uuid primary key default gen_random_uuid(),
+  jugador_id uuid not null references jugadores(id) on delete cascade,
+  categoria_anterior text,
+  categoria_nueva text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- ÍNDICES (velocidad)
 -- Postgres indexa automáticamente las primary key y las columnas unique,
@@ -284,6 +296,8 @@ create index if not exists idx_flyers_torneo on flyers(torneo_id);
 create index if not exists idx_sponsors_torneo on sponsors(torneo_id);
 create index if not exists idx_push_subscriptions_jugador on push_subscriptions(jugador_id);
 create index if not exists idx_notificaciones_jugador on notificaciones(jugador_id);
+create index if not exists idx_historial_categoria_jugador on historial_categoria(jugador_id);
+create index if not exists idx_historial_categoria_fecha on historial_categoria(created_at);
 
 -- ============================================================
 -- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
@@ -553,6 +567,27 @@ create or replace function torneos_ganados_publico(p_jugador_id uuid) returns ta
   order by coalesce(t.fecha_fin, t.fecha_inicio) desc;
 $$;
 
+-- jugadores que subieron de categoría este mes (para la tira rotativa de Inicio).
+-- "subir" = pasar a una categoría con "orden" más alto; si alguien ascendió más de
+-- una vez en el mes, se muestra solo la más reciente (distinct on).
+drop function if exists ascendidos_del_mes();
+create or replace function ascendidos_del_mes() returns table (
+  jugador_id uuid, nombre text, apellido text, foto_url text, categoria_nueva text, fecha timestamptz
+) language sql stable security definer set search_path = public as $$
+  select jugador_id, nombre, apellido, foto_url, categoria_nueva, fecha from (
+    select distinct on (h.jugador_id)
+      h.jugador_id, j.nombre, j.apellido, j.foto_url, h.categoria_nueva, h.created_at as fecha
+    from historial_categoria h
+    join jugadores j on j.id = h.jugador_id
+    join categorias ca_nueva on ca_nueva.nombre = h.categoria_nueva
+    join categorias ca_vieja on ca_vieja.nombre = h.categoria_anterior
+    where h.created_at >= date_trunc('month', now())
+      and ca_nueva.orden > ca_vieja.orden
+    order by h.jugador_id, h.created_at desc
+  ) t
+  order by fecha desc;
+$$;
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- Lectura de listados públicos (ranking, torneos, complejos, sponsors)
@@ -579,6 +614,7 @@ alter table jugador_del_mes enable row level security;
 alter table push_subscriptions enable row level security;
 alter table notificaciones enable row level security;
 alter table admins enable row level security;
+alter table historial_categoria enable row level security;
 
 -- complejos / canchas: lectura pública, escritura solo admin
 drop policy if exists "complejos_select" on complejos;
@@ -653,6 +689,10 @@ drop policy if exists "parejas_admin" on parejas;
 create policy "parejas_admin" on parejas for all using (is_admin()) with check (is_admin());
 drop policy if exists "partidos_admin" on partidos;
 create policy "partidos_admin" on partidos for all using (is_admin()) with check (is_admin());
+
+-- historial_categoria: lo escribe el admin al aprobar un pedido; se lee vía ascendidos_del_mes()
+drop policy if exists "historial_categoria_admin" on historial_categoria;
+create policy "historial_categoria_admin" on historial_categoria for all using (is_admin()) with check (is_admin());
 
 -- inscripciones: cada jugador ve/crea/borra la suya, admin todas
 drop policy if exists "inscripciones_select" on inscripciones;
