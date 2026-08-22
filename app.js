@@ -5,6 +5,7 @@
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 // ---------- estado local ----------
 let torneoActualId = null;
@@ -41,23 +42,60 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 
 // ============================================================
-// RANKING
+// RANKING (segmentado por categoría)
 // ============================================================
+let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || null;
+
+async function cargarCategoriasDisponibles() {
+  const { data } = await sb.from("jugadores").select("categoria").eq("activo", true);
+  const categorias = [...new Set((data || []).map((j) => j.categoria).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+  return categorias;
+}
+
 async function cargarRanking() {
-  const { data, error } = await sb.from("vista_ranking").select("*").limit(50);
+  const categorias = await cargarCategoriasDisponibles();
+  const cont = document.getElementById("categoriaPills");
+
+  if (categorias.length === 0) {
+    cont.innerHTML = "";
+    document.querySelector("#tablaRanking tbody").innerHTML = "";
+    document.getElementById("rankingVacio").style.display = "block";
+    return;
+  }
+
+  if (!categoriaRankingActual || !categorias.includes(categoriaRankingActual)) {
+    categoriaRankingActual = categorias[0];
+  }
+
+  cont.innerHTML = categorias.map((c) =>
+    `<button class="pill ${c === categoriaRankingActual ? "active" : ""}" data-categoria="${c}">${c}</button>`
+  ).join("");
+  cont.querySelectorAll(".pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      categoriaRankingActual = btn.dataset.categoria;
+      localStorage.setItem("np_categoria_ranking", categoriaRankingActual);
+      cargarRanking();
+    });
+  });
+
+  const { data } = await sb.from("jugadores").select("*")
+    .eq("activo", true).eq("categoria", categoriaRankingActual)
+    .order("puntos_ranking", { ascending: false });
+
   const tbody = document.querySelector("#tablaRanking tbody");
   tbody.innerHTML = "";
-  if (error || !data || data.length === 0) {
+  if (!data || data.length === 0) {
     document.getElementById("rankingVacio").style.display = "block";
     return;
   }
   document.getElementById("rankingVacio").style.display = "none";
-  data.forEach((j) => {
+  data.forEach((j, idx) => {
+    const posicion = idx + 1;
     const tr = document.createElement("tr");
-    const posClass = j.posicion <= 3 ? `pos-${j.posicion}` : "";
-    tr.innerHTML = `<td class="${posClass}">${j.posicion}</td>
+    const posClass = posicion <= 3 ? `pos-${posicion}` : "";
+    tr.innerHTML = `<td class="${posClass}">${posicion}</td>
       <td>${j.nombre} ${j.apellido}</td>
-      <td>${j.nivel}</td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
@@ -75,10 +113,10 @@ function renderDisponibilidadForm() {
     const row = document.createElement("div");
     row.className = "day-picker";
     row.innerHTML = `
-      <label><input type="checkbox" data-dia="${idx}" class="chkDia" /> ${dia}</label>
-      <input type="time" class="horaDesde" data-dia="${idx}" value="19:00" style="max-width:100px" />
-      <span style="align-self:center;color:var(--muted)">a</span>
-      <input type="time" class="horaHasta" data-dia="${idx}" value="23:00" style="max-width:100px" />
+      <label><input type="checkbox" data-dia="${idx}" class="chkDia" /> ${DIAS_CORTO[idx]}</label>
+      <input type="time" class="horaDesde" data-dia="${idx}" value="19:00" />
+      <span class="sep">a</span>
+      <input type="time" class="horaHasta" data-dia="${idx}" value="23:00" />
     `;
     cont.appendChild(row);
   });
@@ -96,7 +134,7 @@ async function cargarJugadores() {
   cacheJugadores.forEach((j) => {
     const div = document.createElement("div");
     div.className = "match-card";
-    div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.nivel}</span></div>
+    div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria}</span></div>
       <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>`;
     cont.appendChild(div);
   });
@@ -122,6 +160,7 @@ document.getElementById("btnRegistrarJugador").addEventListener("click", async (
     email: email || null,
     telefono: document.getElementById("jTelefono").value.trim() || null,
     nivel: document.getElementById("jNivel").value,
+    categoria: document.getElementById("jCategoria").value.trim() || "6ta",
     lado_preferido: document.getElementById("jLado").value
   };
 

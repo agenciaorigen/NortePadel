@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v1";
+const CACHE = "norte-padel-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,7 +8,8 @@ const APP_SHELL = [
   "./matching.js",
   "./manifest.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/icon-512-maskable.png"
 ];
 
 self.addEventListener("install", (event) => {

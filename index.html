@@ -4,18 +4,24 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
-<meta name="theme-color" content="#0ea5a4" />
+<meta name="theme-color" content="#050709" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/icon-192.png" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
 <header class="topbar">
-  <img src="icons/icon-192.png" alt="Norte Padel" />
-  <h1>Norte Padel</h1>
-  <button id="btnNotif" title="Notificaciones">🔔 <span id="notifCount"></span></button>
+  <div class="logo-ring"><img src="icons/icon-192.png" alt="Norte Padel" /></div>
+  <h1>NORTE <span>PADEL</span></h1>
+  <button id="btnNotif" title="Notificaciones" aria-label="Notificaciones">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+    <span id="notifCount"></span>
+  </button>
 </header>
 
 <main>
@@ -23,9 +29,10 @@
   <!-- RANKING -->
   <section id="view-ranking" class="view active">
     <div class="card">
-      <h2>Ranking general</h2>
+      <h2>Ranking por categoría</h2>
+      <div class="pill-row" id="categoriaPills"></div>
       <table id="tablaRanking">
-        <thead><tr><th>#</th><th>Jugador</th><th>Nivel</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
+        <thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
         <tbody></tbody>
       </table>
       <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
@@ -136,12 +143,19 @@
       </div>
       <div class="row">
         <div>
-          <label>Nivel</label>
-          <select id="jNivel">
-            <option value="principiante">Principiante</option>
-            <option value="intermedio" selected>Intermedio</option>
-            <option value="avanzado">Avanzado</option>
-          </select>
+          <label>Categoría</label>
+          <input id="jCategoria" list="listaCategorias" placeholder="Ej: 6ta" value="6ta" />
+          <datalist id="listaCategorias">
+            <option value="8va"></option>
+            <option value="7ma"></option>
+            <option value="6ta"></option>
+            <option value="5ta"></option>
+            <option value="4ta"></option>
+            <option value="3ra"></option>
+            <option value="2da"></option>
+            <option value="1ra"></option>
+            <option value="Damas"></option>
+          </datalist>
         </div>
         <div>
           <label>Lado preferido</label>
@@ -151,6 +165,17 @@
             <option value="reves">Revés</option>
           </select>
         </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Nivel</label>
+          <select id="jNivel">
+            <option value="principiante">Principiante</option>
+            <option value="intermedio" selected>Intermedio</option>
+            <option value="avanzado">Avanzado</option>
+          </select>
+        </div>
+        <div></div>
       </div>
 
       <label>¿Qué días y horarios podés jugar?</label>
@@ -204,11 +229,26 @@
 </main>
 
 <nav class="tabbar">
-  <button data-view="ranking" class="tab active"><span class="icon">🏆</span>Ranking</button>
-  <button data-view="torneos" class="tab"><span class="icon">📅</span>Torneos</button>
-  <button data-view="jugadores" class="tab"><span class="icon">🙋</span>Jugadores</button>
-  <button data-view="complejos" class="tab"><span class="icon">🏟️</span>Complejos</button>
-  <button data-view="flyers" class="tab"><span class="icon">🖼️</span>Flyers</button>
+  <button data-view="ranking" class="tab active">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
+    Ranking
+  </button>
+  <button data-view="torneos" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>
+    Torneos
+  </button>
+  <button data-view="jugadores" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20c0-3.6 2.9-6.3 6.5-6.3s6.5 2.7 6.5 6.3"/></svg></span>
+    Jugadores
+  </button>
+  <button data-view="complejos" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s6.5-6 6.5-11A6.5 6.5 0 0 0 5.5 10c0 5 6.5 11 6.5 11z"/><circle cx="12" cy="10" r="2.2"/></svg></span>
+    Complejos
+  </button>
+  <button data-view="flyers" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="16" height="15" rx="2"/><path d="M4 16l4.5-4.5L12 15l3-3 5 5"/></svg></span>
+    Flyers
+  </button>
 </nav>
 
 <div id="toast" class="toast" style="display:none"></div>

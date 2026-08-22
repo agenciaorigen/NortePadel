@@ -32,6 +32,7 @@ create table if not exists jugadores (
   email text unique,
   telefono text,
   nivel text default 'intermedio', -- principiante, intermedio, avanzado
+  categoria text not null default '6ta', -- categoría de competencia (6ta, 5ta, 4ta, Damas, etc.)
   lado_preferido text, -- drive, reves, indistinto
   puntos_ranking int not null default 0,
   partidos_jugados int not null default 0,
@@ -39,6 +40,9 @@ create table if not exists jugadores (
   activo boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- por si la tabla ya existía de una instalación anterior sin esta columna
+alter table jugadores add column if not exists categoria text not null default '6ta';
 
 -- ---------- DISPONIBILIDAD HORARIA DEL JUGADOR ----------
 -- dia_semana: 0=domingo ... 6=sábado
@@ -223,11 +227,11 @@ for each row execute function notificar_horario_asignado();
 -- ============================================================
 create or replace view vista_ranking as
 select
-  id, nombre, apellido, nivel, puntos_ranking, partidos_jugados, partidos_ganados,
-  rank() over (order by puntos_ranking desc) as posicion
+  id, nombre, apellido, nivel, categoria, puntos_ranking, partidos_jugados, partidos_ganados,
+  rank() over (partition by categoria order by puntos_ranking desc) as posicion
 from jugadores
 where activo = true
-order by puntos_ranking desc;
+order by categoria, puntos_ranking desc;
 
 -- ============================================================
 -- ROW LEVEL SECURITY
