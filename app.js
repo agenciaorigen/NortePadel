@@ -1107,9 +1107,13 @@ async function refrescarDetalleTorneo() {
   });
 
   const { data: insc } = await sb.rpc("inscriptos_publicos", { p_torneo_id: torneoActualId });
-  document.getElementById("dtInscriptos").innerHTML = (insc || []).map((i) =>
-    `<span class="badge" style="margin-right:6px">${i.nombre} ${i.apellido}</span>`
+  const contInscriptos = document.getElementById("dtInscriptos");
+  contInscriptos.innerHTML = (insc || []).map((i) =>
+    `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${isAdmin ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
   ).join("") || '<p class="empty">Sin inscriptos todavía.</p>';
+  contInscriptos.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
+    btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
+  });
 
   const { data: parejas } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId });
   document.getElementById("dtParejas").innerHTML = (parejas || []).map((p) =>
@@ -1140,6 +1144,27 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
+
+// ---------- sacar a alguien del torneo (ej: no pagó) — solo admin ----------
+async function borrarInscripcion(jugadorId, nombreJugador) {
+  const { data: pareja } = await sb.from("parejas").select("id")
+    .eq("torneo_id", torneoActualId)
+    .or(`jugador1_id.eq.${jugadorId},jugador2_id.eq.${jugadorId}`)
+    .maybeSingle();
+  if (pareja) {
+    const { data: jugado } = await sb.from("partidos").select("id")
+      .eq("torneo_id", torneoActualId)
+      .or(`pareja1_id.eq.${pareja.id},pareja2_id.eq.${pareja.id}`)
+      .eq("estado", "jugado").maybeSingle();
+    if (jugado) { toast(`${nombreJugador} ya jugó partidos en este torneo — sacale la pareja o el partido a mano primero`); return; }
+    await sb.from("parejas").delete().eq("id", pareja.id); // esto borra también sus partidos pendientes (en cascada)
+  }
+  const { error } = await sb.from("inscripciones").delete().eq("torneo_id", torneoActualId).eq("jugador_id", jugadorId);
+  if (error) { toast("Error: " + error.message); return; }
+  toast(`Se sacó a ${nombreJugador} del torneo`);
+  avisarActualizacionEnVivo();
+  refrescarDetalleTorneo();
+}
 
 // ---------- armar parejas automático (solo con los que todavía no tienen pareja) ----------
 document.getElementById("btnArmarParejas").addEventListener("click", async () => {
