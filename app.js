@@ -1096,7 +1096,7 @@ function renderPartidosLista(partidos, canchasTorneo) {
 // SPONSORS / PUBLICIDAD
 // ============================================================
 function renderSponsorItem(s, caption) {
-  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" />` +
+  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${s.nombre.replace(/'/g, "\\'")}'}))" />` +
     (caption ? `<span class="sponsor-caption">${caption}</span>` : "");
   return s.link_url
     ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}">${contenido}</a>`
