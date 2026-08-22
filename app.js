@@ -725,8 +725,21 @@ function estaEnVivo(t) {
   return t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy;
 }
 
+function badgeEstadoTorneo(t) {
+  if (estaEnVivo(t)) return `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>`;
+  if (t.estado === "inscripcion") return `<span class="badge solid">Inscripción abierta</span>`;
+  if (t.estado === "cancelado") return `<span class="badge orange">Cancelado</span>`;
+  return `<span class="badge">${t.estado === "finalizado" ? "Finalizado" : t.estado}</span>`;
+}
+
+function linkMapsComplejo(complejo) {
+  if (!complejo) return "";
+  const query = complejo.direccion ? `${complejo.nombre}, ${complejo.direccion}` : complejo.nombre;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 async function cargarTorneos() {
-  const { data } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").order("fecha_inicio", { ascending: false });
+  const { data } = await sb.from("torneos").select("*, complejos(nombre, direccion), torneo_categorias(categoria)").order("fecha_inicio", { ascending: false });
   cacheTorneos = data || [];
   const cont = document.getElementById("listaTorneos");
   cont.innerHTML = "";
@@ -747,13 +760,25 @@ async function cargarTorneos() {
     const div = document.createElement("div");
     div.className = "match-card";
     div.style.cursor = "pointer";
-    const badge = estaEnVivo(t) ? `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>` : `<span class="badge">${t.estado}</span>`;
-    const categorias = (t.torneo_categorias || []).map((c) => c.categoria).join(", ") || "todas las categorías";
+    const catList = (t.torneo_categorias || []).map((c) => c.categoria);
+    const categorias = catList.length === 0 ? "todas las categorías"
+      : catList.length > 3 ? `${catList.slice(0, 3).join(", ")} +${catList.length - 3} más`
+      : catList.join(", ");
+    const maps = linkMapsComplejo(t.complejos);
     div.innerHTML = `
-      <div class="match-teams">${t.nombre} ${badge}</div>
-      <div class="match-meta">${t.complejos?.nombre || "sin complejo"} · ${categorias} · desde ${t.fecha_inicio}</div>
+      <div class="torneo-card-header">
+        <span class="torneo-nombre">${t.nombre}</span>
+        ${badgeEstadoTorneo(t)}
+      </div>
+      <div class="torneo-lugar">
+        📍 <span>${t.complejos?.nombre || "sin complejo"}</span>
+        ${maps ? `<a href="${maps}" target="_blank" rel="noopener" class="torneo-maps-link">Ver ubicación ↗</a>` : ""}
+      </div>
+      <div class="match-meta">${categorias} · desde ${t.fecha_inicio}</div>
     `;
     div.addEventListener("click", () => abrirTorneo(t.id));
+    const linkMaps = div.querySelector(".torneo-maps-link");
+    if (linkMaps) linkMaps.addEventListener("click", (e) => e.stopPropagation());
     cont.appendChild(div);
   });
 }
