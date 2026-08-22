@@ -144,10 +144,18 @@ document.getElementById("jFoto").addEventListener("change", (e) => {
 async function precargarFormularioPerfil(j) {
   document.getElementById("jNombre").value = j.nombre || "";
   document.getElementById("jApellido").value = j.apellido || "";
-  document.getElementById("jCategoria").value = j.categoria || "6ta";
+  document.getElementById("jCategoria").value = j.categoria_pendiente || j.categoria || "6ta";
   document.getElementById("jTelefono").value = j.telefono || "";
   document.getElementById("jLado").value = j.lado_preferido || "indistinto";
   mostrarFotoPreview(j.foto_url);
+
+  const notice = document.getElementById("categoriaPendienteNotice");
+  if (j.categoria_pendiente) {
+    notice.textContent = `Categoría solicitada: ${j.categoria_pendiente} · pendiente de aprobación del admin`;
+    notice.style.display = "block";
+  } else {
+    notice.style.display = "none";
+  }
 
   renderDisponibilidadForm();
   const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id);
@@ -179,12 +187,13 @@ function renderVistaPerfil() {
     completarCard.style.display = "block";
     miCard.style.display = "none";
     if (miJugador) precargarFormularioPerfil(miJugador);
-    else { renderDisponibilidadForm(); mostrarFotoPreview(null); }
+    else { renderDisponibilidadForm(); mostrarFotoPreview(null); document.getElementById("categoriaPendienteNotice").style.display = "none"; }
   } else {
     completarCard.style.display = "none";
     miCard.style.display = "block";
+    const pendiente = miJugador.categoria_pendiente ? ` (pendiente: ${miJugador.categoria_pendiente})` : "";
     document.getElementById("miPerfilResumen").textContent =
-      `${miJugador.nombre} ${miJugador.apellido} · Categoría ${miJugador.categoria} · ${miJugador.puntos_ranking} pts`;
+      `${miJugador.nombre} ${miJugador.apellido} · Categoría ${miJugador.categoria}${pendiente} · ${miJugador.puntos_ranking} pts`;
   }
 }
 renderDisponibilidadForm();
@@ -195,14 +204,16 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   const apellido = document.getElementById("jApellido").value.trim();
   if (!nombre || !apellido) { toast("Completá nombre y apellido"); return; }
 
+  const categoriaSeleccionada = document.getElementById("jCategoria").value || "6ta";
   const datos = {
     nombre, apellido,
     auth_user_id: currentUser.id,
     email: currentUser.email,
     telefono: document.getElementById("jTelefono").value.trim() || null,
-    categoria: document.getElementById("jCategoria").value || "6ta",
     lado_preferido: document.getElementById("jLado").value
   };
+  // la categoría no se cambia directo: queda pedida y la aprueba el admin (ver trigger en schema.sql)
+  datos.categoria_pendiente = (miJugador && categoriaSeleccionada === miJugador.categoria) ? null : categoriaSeleccionada;
 
   const archivoFoto = document.getElementById("jFoto").files[0];
   if (archivoFoto) {
@@ -238,7 +249,7 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   miJugador = perfil;
   editandoPerfil = false;
   document.getElementById("jFoto").value = "";
-  toast("¡Perfil guardado! 🎾");
+  toast(datos.categoria_pendiente ? "¡Perfil guardado! Tu categoría queda pendiente de aprobación 🎾" : "¡Perfil guardado! 🎾");
   pedirPermisoNotificaciones();
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
@@ -427,22 +438,38 @@ function avatarHtml(fotoUrl, size) {
     : `<div class="avatar avatar-placeholder" style="width:${s}px;height:${s}px">🎾</div>`;
 }
 
+const TAG_DESTACADO = { Damas: "Jugadora del mes", Caballeros: "Jugador del mes" };
 async function cargarJugadorDelMes() {
   const { data } = await sb.rpc("jugador_del_mes_publico");
-  const row = (data && data[0]) || null;
-  const card = document.getElementById("jugadorDelMesCard");
-  if (!row) { card.style.display = "none"; return; }
-  card.style.display = "block";
-  const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}')"` : "";
-  document.getElementById("jugadorDelMesContenido").innerHTML = `
-    <div class="destacado-card" ${fondo}>
-      <div class="destacado-tag">⭐ Jugador del mes</div>
-      <div class="destacado-info">
-        <strong>${row.nombre} ${row.apellido}</strong>
-        <span>${row.categoria}${row.motivo ? " · " + row.motivo : ""}</span>
-      </div>
-    </div>
-  `;
+  const porGenero = { Damas: null, Caballeros: null };
+  (data || []).forEach((row) => { if (row.genero in porGenero) porGenero[row.genero] = row; });
+
+  document.getElementById("jugadorDelMesContenido").innerHTML = ["Damas", "Caballeros"].map((genero) => {
+    const row = porGenero[genero];
+    if (!row) {
+      return `
+        <div class="destacado-card vacio">
+          <div class="destacado-icono">🎾</div>
+          <div class="destacado-info">
+            <strong>${TAG_DESTACADO[genero]}</strong>
+            <span>Aún sin asignar</span>
+          </div>
+        </div>`;
+    }
+    const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}')"` : "";
+    return `
+      <div class="destacado-card" ${fondo}>
+        <div class="destacado-tag">⭐ ${TAG_DESTACADO[genero]}</div>
+        <div class="destacado-stat">
+          <strong>${row.puntos_ranking}</strong>
+          <span>puntos</span>
+        </div>
+        <div class="destacado-info">
+          <strong>${row.nombre} ${row.apellido}</strong>
+          <span>${row.categoria}${row.motivo ? " · " + row.motivo : ""}</span>
+        </div>
+      </div>`;
+  }).join("");
 }
 
 async function cargarHeroPosicion() {
@@ -640,7 +667,10 @@ async function cargarCategorias() {
       <div class="categorias-genero-grupo">
         <h4>${g}</h4>
         ${grupos[g].map((c) =>
-          `<span class="pill removable">${c.nombre} <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button></span>`
+          `<span class="pill removable">${c.nombre}
+            <button type="button" class="btnEditarCategoria" data-id="${c.id}" data-nombre="${c.nombre}" aria-label="Editar ${c.nombre}">✏️</button>
+            <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button>
+          </span>`
         ).join("")}
       </div>
     `).join("");
@@ -649,6 +679,25 @@ async function cargarCategorias() {
         const { error } = await sb.from("categorias").delete().eq("id", btn.dataset.id);
         if (error) { toast("Error: " + error.message); return; }
         cargarCategorias();
+      });
+    });
+    listaAdmin.querySelectorAll(".btnEditarCategoria").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const nombreViejo = btn.dataset.nombre;
+        const nuevoNombre = (prompt("Nuevo nombre para la categoría:", nombreViejo) || "").trim();
+        if (!nuevoNombre || nuevoNombre === nombreViejo) return;
+        const { error } = await sb.from("categorias").update({ nombre: nuevoNombre }).eq("id", btn.dataset.id);
+        if (error) { toast("Error: " + error.message); return; }
+        // mantener consistentes las referencias en texto libre que usan el nombre viejo
+        await Promise.all([
+          sb.from("jugadores").update({ categoria: nuevoNombre }).eq("categoria", nombreViejo),
+          sb.from("jugadores").update({ categoria_pendiente: nuevoNombre }).eq("categoria_pendiente", nombreViejo),
+          sb.from("torneo_categorias").update({ categoria: nuevoNombre }).eq("categoria", nombreViejo)
+        ]);
+        toast("Categoría renombrada");
+        cargarCategorias();
+        cargarRanking();
+        if (isAdmin) cargarJugadoresAdmin();
       });
     });
   }
@@ -715,6 +764,41 @@ async function cargarJugadoresAdmin() {
   }
   llenarSelect(document.getElementById("dtSelectJugador"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
   llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
+  renderSolicitudesCategoria(cacheJugadoresAdmin);
+}
+
+// ============================================================
+// SOLICITUDES DE CATEGORÍA (pedidas por el jugador, las aprueba el admin)
+// ============================================================
+function renderSolicitudesCategoria(jugadores) {
+  const cont = document.getElementById("listaSolicitudesCategoria");
+  if (!cont) return;
+  const solicitudes = jugadores.filter((j) => j.categoria_pendiente);
+  cont.innerHTML = "";
+  if (solicitudes.length === 0) { cont.innerHTML = '<p class="empty">No hay solicitudes pendientes.</p>'; return; }
+  solicitudes.forEach((j) => {
+    const div = document.createElement("div");
+    div.className = "match-card";
+    div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria} → ${j.categoria_pendiente}</span></div>
+      <div class="match-meta" style="display:flex;gap:8px;margin-top:8px">
+        <button class="secondary small btnAprobarCategoria">Aprobar</button>
+        <button class="secondary small danger btnRechazarCategoria">Rechazar</button>
+      </div>`;
+    div.querySelector(".btnAprobarCategoria").addEventListener("click", async () => {
+      const { error } = await sb.from("jugadores").update({ categoria: j.categoria_pendiente, categoria_pendiente: null }).eq("id", j.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Categoría aprobada");
+      cargarJugadoresAdmin();
+      cargarRanking();
+    });
+    div.querySelector(".btnRechazarCategoria").addEventListener("click", async () => {
+      const { error } = await sb.from("jugadores").update({ categoria_pendiente: null }).eq("id", j.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Solicitud rechazada");
+      cargarJugadoresAdmin();
+    });
+    cont.appendChild(div);
+  });
 }
 
 // ============================================================
