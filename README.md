@@ -46,19 +46,22 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 
 **Administradores** (el ícono ⚙️ en el encabezado):
 - Crean los **complejos**, con nombre, dirección y cuántas canchas tiene (las crea automáticamente con ese número; después podés agregar más una por una si hace falta).
-- Crean los **torneos** (desde la pestaña Torneos, ahí aparece el formulario) eligiendo el complejo sede, categoría, fechas y puntos — y pueden subir el flyer ahí mismo, que aparece automáticamente en Inicio.
+- Administran la lista de **categorías** (6ta, 5ta, Damas, Suma12, la que hagan falta): las agregan o las borran desde el panel de administrador, y esa lista es la que después aparece para elegir tanto en el perfil del jugador como al crear un torneo.
+- Crean los **torneos** (desde la pestaña Torneos, ahí aparece el formulario) eligiendo el complejo sede, **qué categorías compiten** (tildan una o varias, por ejemplo de 2da a 8va, o "seleccionar todas"), fechas y puntos — y pueden subir el flyer ahí mismo, que aparece automáticamente en Inicio.
 - Desde el detalle de un torneo: agregan/cambian canchas (por clima u otro motivo), inscriben jugadores manualmente si hace falta, arman las parejas y los partidos con un clic, cargan resultados y reasignan canchas.
 - Eligen al **jugador del mes** desde el panel de administrador.
-- Suben los logos de **auspiciantes/publicidad**.
+- Suben los logos de **auspiciantes/publicidad**, generales (aparecen en Inicio, la columna lateral y todos los torneos) o de un torneo puntual (aparecen solo en ese torneo).
 
-**Jugadores**: se registran ellos mismos (Mi perfil > Crear cuenta), completan su categoría, nivel y en qué días/horarios pueden jugar, y desde ahí ya está. Para anotarse a un torneo entran a la pestaña Torneos, tocan el que quieren y primero ven **quiénes ya se anotaron**. Ahí mismo pueden tocar **"Inscribirme"**: si van a jugar con alguien, buscan su nombre (aparece mientras escriben) y los anota a los **dos juntos** de una sola vez, incluso si su pareja todavía no había entrado a la app — le queda una notificación avisándole que ya está anotada. Si van solos, con tocar el botón alcanza. La app ya sabe con qué horarios cuentan porque los cargaron en su perfil. Pueden editar sus datos y horarios cuando quieran desde Mi perfil.
+**Jugadores**: se registran ellos mismos (Mi perfil > Crear cuenta), completan su categoría (elegida de la lista que armó el administrador) y en qué días/horarios pueden jugar, y desde ahí ya está. Para anotarse a un torneo entran a la pestaña Torneos, tocan el que quieren y primero ven **quiénes ya se anotaron**. Ahí mismo pueden tocar **"Inscribirme"**: si van a jugar con alguien, buscan su nombre (aparece mientras escriben) y los anota a los **dos juntos** de una sola vez, incluso si su pareja todavía no había entrado a la app — le queda una notificación avisándole que ya está anotada. Si van solos, con tocar el botón alcanza. La app ya sabe con qué horarios cuentan porque los cargaron en su perfil. Pueden editar sus datos y horarios cuando quieran desde Mi perfil.
 
 ## 5. El resto de las funciones
 
 - **En vivo** (nueva pestaña, con un punto que titila cuando hay torneo en curso): si no hay ningún torneo corriendo en este momento, muestra fecha y sede del próximo. Si hay uno en curso, muestra el estado "EN VIVO" y, a cada jugador logueado, su propio horario y cancha asignados apenas están cargados (o un aviso de que todavía no le tocó). Desde ahí el administrador entra directo a cargar resultados a medida que se van jugando los partidos, y esos resultados impactan al toque en el ranking de todos.
+- **Categorías por torneo**: cada torneo puede abarcar una o varias categorías (ej: "de 2da a 8va"). Se elige al crearlo y se ve en la lista de torneos y en su detalle.
 - **Ranking por categoría**: en la pestaña Ranking, con pastillas para elegir la categoría (6ta, 5ta, Damas, etc.). Se actualiza solo al cargar cada resultado, incluso en las pantallas de otros jugadores en vivo.
 - **Armado automático**: "Armar parejas" empareja por nivel de ranking a quienes no eligieron pareja propia; "Armar partidos" cruza las parejas, busca un horario donde los 4 jugadores estén disponibles (según lo que cargaron en su perfil) y asigna una cancha libre, evitando choques.
 - **Inicio**: muestra los flyers de los próximos torneos y, si hay uno cargado, el jugador del mes.
+- **Auspiciantes por torneo**: además de los generales (se ven en toda la app), un torneo puede tener sus propios auspiciantes — aparecen solo en el detalle de ese torneo, con el logo bien grande.
 - **Notificaciones**: cuando a alguien le asignan un horario de partido, se carga un resultado en el que jugó, o una pareja lo anota a un torneo, le llega un aviso mientras tiene la app abierta o instalada. Push real con la app cerrada del todo (como WhatsApp) es un paso extra — avisame si lo querés y lo sumamos con claves VAPID y una Supabase Edge Function.
 - **Publicidad**: los logos de sponsors aparecen en Inicio y, en pantallas grandes, en una columna fija al costado de toda la app.
 

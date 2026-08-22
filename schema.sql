@@ -46,6 +46,22 @@ create table if not exists jugadores (
 alter table jugadores add column if not exists categoria text not null default '6ta';
 alter table jugadores add column if not exists auth_user_id uuid unique references auth.users(id) on delete cascade;
 
+-- ---------- CATEGORIAS ----------
+-- Lista editable de categorías (6ta, 5ta, Suma12, etc.) que usan tanto
+-- el perfil de jugador como la creación de torneos. El admin la administra
+-- desde el panel de administrador (agregar / borrar categorías).
+create table if not exists categorias (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null unique,
+  orden int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+insert into categorias (nombre, orden) values
+  ('8va', 1), ('7ma', 2), ('6ta', 3), ('5ta', 4), ('4ta', 5),
+  ('3ra', 6), ('2da', 7), ('1ra', 8), ('Damas', 9)
+on conflict (nombre) do nothing;
+
 -- ---------- ADMINISTRADORES ----------
 -- Quienes pueden crear torneos, complejos, cargar resultados, etc.
 -- Para convertir a alguien en admin: que primero se registre normal en la app
@@ -106,6 +122,14 @@ create table if not exists torneo_canchas (
   unique (torneo_id, cancha_id)
 );
 
+-- Categorías que compiten en cada torneo (un torneo puede abarcar varias, ej: de 2da a 8va)
+create table if not exists torneo_categorias (
+  id uuid primary key default gen_random_uuid(),
+  torneo_id uuid not null references torneos(id) on delete cascade,
+  categoria text not null,
+  unique (torneo_id, categoria)
+);
+
 -- ---------- PAREJAS ----------
 create table if not exists parejas (
   id uuid primary key default gen_random_uuid(),
@@ -150,15 +174,20 @@ create table if not exists flyers (
 );
 
 -- ---------- SPONSORS / PUBLICIDAD ----------
+-- torneo_id null = auspiciante general (aparece en Inicio, la columna lateral
+-- y en todos los torneos). Con torneo_id cargado, aparece solo en ese torneo.
 create table if not exists sponsors (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
   logo_url text not null,
   link_url text,
+  torneo_id uuid references torneos(id) on delete cascade,
   orden int not null default 0,
   activo boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table sponsors add column if not exists torneo_id uuid references torneos(id) on delete cascade;
 
 -- ---------- SUSCRIPCIONES A NOTIFICACIONES PUSH ----------
 create table if not exists push_subscriptions (
@@ -390,10 +419,12 @@ $$;
 -- ============================================================
 alter table complejos enable row level security;
 alter table canchas enable row level security;
+alter table categorias enable row level security;
 alter table jugadores enable row level security;
 alter table disponibilidad enable row level security;
 alter table torneos enable row level security;
 alter table torneo_canchas enable row level security;
+alter table torneo_categorias enable row level security;
 alter table parejas enable row level security;
 alter table inscripciones enable row level security;
 alter table partidos enable row level security;
@@ -414,6 +445,12 @@ drop policy if exists "canchas_select" on canchas;
 create policy "canchas_select" on canchas for select using (true);
 drop policy if exists "canchas_write" on canchas;
 create policy "canchas_write" on canchas for all using (is_admin()) with check (is_admin());
+
+-- categorias: lectura pública, solo admin agrega/borra
+drop policy if exists "categorias_select" on categorias;
+create policy "categorias_select" on categorias for select using (true);
+drop policy if exists "categorias_write" on categorias;
+create policy "categorias_write" on categorias for all using (is_admin()) with check (is_admin());
 
 -- jugadores: cada uno ve/edita su propia fila; admin ve/edita todas.
 -- Para mostrar nombres en público se usan las funciones *_publicos() de arriba.
@@ -448,6 +485,16 @@ drop policy if exists "torneo_canchas_update" on torneo_canchas;
 create policy "torneo_canchas_update" on torneo_canchas for update using (is_admin()) with check (is_admin());
 drop policy if exists "torneo_canchas_delete" on torneo_canchas;
 create policy "torneo_canchas_delete" on torneo_canchas for delete using (is_admin());
+
+-- torneo_categorias: lectura pública (qué categorías compiten en cada torneo), escritura admin
+drop policy if exists "torneo_categorias_select" on torneo_categorias;
+create policy "torneo_categorias_select" on torneo_categorias for select using (true);
+drop policy if exists "torneo_categorias_insert" on torneo_categorias;
+create policy "torneo_categorias_insert" on torneo_categorias for insert with check (is_admin());
+drop policy if exists "torneo_categorias_update" on torneo_categorias;
+create policy "torneo_categorias_update" on torneo_categorias for update using (is_admin()) with check (is_admin());
+drop policy if exists "torneo_categorias_delete" on torneo_categorias;
+create policy "torneo_categorias_delete" on torneo_categorias for delete using (is_admin());
 
 -- parejas, partidos: herramientas de armado, solo admin
 -- (los datos públicos de partidos/parejas se muestran vía las funciones *_publicos())

@@ -17,6 +17,8 @@ let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || nul
 let cacheComplejos = [];
 let cacheCanchas = [];
 let cacheJugadoresAdmin = [];
+let cacheCategorias = [];
+let cacheTorneos = [];
 
 // ---------- utilidades UI ----------
 function toast(msg) {
@@ -41,13 +43,13 @@ document.querySelectorAll(".tab").forEach((btn) => {
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnAdminPanel").addEventListener("click", () => cambiarVista("admin"));
 
-function llenarSelect(select, items, labelFn) {
+function llenarSelect(select, items, labelFn, valueFn) {
   if (!select) return;
   const valorPrevio = select.value;
   select.innerHTML = "";
   items.forEach((it) => {
     const opt = document.createElement("option");
-    opt.value = it.id;
+    opt.value = valueFn ? valueFn(it) : it.id;
     opt.textContent = labelFn(it);
     select.appendChild(opt);
   });
@@ -116,7 +118,6 @@ async function precargarFormularioPerfil(j) {
   document.getElementById("jCategoria").value = j.categoria || "6ta";
   document.getElementById("jTelefono").value = j.telefono || "";
   document.getElementById("jLado").value = j.lado_preferido || "indistinto";
-  document.getElementById("jNivel").value = j.nivel || "intermedio";
 
   renderDisponibilidadForm();
   const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id);
@@ -169,9 +170,8 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
     auth_user_id: currentUser.id,
     email: currentUser.email,
     telefono: document.getElementById("jTelefono").value.trim() || null,
-    categoria: document.getElementById("jCategoria").value.trim() || "6ta",
-    lado_preferido: document.getElementById("jLado").value,
-    nivel: document.getElementById("jNivel").value
+    categoria: document.getElementById("jCategoria").value || "6ta",
+    lado_preferido: document.getElementById("jLado").value
   };
 
   let jugadorId;
@@ -463,6 +463,52 @@ document.getElementById("btnCrearComplejo").addEventListener("click", async () =
 });
 
 // ============================================================
+// CATEGORIAS (editable por el admin: perfil de jugador + torneos)
+// ============================================================
+async function cargarCategorias() {
+  const { data } = await sb.from("categorias").select("*").order("orden");
+  cacheCategorias = data || [];
+
+  llenarSelect(document.getElementById("jCategoria"), cacheCategorias, (c) => c.nombre, (c) => c.nombre);
+
+  const formTorneo = document.getElementById("tCategoriasForm");
+  if (formTorneo) {
+    formTorneo.innerHTML = cacheCategorias.map((c) =>
+      `<label><input type="checkbox" class="chkTorneoCategoria" value="${c.nombre}" /> ${c.nombre}</label>`
+    ).join("");
+  }
+
+  const listaAdmin = document.getElementById("listaCategoriasAdmin");
+  if (listaAdmin) {
+    listaAdmin.innerHTML = cacheCategorias.map((c) =>
+      `<span class="pill removable">${c.nombre} <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button></span>`
+    ).join("");
+    listaAdmin.querySelectorAll(".btnBorrarCategoria").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const { error } = await sb.from("categorias").delete().eq("id", btn.dataset.id);
+        if (error) { toast("Error: " + error.message); return; }
+        cargarCategorias();
+      });
+    });
+  }
+}
+
+document.getElementById("btnAgregarCategoria").addEventListener("click", async () => {
+  const input = document.getElementById("catNueva");
+  const nombre = input.value.trim();
+  if (!nombre) { toast("Poné un nombre de categoría"); return; }
+  const { error } = await sb.from("categorias").insert({ nombre, orden: cacheCategorias.length + 1 });
+  if (error) { toast("Error: " + error.message); return; }
+  input.value = "";
+  toast("Categoría agregada");
+  cargarCategorias();
+});
+
+document.getElementById("btnTodasCategorias").addEventListener("click", () => {
+  document.querySelectorAll(".chkTorneoCategoria").forEach((chk) => (chk.checked = true));
+});
+
+// ============================================================
 // JUGADORES (listado admin, para inscribir manualmente y jugador del mes)
 // ============================================================
 async function cargarJugadoresAdmin() {
@@ -494,9 +540,19 @@ function estaEnVivo(t) {
 }
 
 async function cargarTorneos() {
-  const { data } = await sb.from("torneos").select("*, complejos(nombre)").order("fecha_inicio", { ascending: false });
+  const { data } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").order("fecha_inicio", { ascending: false });
+  cacheTorneos = data || [];
   const cont = document.getElementById("listaTorneos");
   cont.innerHTML = "";
+
+  const spTorneo = document.getElementById("spTorneo");
+  if (spTorneo) {
+    const valorPrevio = spTorneo.value;
+    spTorneo.innerHTML = '<option value="">General (todos los torneos)</option>' +
+      cacheTorneos.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join("");
+    if (valorPrevio) spTorneo.value = valorPrevio;
+  }
+
   if (!data || data.length === 0) {
     cont.innerHTML = `<p class="empty">Todavía no hay torneos creados.</p>`;
     return;
@@ -506,9 +562,10 @@ async function cargarTorneos() {
     div.className = "match-card";
     div.style.cursor = "pointer";
     const badge = estaEnVivo(t) ? `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>` : `<span class="badge">${t.estado}</span>`;
+    const categorias = (t.torneo_categorias || []).map((c) => c.categoria).join(", ") || "todas las categorías";
     div.innerHTML = `
       <div class="match-teams">${t.nombre} ${badge}</div>
-      <div class="match-meta">${t.complejos?.nombre || "sin complejo"} · ${t.categoria} · desde ${t.fecha_inicio}</div>
+      <div class="match-meta">${t.complejos?.nombre || "sin complejo"} · ${categorias} · desde ${t.fecha_inicio}</div>
     `;
     div.addEventListener("click", () => abrirTorneo(t.id));
     cont.appendChild(div);
@@ -532,10 +589,12 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     flyerUrl = pub.publicUrl;
   }
 
+  const categoriasElegidas = Array.from(document.querySelectorAll(".chkTorneoCategoria:checked")).map((c) => c.value);
+  if (categoriasElegidas.length === 0) { toast("Elegí al menos una categoría"); return; }
+
   const torneo = {
     nombre,
     complejo_id: complejoId || null,
-    categoria: document.getElementById("tCategoria").value.trim() || "abierta",
     fecha_inicio: fechaInicio,
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
     puntos_primero: Number(document.getElementById("tPuntos1").value) || 100,
@@ -544,6 +603,8 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
+
+  await sb.from("torneo_categorias").insert(categoriasElegidas.map((categoria) => ({ torneo_id: data.id, categoria })));
 
   if (complejoId) {
     const canchasDelComplejo = cacheCanchas.filter((c) => c.complejo_id === complejoId);
@@ -555,6 +616,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   toast("Torneo creado");
   document.getElementById("tNombre").value = "";
   document.getElementById("tFlyerArchivo").value = "";
+  document.querySelectorAll(".chkTorneoCategoria:checked").forEach((c) => (c.checked = false));
   cargarTorneos();
   cargarInicio();
   abrirTorneo(data.id);
@@ -652,17 +714,19 @@ async function renderInscribirme() {
 
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
-  const { data: t } = await sb.from("torneos").select("*, complejos(nombre)").eq("id", torneoActualId).single();
+  const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", torneoActualId).single();
   if (!t) return;
 
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").textContent = t.estado;
-  document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${t.categoria} · ${t.fecha_inicio} a ${t.fecha_fin}`;
+  const categorias = (t.torneo_categorias || []).map((c) => c.categoria).join(", ") || "todas las categorías";
+  document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
   const flyerImg = document.getElementById("dtFlyer");
   if (t.flyer_url) { flyerImg.src = t.flyer_url; flyerImg.style.display = "block"; }
   else flyerImg.style.display = "none";
 
   await renderInscribirme();
+  await cargarSponsorsTorneo();
 
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(nombre, complejo_id)").eq("torneo_id", torneoActualId);
   document.getElementById("dtCanchas").innerHTML = (tc || []).map((c) =>
@@ -844,8 +908,9 @@ function renderPartidos(partidos, canchasTorneo) {
 // ============================================================
 // SPONSORS / PUBLICIDAD
 // ============================================================
-function renderSponsorItem(s) {
-  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" />`;
+function renderSponsorItem(s, caption) {
+  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" />` +
+    (caption ? `<span class="sponsor-caption">${caption}</span>` : "");
   return s.link_url
     ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}">${contenido}</a>`
     : `<span class="sponsor-item" title="${s.nombre}">${contenido}</span>`;
@@ -859,16 +924,35 @@ async function cargarSponsors() {
   const sidebarCard = document.getElementById("sidebarSponsorsCard");
   const sidebar = document.getElementById("sidebarSponsors");
 
-  if (admin) admin.innerHTML = (data && data.length > 0) ? data.map(renderSponsorItem).join("") : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
+  if (admin) {
+    admin.innerHTML = (data && data.length > 0)
+      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")).join("")
+      : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
+  }
 
-  if (data && data.length > 0) {
-    if (inline) inline.innerHTML = data.map(renderSponsorItem).join("");
+  const generales = (data || []).filter((s) => !s.torneo_id);
+  if (generales.length > 0) {
+    if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (inlineCard) inlineCard.style.display = "block";
-    if (sidebar) sidebar.innerHTML = data.map(renderSponsorItem).join("");
+    if (sidebar) sidebar.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (sidebarCard) sidebarCard.style.display = "block";
   } else {
     if (inlineCard) inlineCard.style.display = "none";
     if (sidebarCard) sidebarCard.style.display = "none";
+  }
+}
+
+async function cargarSponsorsTorneo() {
+  const cont = document.getElementById("dtSponsors");
+  if (!cont || !torneoActualId) return;
+  const { data } = await sb.from("sponsors").select("*").eq("activo", true)
+    .or(`torneo_id.eq.${torneoActualId},torneo_id.is.null`).order("orden");
+  if (data && data.length > 0) {
+    cont.innerHTML = data.map((s) => renderSponsorItem(s)).join("");
+    cont.style.display = "flex";
+  } else {
+    cont.innerHTML = "";
+    cont.style.display = "none";
   }
 }
 
@@ -883,13 +967,15 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 
   const { data: pub } = sb.storage.from("sponsors").getPublicUrl(path);
   const linkUrl = document.getElementById("spLink").value.trim() || null;
-  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl });
+  const torneoId = document.getElementById("spTorneo").value || null;
+  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId });
   if (error) { toast("Error: " + error.message); return; }
 
   toast("Auspiciante agregado");
   document.getElementById("spNombre").value = "";
   document.getElementById("spLink").value = "";
   document.getElementById("spArchivo").value = "";
+  document.getElementById("spTorneo").value = "";
   cargarSponsors();
 });
 
@@ -969,9 +1055,9 @@ if ("serviceWorker" in navigator) {
 // ============================================================
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
+  await Promise.all([cargarCategorias(), cargarTorneos()]);
   await Promise.all([
     cargarComplejos(),
-    cargarTorneos(),
     cargarInicio(),
     cargarJugadorDelMes(),
     cargarSponsors(),

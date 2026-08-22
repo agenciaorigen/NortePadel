@@ -174,6 +174,26 @@ tr:first-child td { font-weight: 700; }
 }
 .pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
+.check-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+.check-grid label {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  cursor: pointer;
+}
+.check-grid label:has(input:checked) { color: var(--accent); border-color: var(--accent); }
+
+.link-btn {
+  background: none; border: none; color: var(--accent); font-size: 12px;
+  font-weight: 600; cursor: pointer; padding: 0; margin-left: 6px;
+}
+
+.pill.removable { display: flex; align-items: center; gap: 6px; }
+.pill.removable button {
+  background: none; border: none; color: inherit; cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0;
+}
+
 /* ---------- Admin / roles ---------- */
 .admin-only { display: none; }
 body.is-admin .admin-only { display: block; }
@@ -309,8 +329,9 @@ nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
   border: 1px solid var(--border);
 }
 .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { flex-shrink: 1; text-align: center; }
-.sponsor-strip img { height: 34px; max-width: 120px; object-fit: contain; display: block; filter: grayscale(100%); opacity: .75; transition: filter .15s, opacity .15s; }
+.sponsor-strip img { height: 56px; max-width: 180px; object-fit: contain; display: block; filter: grayscale(100%); opacity: .75; transition: filter .15s, opacity .15s; }
 .sponsor-strip a:hover img { filter: grayscale(0%); opacity: 1; }
+.sponsor-caption { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; }
 
 /* ============================================================
    ESCRITORIO: nav lateral + columna de publicidad fija
