@@ -49,6 +49,7 @@ alter table jugadores add column if not exists categoria text not null default '
 alter table jugadores add column if not exists auth_user_id uuid unique references auth.users(id) on delete cascade;
 alter table jugadores add column if not exists debe_cambiar_clave boolean not null default false;
 alter table jugadores add column if not exists foto_url text;
+alter table jugadores add column if not exists categoria_pendiente text; -- categoría que el jugador pidió, a la espera de que el admin la apruebe
 -- por si la tabla venía con puntos_ranking como entero, de la importación histórica con medios puntos por ascenso
 -- (hay que tirar la vista que depende de la columna antes de poder cambiarle el tipo; se vuelve a crear más abajo)
 drop view if exists vista_ranking;
@@ -91,6 +92,23 @@ create or replace function is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from admins where user_id = auth.uid());
 $$;
+
+-- un jugador no puede cambiar su propia categoría oficial directo (solo puede dejarla
+-- pedida en categoria_pendiente); si intenta escribir en categoria igual, se ignora.
+-- el admin sí puede escribir categoria libremente (para aprobar pedidos o corregir errores).
+create or replace function proteger_categoria_jugador() returns trigger as $$
+begin
+  if not is_admin() and new.categoria is distinct from old.categoria then
+    new.categoria := old.categoria;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_proteger_categoria on jugadores;
+create trigger trg_proteger_categoria
+before update on jugadores
+for each row execute function proteger_categoria_jugador();
 
 -- ---------- JUGADOR DEL MES ----------
 create table if not exists jugador_del_mes (
@@ -444,14 +462,25 @@ begin
 end;
 $$;
 
--- si existía de una versión anterior sin foto_url, hay que tirarla antes de poder agregarle la columna
+-- si existía de una versión anterior con otras columnas, hay que tirarla antes de poder redefinirla
 drop function if exists jugador_del_mes_publico();
+-- devuelve hasta 2 filas: el/la más reciente de Damas y de Caballeros por separado,
+-- para poder mostrar "Jugador del mes" y "Jugadora del mes" a la vez en Inicio.
 create or replace function jugador_del_mes_publico() returns table (
-  jugador_id uuid, nombre text, apellido text, categoria text, foto_url text, motivo text, created_at timestamptz
+  jugador_id uuid, nombre text, apellido text, categoria text, genero text,
+  puntos_ranking numeric, foto_url text, motivo text, created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
-  select j.id, j.nombre, j.apellido, j.categoria, j.foto_url, m.motivo, m.created_at
-  from jugador_del_mes m join jugadores j on j.id = m.jugador_id
-  order by m.created_at desc limit 1;
+  select distinct on (genero) jugador_id, nombre, apellido, categoria, genero, puntos_ranking, foto_url, motivo, created_at
+  from (
+    select j.id as jugador_id, j.nombre, j.apellido, j.categoria,
+      case when j.categoria like '% Damas' then 'Damas'
+           when j.categoria like '% Caballeros' then 'Caballeros'
+           else 'Otras' end as genero,
+      j.puntos_ranking, j.foto_url, m.motivo, m.created_at
+    from jugador_del_mes m join jugadores j on j.id = m.jugador_id
+  ) t
+  where genero in ('Damas', 'Caballeros')
+  order by genero, created_at desc;
 $$;
 
 -- ---------- CAMPEONES ----------
