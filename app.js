@@ -555,6 +555,16 @@ async function cargarCampeones() {
 // ============================================================
 // EN VIVO: torneo actual (o el próximo) + mi partido asignado
 // ============================================================
+// fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color
+// (se reutiliza acá y en la lista de partidos del detalle del torneo)
+function matchVsRowHtml(nombre1, nombre2) {
+  return `<div class="match-vs-row">
+    <span class="match-vs-team">${nombre1}</span>
+    <span class="match-vs-divider">V</span>
+    <span class="match-vs-team derecha">${nombre2}</span>
+  </div>`;
+}
+
 async function cargarEnVivo() {
   const hoy = new Date().toISOString().slice(0, 10);
   const { data: torneos } = await sb.from("torneos").select("*, complejos(nombre, direccion)").order("fecha_inicio");
@@ -578,11 +588,13 @@ async function cargarEnVivo() {
         const miPartido = (partidos || []).find((p) => p.pareja1_id === miPareja.id || p.pareja2_id === miPareja.id);
         if (miPartido) {
           const horario = miPartido.horario ? new Date(miPartido.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "a definir";
-          const rival = miPartido.pareja1_id === miPareja.id ? miPartido.pareja2_nombre : miPartido.pareja1_nombre;
+          const esPareja1 = miPartido.pareja1_id === miPareja.id;
+          const miEquipo = esPareja1 ? miPartido.pareja1_nombre : miPartido.pareja2_nombre;
+          const rival = esPareja1 ? miPartido.pareja2_nombre : miPartido.pareja1_nombre;
           miPartidoHtml = `<div class="match-card" style="border-color:var(--accent);margin-top:14px">
-            <h3 style="color:var(--accent);margin-bottom:6px">Tu partido</h3>
+            <h3 style="color:var(--accent);margin-bottom:2px">Tu partido</h3>
+            ${matchVsRowHtml(miEquipo, rival)}
             <div class="match-meta">🕒 ${horario} · 📍 ${miPartido.cancha_nombre || "cancha a definir"}</div>
-            <div class="match-meta">vs ${rival}</div>
             <span class="badge" style="margin-top:6px;display:inline-block">${miPartido.estado}</span>
           </div>`;
         } else {
@@ -593,24 +605,32 @@ async function cargarEnVivo() {
       }
     }
     cont.innerHTML = `
-      <span class="badge live"><span class="live-dot"></span>EN VIVO</span>
-      <h2 style="margin-top:10px">${enCurso.nombre}</h2>
-      <p class="match-meta">${enCurso.complejos?.nombre || "sin complejo"} · ${enCurso.fecha_inicio} a ${enCurso.fecha_fin}</p>
-      ${miPartidoHtml}
-      <button class="gradient" id="btnVerTorneoEnVivo" style="margin-top:14px">Ver partidos y resultados</button>
+      <div class="envivo-header">
+        <span class="badge live"><span class="live-dot"></span>EN VIVO</span>
+        <h2 class="envivo-titulo">${enCurso.nombre}</h2>
+        <p class="envivo-sub">${enCurso.complejos?.nombre || "sin complejo"} · ${enCurso.fecha_inicio} al ${enCurso.fecha_fin}</p>
+      </div>
+      <div class="card">
+        ${miPartidoHtml}
+        <button class="gradient" id="btnVerTorneoEnVivo" style="margin-top:14px">Ver partidos y resultados</button>
+      </div>
     `;
     document.getElementById("btnVerTorneoEnVivo").addEventListener("click", () => abrirTorneo(enCurso.id));
   } else if (proximo) {
     const direccion = proximo.complejos?.direccion ? ` (${proximo.complejos.direccion})` : "";
     cont.innerHTML = `
-      <p class="match-meta">No hay ningún torneo en curso ahora mismo.</p>
-      <h2 style="margin-top:10px">Próximo: ${proximo.nombre}</h2>
-      <p class="match-meta">📅 ${proximo.fecha_inicio} · 📍 ${proximo.complejos?.nombre || "a confirmar"}${direccion}</p>
-      <button class="secondary small" id="btnVerProximo" style="margin-top:12px">Ver torneo</button>
+      <div class="envivo-header">
+        <span class="envivo-sub">No hay ningún torneo en curso ahora mismo</span>
+        <h2 class="envivo-titulo">Próximo: ${proximo.nombre}</h2>
+        <p class="envivo-sub">📅 ${proximo.fecha_inicio} · 📍 ${proximo.complejos?.nombre || "a confirmar"}${direccion}</p>
+      </div>
+      <div class="card">
+        <button class="secondary small" id="btnVerProximo">Ver torneo</button>
+      </div>
     `;
     document.getElementById("btnVerProximo").addEventListener("click", () => abrirTorneo(proximo.id));
   } else {
-    cont.innerHTML = '<p class="empty">Todavía no hay torneos programados.</p>';
+    cont.innerHTML = '<div class="card"><p class="empty">Todavía no hay torneos programados.</p></div>';
   }
 }
 
@@ -1279,9 +1299,7 @@ function renderPartidosLista(partidos, canchasTorneo) {
     div.className = "match-card";
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
-      <div class="match-teams">${p.pareja1_nombre}</div>
-      <div class="match-meta" style="text-align:center">vs</div>
-      <div class="match-teams">${p.pareja2_nombre}</div>
+      ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre)}
       <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}</div>
       ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `

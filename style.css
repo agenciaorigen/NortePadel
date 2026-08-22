@@ -6,6 +6,7 @@
   --accent-ink: #0c1400;   /* texto sobre el verde */
   --accent-2: #ff2d95;     /* magenta */
   --accent-3: #6a3dff;     /* violeta/azul */
+  --accent-teal: #0f9e96;  /* filas de partidos tipo "order of play" */
   --text: #f5f7fb;
   --muted: #8b93a7;
   --border: #232838;
@@ -500,6 +501,39 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .suggest-item:last-child { border-radius: 0 0 10px 10px; }
 
 /* ---------- En vivo ---------- */
+.envivo-header {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 26px 20px 22px;
+  margin-bottom: 16px;
+  text-align: center;
+  background:
+    linear-gradient(0deg, rgba(5,7,10,.88), rgba(5,7,10,.4) 55%),
+    radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.35), transparent 55%),
+    url('hero-cancha.jpg') center/cover no-repeat, #05070a;
+  border: 1px solid var(--border);
+}
+.envivo-header .badge.live { margin-bottom: 10px; }
+.envivo-titulo {
+  font-size: 24px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .01em; margin: 4px 0 6px; line-height: 1.15;
+}
+.envivo-sub {
+  font-size: 11.5px; color: #dfe4ee; text-transform: uppercase;
+  letter-spacing: .05em; font-weight: 600;
+}
+
+/* fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color */
+.match-vs-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--accent-teal); color: #fff;
+  border-radius: 10px; padding: 12px 14px; margin: 10px 0;
+}
+.match-vs-team { flex: 1; font-weight: 700; font-size: 12.5px; line-height: 1.35; }
+.match-vs-team.derecha { text-align: right; }
+.match-vs-divider { font-weight: 800; color: var(--accent); font-size: 13px; flex-shrink: 0; }
+
 .badge.live {
   background: rgba(255,45,149,.16);
   color: #ff6fb8;
