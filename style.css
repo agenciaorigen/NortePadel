@@ -438,12 +438,18 @@ tr:first-child td { font-weight: 700; }
 /* ---------- Vista calendario (canchas × horarios) ---------- */
 .tabla-calendario { font-size: 12px; white-space: nowrap; }
 .tabla-calendario th, .tabla-calendario td { padding: 6px; vertical-align: top; }
+.tabla-calendario th {
+  background: rgba(5,7,10,.7); color: var(--text); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em; border-radius: 6px;
+}
 .calendario-hora { color: var(--muted); font-weight: 600; white-space: nowrap; }
 .calendario-partido {
-  background: #0e182c; border: 1px solid var(--border); border-radius: 8px;
-  padding: 6px 8px; line-height: 1.35; min-width: 110px;
+  background: var(--accent-teal); color: #fff; border-radius: 8px;
+  padding: 6px 8px; line-height: 1.35; min-width: 110px; font-weight: 600;
 }
-.calendario-partido.jugado { border-color: rgba(180,255,57,.4); }
+.calendario-partido.jugado { background: #0e182c; border: 1px solid rgba(180,255,57,.4); color: var(--text); font-weight: 400; }
+.calendario-vs { color: var(--accent); font-weight: 800; margin: 0 3px; }
+.calendario-partido.jugado .calendario-vs { color: var(--accent); }
 
 /* ---------- Vista llave (eliminación directa) ---------- */
 .llave-scroll { overflow-x: auto; padding-bottom: 6px; }
@@ -584,6 +590,31 @@ nav.tabbar .icon { position: relative; }
 .match-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .match-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .match-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* panel de carga de resultado: separado visualmente del partido/calendario público, solo admin */
+.match-admin-panel {
+  background: rgba(5,7,10,.6);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+}
+.match-admin-panel .match-actions:first-of-type { margin-top: 0; }
+.match-admin-label {
+  margin: 0 0 8px; color: var(--muted); font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+
+/* tarjeta "Partidos" (Lista / Calendario / Llave) con fondo tipo póster */
+.card.partidos-poster {
+  position: relative;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(5,7,10,.85), rgba(5,7,10,.94) 45%),
+    radial-gradient(120% 90% at 15% -10%, rgba(15,158,150,.3), transparent 55%),
+    url('hero-cancha.jpg') center/cover no-repeat, #05070a;
+}
+.partidos-poster > h3 { text-transform: uppercase; letter-spacing: .03em; }
 
 .torneo-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .torneo-nombre { font-weight: 700; font-size: 15.5px; }

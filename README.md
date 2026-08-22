@@ -38,13 +38,13 @@ Recién instalada, nadie es administrador todavía (ni siquiera vos) — es a pr
    insert into admins (user_id)
    select id from auth.users where email = 'tu-email@ejemplo.com';
    ```
-3. Volvé a la app y refrescá la página. Ahora vas a ver el ícono de engranaje ⚙️ en el encabezado: ese es tu panel de administrador.
+3. Volvé a la app y refrescá la página. Ahora vas a ver "Config" ⚙️ en el menú (al costado en pantallas grandes, abajo del todo en el celular): ese es tu panel de administrador.
 
 Repetí el paso 2 con el email de cualquier otra persona que también organice torneos con vos.
 
 ## 4. Cómo funciona para cada rol
 
-**Administradores** (el ícono ⚙️ en el encabezado):
+**Administradores** ("Config" ⚙️ en el menú — al costado en pc, abajo en celular, junto con Inicio/En vivo/Torneos/Ranking):
 - Crean los **complejos**, con nombre, dirección y cuántas canchas tiene (las crea automáticamente con ese número; después podés agregar más una por una si hace falta).
 - Administran la lista de **categorías** (6ta, 5ta, Damas, Suma12, la que hagan falta): las agregan, **editan el nombre** (✏️, para corregir errores de tipeo — renombra también a todos los jugadores y torneos que ya la tenían asignada) o las borran desde el panel de administrador, y esa lista es la que después aparece para elegir tanto en el perfil del jugador como al crear un torneo.
 - **Aprueban o rechazan los pedidos de categoría** de los jugadores, desde "Solicitudes de categoría" en el panel de administrador. Un jugador nunca puede cambiar su categoría oficial por su cuenta (está bloqueado también a nivel de base de datos, no solo en la pantalla) — solo puede pedirla, y el admin decide.
@@ -58,7 +58,7 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 
 ## 5. El resto de las funciones
 
-- **En vivo** (pestaña con un punto que titila cuando hay torneo en curso): encabezado grande con foto de fondo y el nombre del torneo bien visible, estilo cartel de "orden de juego". Si no hay ningún torneo corriendo en este momento, muestra fecha y sede del próximo. Si hay uno en curso, muestra el estado "EN VIVO" y, a cada jugador logueado, su propio partido asignado (con su pareja y el rival en una fila de color, no solo texto) o un aviso de que todavía no le tocó. Esa misma fila de color se usa en la lista de partidos del detalle del torneo, para que se lea como un fixture real y no una lista de texto plano. Desde ahí el administrador entra directo a cargar resultados a medida que se van jugando los partidos, y esos resultados impactan al toque en el ranking de todos.
+- **En vivo** (pestaña con un punto que titila cuando hay torneo en curso): encabezado grande con foto de fondo y el nombre del torneo bien visible, estilo cartel de "orden de juego". Si no hay ningún torneo corriendo en este momento, muestra fecha y sede del próximo. Si hay uno en curso, muestra el estado "EN VIVO" y, a cada jugador logueado, su propio partido asignado (con su pareja y el rival en una fila de color, no solo texto) o un aviso de que todavía no le tocó. Esa misma fila de color se usa en la lista de partidos del detalle del torneo, para que se lea como un fixture real y no una lista de texto plano. La tarjeta "Partidos" del detalle del torneo (Lista, Calendario y Llave) también tiene ese fondo tipo cartel, y en la vista Calendario cada partido se ve en un color sólido en vez del cuadrito gris de antes. Cargar un resultado sigue siendo cosa de admin: esos controles quedan aparte, en un recuadro con borde punteado y la etiqueta "Cargar resultado (solo admin)", para no mezclarse con lo que ve cualquier jugador.
 - **Categorías por torneo**: cada torneo puede abarcar una o varias categorías (ej: "de 2da a 8va"). Se elige al crearlo y se ve en la lista de torneos y en su detalle.
 - **Ranking por eliminación directa**: al cargar el resultado de un partido de bracket, la pareja que **pierde** suma los puntos de la ronda en la que quedó eliminada (llegó hasta ahí). En la Final, el ganador suma los puntos de "Campeón" y el perdedor los de "Sub". Un partido de fase de grupos (o sin ronda asignada) no reparte puntos de ranking, solo cuenta como partido jugado.
 - **Ranking por categoría**: en la pestaña Ranking, primero se elige Damas o Caballeros y recién ahí aparecen las pastillas de esas categorías (6ta, 5ta, etc.) — así entran todas, aunque haya muchas, sin que las tape el ancho de la pantalla. Se ve la tabla completa de esa categoría (sin cortar), con la foto de cada jugador al lado del nombre — más grande para el top 5. Se actualiza solo al cargar cada resultado, incluso en las pantallas de otros jugadores en vivo. La misma separación Damas/Caballeros se usa para elegir categoría en el perfil del jugador, al crear un torneo y en el panel de administrador.
@@ -75,7 +75,7 @@ Repetí el paso 2 con el email de cualquier otra persona que también organice t
 
 ## 6. Seguridad
 
-La base de datos quedó con permisos por rol de verdad (no solo ocultos en la interfaz): un jugador solo puede crear o editar su propia fila y su propia inscripción; crear torneos, complejos, cargar resultados o subir flyers/sponsors requiere estar en la tabla `admins`. Los emails y teléfonos de los jugadores no son visibles públicamente — el ranking y las listas públicas se arman con funciones que exponen solo nombre, categoría y puntos. La categoría oficial (`categoria`) tampoco la puede cambiar un jugador directo aunque manipule la app: hay una regla en la base de datos que revierte cualquier intento y solo la deja pasar si la cambia un administrador. El panel de administrador (pestaña de configuración ⚙️) solo se ve y se puede abrir si estás en la tabla `admins` — para cualquier otra persona, ni el botón aparece.
+La base de datos quedó con permisos por rol de verdad (no solo ocultos en la interfaz): un jugador solo puede crear o editar su propia fila y su propia inscripción; crear torneos, complejos, cargar resultados o subir flyers/sponsors requiere estar en la tabla `admins`. Los emails y teléfonos de los jugadores no son visibles públicamente — el ranking y las listas públicas se arman con funciones que exponen solo nombre, categoría y puntos. La categoría oficial (`categoria`) tampoco la puede cambiar un jugador directo aunque manipule la app: hay una regla en la base de datos que revierte cualquier intento y solo la deja pasar si la cambia un administrador. El panel de administrador ("Config" ⚙️ en el menú) solo se ve y se puede abrir si estás en la tabla `admins` — para cualquier otra persona, ni el botón aparece.
 
 ## 7. Velocidad
 

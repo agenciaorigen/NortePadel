@@ -44,7 +44,6 @@ document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => cambiarVista(btn.dataset.view));
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
-document.getElementById("btnAdminPanel").addEventListener("click", () => cambiarVista("admin"));
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
 
 // agrupa categorías tipo "6ta Damas" / "6ta Caballeros" por género; lo que no matchea
@@ -1245,7 +1244,7 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
     canchas.forEach((c) => {
       const p = celda(h, c.id);
       html += "<td>" + (p
-        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">${p.pareja1_nombre}<br>vs<br>${p.pareja2_nombre}${p.ronda && p.ronda !== "Fase de grupos" ? `<br><span class="badge orange">${p.ronda}</span>` : ""}</div>`
+        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">${p.pareja1_nombre}<span class="calendario-vs">V</span>${p.pareja2_nombre}${p.ronda && p.ronda !== "Fase de grupos" ? `<br><span class="badge orange">${p.ronda}</span>` : ""}</div>`
         : "") + "</td>";
     });
     html += "</tr>";
@@ -1303,22 +1302,25 @@ function renderPartidosLista(partidos, canchasTorneo) {
       <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}</div>
       ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
-      <div class="match-actions">
-        <select class="selectRonda" data-p="${p.id}">
-          ${["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"].map((r) =>
-            `<option value="${r}" ${(p.ronda || "Fase de grupos") === r ? "selected" : ""}>${r}</option>`
-          ).join("")}
-        </select>
-      </div>
-      <div class="match-actions">
-        <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
-        <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}">Cargar resultado</button>
-      </div>
-      <div class="match-actions">
-        <select class="selectReasignar" data-p="${p.id}">
-          ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
-        </select>
-        <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
+      <div class="match-admin-panel">
+        <p class="match-admin-label">Cargar resultado (solo admin)</p>
+        <div class="match-actions">
+          <select class="selectRonda" data-p="${p.id}">
+            ${["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"].map((r) =>
+              `<option value="${r}" ${(p.ronda || "Fase de grupos") === r ? "selected" : ""}>${r}</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div class="match-actions">
+          <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
+          <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}">Cargar resultado</button>
+        </div>
+        <div class="match-actions">
+          <select class="selectReasignar" data-p="${p.id}">
+            ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
+          </select>
+          <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
+        </div>
       </div>` : ""}
     `;
     cont.appendChild(div);
