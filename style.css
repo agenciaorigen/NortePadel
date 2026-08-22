@@ -174,6 +174,46 @@ tr:first-child td { font-weight: 700; }
 }
 .pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
+/* ---------- Avatares / fotos de perfil ---------- */
+.avatar {
+  width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+  background: #1a2236; border: 2px solid var(--card); flex-shrink: 0;
+}
+.avatar-placeholder { display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.avatar-grande { width: 88px; height: 88px; border: 2px solid var(--accent); font-size: 30px; margin-bottom: 8px; }
+
+.campeones-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.campeon-card {
+  flex-shrink: 0; width: 140px; text-align: center;
+  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 10px;
+}
+.campeon-avatares { display: flex; justify-content: center; margin-bottom: 6px; }
+.campeon-avatares .avatar { width: 48px; height: 48px; margin-left: -12px; }
+.campeon-avatares .avatar:first-child { margin-left: 0; }
+.campeon-nombres { font-size: 12px; font-weight: 600; line-height: 1.3; }
+.campeon-torneo { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ---------- Vista calendario (canchas × horarios) ---------- */
+.tabla-calendario { font-size: 12px; white-space: nowrap; }
+.tabla-calendario th, .tabla-calendario td { padding: 6px; vertical-align: top; }
+.calendario-hora { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.calendario-partido {
+  background: #0e182c; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 8px; line-height: 1.35; min-width: 110px;
+}
+.calendario-partido.jugado { border-color: rgba(180,255,57,.4); }
+
+/* ---------- Vista llave (eliminación directa) ---------- */
+.llave-scroll { overflow-x: auto; padding-bottom: 6px; }
+.llave { display: flex; gap: 22px; }
+.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 150px; }
+.llave-columna h3 { text-align: center; }
+.llave-partido {
+  background: #0e182c; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+}
+.llave-equipo { padding: 3px 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.llave-equipo.ganador { color: var(--accent); }
+
 .check-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
 .check-grid label {
   display: flex; align-items: center; gap: 6px;

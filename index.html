@@ -54,6 +54,11 @@
       <div id="jugadorDelMesContenido"></div>
     </div>
 
+    <div class="card" id="campeonesCard" style="display:none">
+      <h3>🏆 Campeones</h3>
+      <div class="campeones-strip" id="campeonesContenido"></div>
+    </div>
+
     <div class="card">
       <h2>Próximos torneos</h2>
       <div class="flyer-grid" id="flyerMini"></div>
@@ -159,7 +164,12 @@
     <div class="card">
       <h3>Partidos</h3>
       <button class="primary admin-only" id="btnArmarPartidos">Armar partidos automáticamente</button>
-      <div id="dtPartidos" style="margin-top:12px"></div>
+      <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
+        <button class="pill active" data-vista="lista">Lista</button>
+        <button class="pill" data-vista="calendario">Calendario</button>
+        <button class="pill" data-vista="llave">Llave</button>
+      </div>
+      <div id="dtPartidos"></div>
     </div>
   </section>
 
@@ -191,6 +201,12 @@
 
     <div class="card" id="completarPerfilCard" style="display:none">
       <h2>Completá tu perfil de jugador</h2>
+      <div style="text-align:center;margin-bottom:14px">
+        <img id="fotoPreview" alt="Tu foto de perfil" class="avatar avatar-grande" style="display:none;margin:0 auto" onerror="mostrarFotoPreview(null)" />
+        <div id="fotoPlaceholder" class="avatar avatar-grande avatar-placeholder" style="margin:0 auto">🎾</div>
+        <label>Foto de perfil</label>
+        <input id="jFoto" type="file" accept="image/*" />
+      </div>
       <div class="row">
         <div><label>Nombre</label><input id="jNombre" /></div>
         <div><label>Apellido</label><input id="jApellido" /></div>

@@ -19,6 +19,9 @@ let cacheCanchas = [];
 let cacheJugadoresAdmin = [];
 let cacheCategorias = [];
 let cacheTorneos = [];
+let vistaPartidosActual = "lista"; // lista | calendario | llave
+let ultimosPartidos = [];
+let ultimasCanchasTorneo = [];
 
 // ---------- utilidades UI ----------
 function toast(msg) {
@@ -112,12 +115,24 @@ function renderDisponibilidadForm() {
   });
 }
 
+function mostrarFotoPreview(url) {
+  const img = document.getElementById("fotoPreview");
+  const placeholder = document.getElementById("fotoPlaceholder");
+  if (url) { img.src = url; img.style.display = "block"; placeholder.style.display = "none"; }
+  else { img.style.display = "none"; placeholder.style.display = "flex"; }
+}
+document.getElementById("jFoto").addEventListener("change", (e) => {
+  const archivo = e.target.files[0];
+  if (archivo) mostrarFotoPreview(URL.createObjectURL(archivo));
+});
+
 async function precargarFormularioPerfil(j) {
   document.getElementById("jNombre").value = j.nombre || "";
   document.getElementById("jApellido").value = j.apellido || "";
   document.getElementById("jCategoria").value = j.categoria || "6ta";
   document.getElementById("jTelefono").value = j.telefono || "";
   document.getElementById("jLado").value = j.lado_preferido || "indistinto";
+  mostrarFotoPreview(j.foto_url);
 
   renderDisponibilidadForm();
   const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id);
@@ -149,7 +164,7 @@ function renderVistaPerfil() {
     completarCard.style.display = "block";
     miCard.style.display = "none";
     if (miJugador) precargarFormularioPerfil(miJugador);
-    else renderDisponibilidadForm();
+    else { renderDisponibilidadForm(); mostrarFotoPreview(null); }
   } else {
     completarCard.style.display = "none";
     miCard.style.display = "block";
@@ -173,6 +188,15 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
     categoria: document.getElementById("jCategoria").value || "6ta",
     lado_preferido: document.getElementById("jLado").value
   };
+
+  const archivoFoto = document.getElementById("jFoto").files[0];
+  if (archivoFoto) {
+    const path = `${currentUser.id}-${Date.now()}-${archivoFoto.name}`;
+    const { error: upErr } = await sb.storage.from("fotos").upload(path, archivoFoto);
+    if (upErr) { toast("Error subiendo la foto: " + upErr.message); return; }
+    const { data: pub } = sb.storage.from("fotos").getPublicUrl(path);
+    datos.foto_url = pub.publicUrl;
+  }
 
   let jugadorId;
   if (miJugador) {
@@ -198,12 +222,14 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   const { data: perfil } = await sb.from("jugadores").select("*").eq("id", jugadorId).single();
   miJugador = perfil;
   editandoPerfil = false;
+  document.getElementById("jFoto").value = "";
   toast("¡Perfil guardado! 🎾");
   pedirPermisoNotificaciones();
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
   cargarRanking();
+  cargarJugadorDelMes();
   if (torneoActualId) renderInscribirme();
 });
 
@@ -339,6 +365,13 @@ async function cargarInicio() {
   }
 }
 
+function avatarHtml(fotoUrl, size) {
+  const s = size || 44;
+  return fotoUrl
+    ? `<img class="avatar" src="${fotoUrl}" alt="" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
+    : `<div class="avatar avatar-placeholder" style="width:${s}px;height:${s}px">🎾</div>`;
+}
+
 async function cargarJugadorDelMes() {
   const { data } = await sb.rpc("jugador_del_mes_publico");
   const row = (data && data[0]) || null;
@@ -346,9 +379,28 @@ async function cargarJugadorDelMes() {
   if (!row) { card.style.display = "none"; return; }
   card.style.display = "block";
   document.getElementById("jugadorDelMesContenido").innerHTML = `
-    <div class="match-teams">${row.nombre} ${row.apellido} <span class="badge">${row.categoria}</span></div>
-    ${row.motivo ? `<div class="match-meta">${row.motivo}</div>` : ""}
+    <div style="display:flex;align-items:center;gap:10px">
+      ${avatarHtml(row.foto_url, 56)}
+      <div>
+        <div class="match-teams">${row.nombre} ${row.apellido} <span class="badge">${row.categoria}</span></div>
+        ${row.motivo ? `<div class="match-meta">${row.motivo}</div>` : ""}
+      </div>
+    </div>
   `;
+}
+
+async function cargarCampeones() {
+  const { data } = await sb.rpc("campeones_publico");
+  const card = document.getElementById("campeonesCard");
+  if (!data || data.length === 0) { card.style.display = "none"; return; }
+  card.style.display = "block";
+  document.getElementById("campeonesContenido").innerHTML = data.map((c) => `
+    <div class="campeon-card">
+      <div class="campeon-avatares">${avatarHtml(c.jugador1_foto, 48)}${avatarHtml(c.jugador2_foto, 48)}</div>
+      <div class="campeon-nombres">${c.jugador1_nombre} ${c.jugador1_apellido} / ${c.jugador2_nombre} ${c.jugador2_apellido}</div>
+      <div class="campeon-torneo">🏆 ${c.torneo_nombre}</div>
+    </div>
+  `).join("");
 }
 
 // ============================================================
@@ -879,7 +931,89 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
 });
 
 // ---------- render de partidos + carga de resultados ----------
+document.querySelectorAll("#partidosVistaPills .pill").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    vistaPartidosActual = btn.dataset.vista;
+    document.querySelectorAll("#partidosVistaPills .pill").forEach((b) => b.classList.toggle("active", b === btn));
+    renderPartidos(ultimosPartidos, ultimasCanchasTorneo);
+  });
+});
+
 function renderPartidos(partidos, canchasTorneo) {
+  ultimosPartidos = partidos;
+  ultimasCanchasTorneo = canchasTorneo;
+  if (vistaPartidosActual === "calendario") return renderPartidosCalendario(partidos, canchasTorneo);
+  if (vistaPartidosActual === "llave") return renderPartidosLlave(partidos);
+  return renderPartidosLista(partidos, canchasTorneo);
+}
+
+// vista "tipo calendario": una tabla con las canchas del torneo como columnas
+// y cada horario distinto en el que hay algún partido como fila.
+function renderPartidosCalendario(partidos, canchasTorneo) {
+  const cont = document.getElementById("dtPartidos");
+  const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean);
+  const conHorario = partidos.filter((p) => p.horario);
+  const sinHorario = partidos.filter((p) => !p.horario);
+
+  if (canchas.length === 0 || conHorario.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos con cancha y horario asignados.</p>';
+    return;
+  }
+
+  const horarios = [...new Set(conHorario.map((p) => p.horario))].sort();
+  const celda = (horario, canchaId) => conHorario.find((p) => p.horario === horario && p.cancha_id === canchaId);
+
+  let html = '<div style="overflow-x:auto"><table class="tabla-calendario"><thead><tr><th>Horario</th>' +
+    canchas.map((c) => `<th>${c.nombre}</th>`).join("") + "</tr></thead><tbody>";
+  horarios.forEach((h) => {
+    const fecha = new Date(h).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    html += `<tr><td class="calendario-hora">${fecha}</td>`;
+    canchas.forEach((c) => {
+      const p = celda(h, c.id);
+      html += "<td>" + (p
+        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">${p.pareja1_nombre}<br>vs<br>${p.pareja2_nombre}${p.ronda && p.ronda !== "Fase de grupos" ? `<br><span class="badge orange">${p.ronda}</span>` : ""}</div>`
+        : "") + "</td>";
+    });
+    html += "</tr>";
+  });
+  html += "</tbody></table></div>";
+
+  if (sinHorario.length > 0) {
+    html += `<p class="match-meta" style="margin-top:10px">Sin horario asignado (${sinHorario.length}): ` +
+      sinHorario.map((p) => `${p.pareja1_nombre} vs ${p.pareja2_nombre}`).join(" · ") + "</p>";
+  }
+  cont.innerHTML = html;
+}
+
+// vista "llave": cuadro de eliminación directa, una columna por ronda de bracket
+// (la fase de grupos no entra acá porque no es de eliminación directa)
+function renderPartidosLlave(partidos) {
+  const cont = document.getElementById("dtPartidos");
+  const RONDAS = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
+  const columnas = RONDAS.map((r) => ({ ronda: r, partidos: partidos.filter((p) => p.ronda === r) }))
+    .filter((col) => col.partidos.length > 0);
+
+  if (columnas.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos de eliminación directa. Asignales una ronda (Cuartos, Semifinal, etc.) al cargar el resultado.</p>';
+    return;
+  }
+
+  cont.innerHTML = '<div class="llave-scroll"><div class="llave">' +
+    columnas.map((col) => `
+      <div class="llave-columna">
+        <h3>${col.ronda}</h3>
+        ${col.partidos.map((p) => `
+          <div class="llave-partido">
+            <div class="llave-equipo ${p.ganador_pareja_id === p.pareja1_id ? "ganador" : ""}">${p.pareja1_nombre}</div>
+            <div class="llave-equipo ${p.ganador_pareja_id === p.pareja2_id ? "ganador" : ""}">${p.pareja2_nombre}</div>
+            <div class="match-meta" style="text-align:center">${p.estado === "jugado" ? "✔️ jugado" : (p.cancha_nombre || "sin cancha")}</div>
+          </div>
+        `).join("")}
+      </div>
+    `).join("") + "</div></div>";
+}
+
+function renderPartidosLista(partidos, canchasTorneo) {
   const cont = document.getElementById("dtPartidos");
   cont.innerHTML = "";
   if (partidos.length === 0) {
@@ -941,6 +1075,7 @@ function renderPartidos(partidos, canchasTorneo) {
       avisarActualizacionEnVivo();
       refrescarDetalleTorneo();
       cargarRanking();
+      if (ronda === "Final") cargarCampeones();
     });
   });
 
@@ -1112,6 +1247,7 @@ async function init() {
     cargarComplejos(),
     cargarInicio(),
     cargarJugadorDelMes(),
+    cargarCampeones(),
     cargarSponsors(),
     cargarRanking(),
     cargarEnVivo(),

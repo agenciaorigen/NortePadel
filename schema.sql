@@ -40,6 +40,7 @@ create table if not exists jugadores (
   partidos_ganados int not null default 0,
   activo boolean not null default true,
   debe_cambiar_clave boolean not null default false, -- true para cuentas importadas con clave provisoria
+  foto_url text, -- foto de perfil, la sube cada jugador desde "Mi perfil"
   created_at timestamptz not null default now()
 );
 
@@ -47,7 +48,10 @@ create table if not exists jugadores (
 alter table jugadores add column if not exists categoria text not null default '6ta';
 alter table jugadores add column if not exists auth_user_id uuid unique references auth.users(id) on delete cascade;
 alter table jugadores add column if not exists debe_cambiar_clave boolean not null default false;
+alter table jugadores add column if not exists foto_url text;
 -- por si la tabla venía con puntos_ranking como entero, de la importación histórica con medios puntos por ascenso
+-- (hay que tirar la vista que depende de la columna antes de poder cambiarle el tipo; se vuelve a crear más abajo)
+drop view if exists vista_ranking;
 alter table jugadores alter column puntos_ranking type numeric(10,1) using puntos_ranking::numeric(10,1);
 alter table jugadores alter column puntos_ranking set default 0;
 
@@ -345,6 +349,9 @@ order by categoria, puntos_ranking desc;
 -- puede quedar bloqueada por RLS y estas funciones son la única forma
 -- de leer datos de jugadores desde afuera.
 -- ============================================================
+-- si existía de una versión anterior con puntos_ranking como int, hay que tirarla:
+-- Postgres no deja cambiarle el tipo de columna de salida a una función con "or replace"
+drop function if exists jugadores_publicos();
 create or replace function jugadores_publicos() returns table (
   id uuid, nombre text, apellido text, categoria text, nivel text,
   puntos_ranking numeric(10,1), partidos_jugados int, partidos_ganados int
@@ -437,12 +444,35 @@ begin
 end;
 $$;
 
+-- si existía de una versión anterior sin foto_url, hay que tirarla antes de poder agregarle la columna
+drop function if exists jugador_del_mes_publico();
 create or replace function jugador_del_mes_publico() returns table (
-  jugador_id uuid, nombre text, apellido text, categoria text, motivo text, created_at timestamptz
+  jugador_id uuid, nombre text, apellido text, categoria text, foto_url text, motivo text, created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
-  select j.id, j.nombre, j.apellido, j.categoria, m.motivo, m.created_at
+  select j.id, j.nombre, j.apellido, j.categoria, j.foto_url, m.motivo, m.created_at
   from jugador_del_mes m join jugadores j on j.id = m.jugador_id
   order by m.created_at desc limit 1;
+$$;
+
+-- ---------- CAMPEONES ----------
+-- Se arma solo, a partir de los partidos de "Final" ya jugados: no hace falta cargar nada aparte.
+drop function if exists campeones_publico();
+create or replace function campeones_publico() returns table (
+  torneo_id uuid, torneo_nombre text, fecha date,
+  jugador1_nombre text, jugador1_apellido text, jugador1_foto text,
+  jugador2_nombre text, jugador2_apellido text, jugador2_foto text
+) language sql stable security definer set search_path = public as $$
+  select t.id, t.nombre, coalesce(t.fecha_fin, t.fecha_inicio),
+    j1.nombre, j1.apellido, j1.foto_url,
+    j2.nombre, j2.apellido, j2.foto_url
+  from partidos pt
+  join torneos t on t.id = pt.torneo_id
+  join parejas p on p.id = pt.ganador_pareja_id
+  join jugadores j1 on j1.id = p.jugador1_id
+  join jugadores j2 on j2.id = p.jugador2_id
+  where pt.ronda = 'Final' and pt.estado = 'jugado' and pt.ganador_pareja_id is not null
+  order by coalesce(t.fecha_fin, t.fecha_inicio) desc
+  limit 8;
 $$;
 
 -- ============================================================
@@ -630,3 +660,20 @@ drop policy if exists "sponsors_public_write" on storage.objects;
 drop policy if exists "sponsors_admin_write" on storage.objects;
 create policy "sponsors_admin_write" on storage.objects
   for insert with check (bucket_id = 'sponsors' and public.is_admin());
+
+-- ============================================================
+-- STORAGE: bucket público para fotos de perfil de jugadores
+-- A diferencia de flyers/sponsors, acá puede subir CUALQUIER usuario logueado
+-- (su propia foto), no solo el admin.
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('fotos', 'fotos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "fotos_public_read" on storage.objects;
+create policy "fotos_public_read" on storage.objects
+  for select using (bucket_id = 'fotos');
+
+drop policy if exists "fotos_auth_write" on storage.objects;
+create policy "fotos_auth_write" on storage.objects
+  for insert with check (bucket_id = 'fotos' and auth.role() = 'authenticated');
