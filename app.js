@@ -1123,7 +1123,10 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     duracion_minutos: Number(document.getElementById("tDuracion").value) || 90,
     dias_semana: diasElegidos.length ? diasElegidos : null,
     hora_desde: document.getElementById("tHoraDesde").value || null,
-    hora_hasta: document.getElementById("tHoraHasta").value || null
+    hora_hasta: document.getElementById("tHoraHasta").value || null,
+    fase_grupos_formato: document.getElementById("tFaseGruposFormato").value,
+    tamano_grupo: Number(document.getElementById("tTamanoGrupo").value) || 3,
+    avanzan_por_grupo: Number(document.getElementById("tAvanzanPorGrupo").value) || 2
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
@@ -1403,6 +1406,9 @@ document.getElementById("btnMostrarEditarTorneo").addEventListener("click", asyn
   document.querySelectorAll(".chkDiaTorneoEdit").forEach((chk) => (chk.checked = diasActuales.has(Number(chk.value))));
   document.getElementById("teHoraDesde").value = t.hora_desde ? t.hora_desde.slice(0, 5) : "";
   document.getElementById("teHoraHasta").value = t.hora_hasta ? t.hora_hasta.slice(0, 5) : "";
+  document.getElementById("teFaseGruposFormato").value = t.fase_grupos_formato || "grupos";
+  document.getElementById("teTamanoGrupo").value = t.tamano_grupo || 3;
+  document.getElementById("teAvanzanPorGrupo").value = t.avanzan_por_grupo || 2;
   document.getElementById("teFlyerArchivo").value = "";
   const categoriasActuales = new Set(categoriasTorneoActual);
   document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
@@ -1445,7 +1451,10 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
     duracion_minutos: Number(document.getElementById("teDuracion").value) || 90,
     dias_semana: diasElegidosEdit.length ? diasElegidosEdit : null,
     hora_desde: document.getElementById("teHoraDesde").value || null,
-    hora_hasta: document.getElementById("teHoraHasta").value || null
+    hora_hasta: document.getElementById("teHoraHasta").value || null,
+    fase_grupos_formato: document.getElementById("teFaseGruposFormato").value,
+    tamano_grupo: Number(document.getElementById("teTamanoGrupo").value) || 3,
+    avanzan_por_grupo: Number(document.getElementById("teAvanzanPorGrupo").value) || 2
   };
   const { error } = await sb.from("torneos").update(cambios).eq("id", torneoActualId);
   if (error) { toast("Error: " + error.message); return; }
@@ -1569,16 +1578,32 @@ async function jugadoresDisponibilidad(jugadorIds) {
   return disponibilidadPorJugador;
 }
 
-// Arma (e inserta) los partidos de un grupo de parejas de UNA categoría,
-// encadenando la ocupación de cancha/horario ya usada por otras categorías
-// del mismo torneo para no proponerles la misma cancha a la misma hora.
-async function armarPartidosParaGrupo(parejasGrupo, categoria, ronda, torneo, canchas, ocupacionAcumulada) {
-  if (parejasGrupo.length < 2) return { generados: 0, sinHorario: 0 };
-  const jugadorIds = [...new Set(parejasGrupo.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+// Divide las parejas de una categoría en grupos chicos según el tamaño
+// configurado en el torneo. Si el último grupo queda con una sola pareja
+// suelta (sin nadie contra quién jugar), se la suma al grupo anterior en
+// vez de dejarla afuera.
+function armarGruposDeParejas(parejasCategoria, tamanoGrupo) {
+  const gruposArr = [];
+  for (let i = 0; i < parejasCategoria.length; i += tamanoGrupo) gruposArr.push(parejasCategoria.slice(i, i + tamanoGrupo));
+  if (gruposArr.length > 1 && gruposArr[gruposArr.length - 1].length === 1) {
+    gruposArr[gruposArr.length - 2].push(...gruposArr.pop());
+  }
+  return gruposArr;
+}
+
+// Arma (e inserta) los partidos de UNA categoría, encadenando la ocupación
+// de cancha/horario ya usada por otras categorías del mismo torneo para no
+// proponerles la misma cancha a la misma hora. `entrada` es {parejas: [...]}
+// para modo eliminación directa, o {grupos: [[...], ...]} para fase de grupos.
+async function armarPartidosParaGrupo(entrada, categoria, ronda, torneo, canchas, ocupacionAcumulada) {
+  const todasLasParejas = entrada.grupos ? entrada.grupos.flat() : entrada.parejas;
+  if (todasLasParejas.length < 2) return { generados: 0, sinHorario: 0 };
+  const jugadorIds = [...new Set(todasLasParejas.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
   const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
 
   const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
-    parejas: parejasGrupo,
+    parejas: entrada.parejas,
+    grupos: entrada.grupos,
     disponibilidadPorJugador,
     fechasDisponibles: fechasDelTorneo(torneo),
     canchas,
@@ -1594,6 +1619,29 @@ async function armarPartidosParaGrupo(parejasGrupo, categoria, ronda, torneo, ca
     ocupacionAcumulada.push(...partidosGenerados);
   }
   return { generados: partidosGenerados.length, sinHorario: sinHorario.length };
+}
+
+// Calcula la tabla de posiciones de un grupo (todos los partidos ya jugados
+// de un mismo número de grupo): partidos ganados primero, y como
+// desempate, diferencia de sets y después diferencia de games.
+function calcularTablaGrupo(partidosGrupo) {
+  const stats = {};
+  const asegurar = (id) => stats[id] || (stats[id] = { id, ganados: 0, setsFavor: 0, setsContra: 0, gamesFavor: 0, gamesContra: 0 });
+  partidosGrupo.forEach((p) => {
+    const e1 = asegurar(p.pareja1_id), e2 = asegurar(p.pareja2_id);
+    if (p.ganador_pareja_id === p.pareja1_id) e1.ganados++;
+    else if (p.ganador_pareja_id === p.pareja2_id) e2.ganados++;
+    (p.sets || []).forEach((s) => {
+      if (s.p1 > s.p2) { e1.setsFavor++; e2.setsContra++; } else if (s.p2 > s.p1) { e2.setsFavor++; e1.setsContra++; }
+      e1.gamesFavor += s.p1; e1.gamesContra += s.p2;
+      e2.gamesFavor += s.p2; e2.gamesContra += s.p1;
+    });
+  });
+  return Object.values(stats).sort((a, b) =>
+    b.ganados - a.ganados ||
+    (b.setsFavor - b.setsContra) - (a.setsFavor - a.setsContra) ||
+    (b.gamesFavor - b.gamesContra) - (a.gamesFavor - a.gamesContra)
+  );
 }
 
 // Agrupa un array de {..., categoria} por su campo categoria (las sin
@@ -1632,10 +1680,15 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
 
   const ocupacionAcumulada = [...(partidosExistentes || [])];
   const grupos = agruparPorCategoria(parejasSinPartido);
+  const formatoGrupos = torneo.fase_grupos_formato === "grupos";
   let totalGenerados = 0, totalSinHorario = 0;
   for (const categoria of Object.keys(grupos)) {
-    if (grupos[categoria].length < 2) continue; // una sola pareja suelta en esa categoría: no hay con quién cruzarla todavía
-    const { generados, sinHorario } = await armarPartidosParaGrupo(grupos[categoria], categoria, "Fase de grupos", torneo, canchas, ocupacionAcumulada);
+    const parejasCategoria = grupos[categoria];
+    if (parejasCategoria.length < 2) continue; // una sola pareja suelta en esa categoría: no hay con quién cruzarla todavía
+    const entrada = formatoGrupos
+      ? { grupos: armarGruposDeParejas(parejasCategoria, torneo.tamano_grupo || 3) }
+      : { parejas: parejasCategoria };
+    const { generados, sinHorario } = await armarPartidosParaGrupo(entrada, categoria, "Fase de grupos", torneo, canchas, ocupacionAcumulada);
     totalGenerados += generados;
     totalSinHorario += sinHorario;
   }
@@ -1676,13 +1729,27 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
     const sinJugar = partidosFaseActual.filter((p) => p.estado !== "jugado");
     if (sinJugar.length > 0) { mensajes.push(`${categoria}: faltan ${sinJugar.length} resultado(s) de "${faseActual}"`); continue; }
 
-    const ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
-    if (ganadoresIds.length < 2) continue;
-    if (ganadoresIds.length % 2 !== 0) { mensajes.push(`${categoria}: quedaron ${ganadoresIds.length} ganadores (número impar) — resolvé eso a mano`); continue; }
+    // si esta fase se armó en formato "grupos" (todos contra todos, nadie
+    // eliminado), no hay un solo ganador por partido que valga: avanzan las
+    // mejores `avanzan_por_grupo` parejas de cada grupo según la tabla de
+    // posiciones. Si se armó en formato "eliminación", avanza directo el
+    // ganador de cada partido, como antes.
+    const esFaseDeGrupos = partidosFaseActual.some((p) => p.grupo != null);
+    let ganadoresIds;
+    if (esFaseDeGrupos) {
+      const porGrupo = {};
+      partidosFaseActual.forEach((p) => { (porGrupo[p.grupo] = porGrupo[p.grupo] || []).push(p); });
+      const avanzan = torneo.avanzan_por_grupo || 2;
+      ganadoresIds = Object.values(porGrupo).flatMap((partidosG) => calcularTablaGrupo(partidosG).slice(0, avanzan).map((s) => s.id));
+    } else {
+      ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
+    }
+    if (ganadoresIds.length < 2) { if (ganadoresIds.length === 1) mensajes.push(`${categoria}: ya tiene a su campeón, no hay más fases para armar`); continue; }
+    if (ganadoresIds.length % 2 !== 0) { mensajes.push(`${categoria}: quedaron ${ganadoresIds.length} clasificados (número impar) — resolvé eso a mano`); continue; }
 
     const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
     const siguienteFase = FASES_TORNEO[indexActual + 1];
-    const { generados } = await armarPartidosParaGrupo(parejasGanadoras, categoria, siguienteFase, torneo, canchas, ocupacionAcumulada);
+    const { generados } = await armarPartidosParaGrupo({ parejas: parejasGanadoras }, categoria, siguienteFase, torneo, canchas, ocupacionAcumulada);
     if (generados > 0) { totalGenerados += generados; mensajes.push(`${categoria}: se armó "${siguienteFase}" (${generados})`); }
   }
 
@@ -1745,7 +1812,7 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
              <div class="calendario-equipo">${p.pareja1_nombre}</div>
              <div class="calendario-vs">V</div>
              <div class="calendario-equipo">${p.pareja2_nombre}</div>
-             ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : ""}
+             ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
              ${!partidosCategoriaFiltro && p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
            </div>`
         : "") + "</td>";
@@ -1789,6 +1856,12 @@ function renderPartidosLlave(partidos) {
     `).join("") + "</div></div>";
 }
 
+// convierte los sets guardados ([{p1,p2}, ...]) a texto legible "6-3, 6-4"
+// en vez de mostrar el JSON crudo
+function formatearSets(sets) {
+  return (sets || []).map((s) => `${s.p1}-${s.p2}`).join(", ") || "sin datos";
+}
+
 // convierte un horario guardado (ISO, UTC) al formato que espera un input
 // datetime-local (hora local, sin zona) para poder mostrarlo precargado
 function toDatetimeLocalValue(horarioISO) {
@@ -1811,8 +1884,8 @@ function renderPartidosLista(partidos, canchasTorneo) {
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
       ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre)}
-      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
-      ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
+      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
+      ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${formatearSets(p.sets)}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
       <div class="match-admin-panel">
         <p class="match-admin-label">Cargar resultado (solo admin) — ${p.ronda || "Fase de grupos"}</p>

@@ -147,6 +147,15 @@
         <div><label>Horario desde</label><input id="tHoraDesde" type="time" /></div>
         <div><label>Horario hasta</label><input id="tHoraHasta" type="time" /></div>
       </div>
+      <label>Formato de la fase de grupos</label>
+      <select id="tFaseGruposFormato">
+        <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
+        <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
+      </select>
+      <div class="row">
+        <div><label>Parejas por grupo</label><input id="tTamanoGrupo" type="number" value="3" min="2" /></div>
+        <div><label>Cuántas avanzan por grupo</label><input id="tAvanzanPorGrupo" type="number" value="2" min="1" /></div>
+      </div>
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
       <div class="check-grid" id="tCategoriasForm"></div>
       <div class="row">
@@ -204,6 +213,15 @@
       <div class="row">
         <div><label>Horario desde</label><input id="teHoraDesde" type="time" /></div>
         <div><label>Horario hasta</label><input id="teHoraHasta" type="time" /></div>
+      </div>
+      <label>Formato de la fase de grupos</label>
+      <select id="teFaseGruposFormato">
+        <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
+        <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
+      </select>
+      <div class="row">
+        <div><label>Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
+        <div><label>Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
       </div>
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategoriasEdit">seleccionar todas</button></label>
       <div class="check-grid" id="teCategoriasForm"></div>

@@ -156,6 +156,12 @@ alter table torneos add column if not exists duracion_minutos int not null defau
 alter table torneos add column if not exists dias_semana int[]; -- días de semana permitidos (0=domingo..6=sábado); null = todos los días del rango
 alter table torneos add column if not exists hora_desde time; -- horario del día desde el que se puede programar (opcional)
 alter table torneos add column if not exists hora_hasta time; -- horario del día hasta el que se puede programar (opcional)
+-- formato de la fase de grupos: 'grupos' = todos contra todos en grupos chicos,
+-- nadie queda eliminado en esta etapa (cada pareja juega tamano_grupo-1 partidos);
+-- 'eliminacion' = 1 solo partido, el que pierde queda afuera directo.
+alter table torneos add column if not exists fase_grupos_formato text not null default 'grupos';
+alter table torneos add column if not exists tamano_grupo int not null default 3; -- parejas por grupo (solo aplica si fase_grupos_formato='grupos')
+alter table torneos add column if not exists avanzan_por_grupo int not null default 2; -- cuántas parejas de cada grupo pasan a la siguiente fase
 
 -- Canchas habilitadas para cada torneo (permite reasignar por clima u otro motivo)
 create table if not exists torneo_canchas (
@@ -212,6 +218,7 @@ create table if not exists partidos (
   updated_at timestamptz not null default now()
 );
 alter table partidos add column if not exists categoria text;
+alter table partidos add column if not exists grupo int; -- número de grupo dentro de la fase de grupos (null = no es de fase de grupos, o es de eliminación directa)
 
 -- ---------- FLYERS ----------
 create table if not exists flyers (
@@ -493,12 +500,12 @@ $$;
 
 drop function if exists partidos_publicos(uuid);
 create or replace function partidos_publicos(p_torneo_id uuid) returns table (
-  id uuid, ronda text, categoria text, horario timestamptz, estado text, sets jsonb,
+  id uuid, ronda text, categoria text, grupo int, horario timestamptz, estado text, sets jsonb,
   cancha_id uuid, cancha_nombre text,
   pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
   pareja1_nombre text, pareja2_nombre text
 ) language sql stable security definer set search_path = public as $$
-  select pa.id, pa.ronda, pa.categoria, pa.horario, pa.estado, pa.sets,
+  select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.horario, pa.estado, pa.sets,
     pa.cancha_id, c.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
     coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),

@@ -56,7 +56,11 @@ const FRANJA_SIN_DATOS = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("23
 //  partidosYaProgramados: [{cancha_id, horario}] partidos que ya están
 //    ocupando cancha y horario (de otras categorías del mismo torneo, por
 //    ejemplo) para no proponerles la misma cancha a la misma hora.
-function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [] }) {
+//  grupos: [[pareja,...], ...] — si viene, se ignora `parejas` y se arma en
+//    modo "fase de grupos": cada grupo juega TODOS contra todos (nadie queda
+//    eliminado en esta etapa). Si no viene, se usa `parejas` en modo
+//    eliminación directa: cada pareja contra la siguiente de la lista.
+function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [] }) {
   const partidosGenerados = [];
   const sinHorario = [];
   const ocupacionCancha = {}; // cancha_id -> [{desde:Date, hasta:Date}]
@@ -121,17 +125,25 @@ function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisp
     return null;
   }
 
-  // Round-robin simple: cada pareja contra la siguiente en la lista
-  const disponibles = [...parejas];
-  for (let i = 0; i < disponibles.length - 1; i += 2) {
-    const pareja1 = disponibles[i];
-    const pareja2 = disponibles[i + 1];
+  // arma la lista de cruces (pares de parejas) según el modo
+  const cruces = [];
+  if (grupos) {
+    grupos.forEach((grupo, idx) => {
+      for (let a = 0; a < grupo.length; a++) {
+        for (let b = a + 1; b < grupo.length; b++) cruces.push({ pareja1: grupo[a], pareja2: grupo[b], grupo: idx + 1 });
+      }
+    });
+  } else {
+    for (let i = 0; i < parejas.length - 1; i += 2) cruces.push({ pareja1: parejas[i], pareja2: parejas[i + 1], grupo: null });
+  }
+
+  cruces.forEach(({ pareja1, pareja2, grupo }) => {
     const jugadoresIds = [pareja1.jugador1_id, pareja1.jugador2_id, pareja2.jugador1_id, pareja2.jugador2_id];
 
     const slot = buscarSlot(jugadoresIds);
     if (!slot) {
       sinHorario.push({ pareja1, pareja2 });
-      continue;
+      return;
     }
 
     jugadoresIds.forEach((jid) => {
@@ -144,9 +156,10 @@ function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisp
       pareja1_id: pareja1.id,
       pareja2_id: pareja2.id,
       cancha_id: slot.cancha.id,
-      horario: slot.horario.toISOString()
+      horario: slot.horario.toISOString(),
+      grupo
     });
-  }
+  });
 
   return { partidosGenerados, sinHorario };
 }
