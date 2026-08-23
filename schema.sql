@@ -200,6 +200,7 @@ create table if not exists partidos (
   id uuid primary key default gen_random_uuid(),
   torneo_id uuid not null references torneos(id) on delete cascade,
   ronda text default 'Fase de grupos',
+  categoria text, -- categoría de este partido (un torneo puede tener varias corriendo en paralelo)
   pareja1_id uuid references parejas(id) on delete cascade,
   pareja2_id uuid references parejas(id) on delete cascade,
   cancha_id uuid references canchas(id) on delete set null,
@@ -210,6 +211,7 @@ create table if not exists partidos (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table partidos add column if not exists categoria text;
 
 -- ---------- FLYERS ----------
 create table if not exists flyers (
@@ -491,12 +493,12 @@ $$;
 
 drop function if exists partidos_publicos(uuid);
 create or replace function partidos_publicos(p_torneo_id uuid) returns table (
-  id uuid, ronda text, horario timestamptz, estado text, sets jsonb,
+  id uuid, ronda text, categoria text, horario timestamptz, estado text, sets jsonb,
   cancha_id uuid, cancha_nombre text,
   pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
   pareja1_nombre text, pareja2_nombre text
 ) language sql stable security definer set search_path = public as $$
-  select pa.id, pa.ronda, pa.horario, pa.estado, pa.sets,
+  select pa.id, pa.ronda, pa.categoria, pa.horario, pa.estado, pa.sets,
     pa.cancha_id, c.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
     coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),

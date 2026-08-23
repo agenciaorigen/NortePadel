@@ -24,6 +24,7 @@ let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva
 let vistaPartidosActual = "lista"; // lista | calendario | llave
 let ultimosPartidos = [];
 let ultimasCanchasTorneo = [];
+let partidosCategoriaFiltro = ""; // "" = todas las categorías del torneo
 let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instagram_url)
 
 // ---------- utilidades UI ----------
@@ -1301,6 +1302,10 @@ async function refrescarDetalleTorneo() {
   const selCatInscribir = document.getElementById("dtSelectCategoriaInscribir");
   selCatInscribir.innerHTML = `<option value="">Elegí la categoría</option>` +
     categoriasTorneoActual.map((c) => `<option value="${c}">${c}</option>`).join("");
+  const selCatPartidos = document.getElementById("partidosCategoriaFiltro");
+  if (!categoriasTorneoActual.includes(partidosCategoriaFiltro)) partidosCategoriaFiltro = "";
+  selCatPartidos.innerHTML = `<option value="">Todas</option>` +
+    categoriasTorneoActual.map((c) => `<option value="${c}" ${c === partidosCategoriaFiltro ? "selected" : ""}>${c}</option>`).join("");
 
   const contCosto = document.getElementById("dtCosto");
   if (t.costo && Number(t.costo) > 0) {
@@ -1327,7 +1332,7 @@ async function refrescarDetalleTorneo() {
   await renderInscribirme();
   await cargarSponsorsTorneo();
 
-  const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(nombre, complejo_id)").eq("torneo_id", torneoActualId);
+  const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id)").eq("torneo_id", torneoActualId);
   document.getElementById("dtCanchas").innerHTML = (tc || []).map((c) =>
     `<span class="badge orange" style="margin-right:6px">${c.canchas?.nombre || "?"}</span>`
   ).join("") || '<p class="empty">Sin canchas asignadas todavía.</p>';
@@ -1564,13 +1569,57 @@ async function jugadoresDisponibilidad(jugadorIds) {
   return disponibilidadPorJugador;
 }
 
+// Arma (e inserta) los partidos de un grupo de parejas de UNA categoría,
+// encadenando la ocupación de cancha/horario ya usada por otras categorías
+// del mismo torneo para no proponerles la misma cancha a la misma hora.
+async function armarPartidosParaGrupo(parejasGrupo, categoria, ronda, torneo, canchas, ocupacionAcumulada) {
+  if (parejasGrupo.length < 2) return { generados: 0, sinHorario: 0 };
+  const jugadorIds = [...new Set(parejasGrupo.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
+
+  const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
+    parejas: parejasGrupo,
+    disponibilidadPorJugador,
+    fechasDisponibles: fechasDelTorneo(torneo),
+    canchas,
+    duracionMinutos: torneo.duracion_minutos || 90,
+    ventana: ventanaDelTorneo(torneo),
+    partidosYaProgramados: ocupacionAcumulada
+  });
+
+  if (partidosGenerados.length > 0) {
+    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ronda, categoria, ...p, estado: "programado" }));
+    const { error } = await sb.from("partidos").insert(filas);
+    if (error) { toast(`Error armando ${categoria}: ` + error.message); return { generados: 0, sinHorario: 0 }; }
+    ocupacionAcumulada.push(...partidosGenerados);
+  }
+  return { generados: partidosGenerados.length, sinHorario: sinHorario.length };
+}
+
+// Agrupa un array de {..., categoria} por su campo categoria (las sin
+// categoría asignada todavía quedan juntas bajo "Sin categoría", para no
+// perderlas de vista en vez de mezclarlas con otro grupo).
+function agruparPorCategoria(lista) {
+  const grupos = {};
+  lista.forEach((x) => {
+    const cat = x.categoria || "Sin categoría";
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(x);
+  });
+  return grupos;
+}
+
 document.getElementById("btnArmarPartidos").addEventListener("click", async () => {
-  const { data: parejasDb } = await sb.from("parejas").select("*").eq("torneo_id", torneoActualId);
+  // parejas_publicas ya trae la categoría de cada pareja (la del torneo puntual
+  // en el que se anotó) — un torneo puede tener varias categorías corriendo en
+  // paralelo (ej: Damas y Caballeros, varias divisiones) y cada una arma su
+  // propia fase de grupos por separado, nunca cruzadas entre sí.
+  const { data: parejasDb } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId });
   if (!parejasDb || parejasDb.length < 2) { toast("Armá primero al menos 2 parejas"); return; }
 
   // evita duplicar partidos si se apreta el botón más de una vez: solo arma
   // fase de grupos para las parejas que todavía no tienen ningún partido
-  const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id").eq("torneo_id", torneoActualId);
+  const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id, cancha_id, horario").eq("torneo_id", torneoActualId);
   const yaJuegan = new Set((partidosExistentes || []).flatMap((p) => [p.pareja1_id, p.pareja2_id]));
   const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id));
   if (parejasSinPartido.length < 2) { toast("Todas las parejas ya tienen un partido de fase de grupos asignado"); return; }
@@ -1581,77 +1630,64 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
   if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
 
-  const jugadorIds = [...new Set(parejasSinPartido.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
-  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
-
-  const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
-    parejas: parejasSinPartido,
-    disponibilidadPorJugador,
-    fechasDisponibles: fechasDelTorneo(torneo),
-    canchas,
-    duracionMinutos: torneo.duracion_minutos || 90,
-    ventana: ventanaDelTorneo(torneo)
-  });
-
-  if (partidosGenerados.length > 0) {
-    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ronda: "Fase de grupos", ...p, estado: "programado" }));
-    const { error } = await sb.from("partidos").insert(filas);
-    if (error) { toast("Error: " + error.message); return; }
+  const ocupacionAcumulada = [...(partidosExistentes || [])];
+  const grupos = agruparPorCategoria(parejasSinPartido);
+  let totalGenerados = 0, totalSinHorario = 0;
+  for (const categoria of Object.keys(grupos)) {
+    if (grupos[categoria].length < 2) continue; // una sola pareja suelta en esa categoría: no hay con quién cruzarla todavía
+    const { generados, sinHorario } = await armarPartidosParaGrupo(grupos[categoria], categoria, "Fase de grupos", torneo, canchas, ocupacionAcumulada);
+    totalGenerados += generados;
+    totalSinHorario += sinHorario;
   }
 
-  toast(`Se programaron ${partidosGenerados.length} partidos` + (sinHorario.length ? `, ${sinHorario.length} quedaron sin horario común` : ""));
+  toast(`Se programaron ${totalGenerados} partidos` + (totalSinHorario ? `, ${totalSinHorario} quedaron sin horario común` : ""));
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
 
-// Toma los ganadores de la fase más avanzada ya jugada por completo y arma
-// la siguiente fase del cuadro (Dieciseisavos, Octavos, Cuartos...),
-// respetando el orden de FASES_TORNEO en vez de dejar que el admin elija
-// la ronda de cada partido a mano.
+// Por cada categoría del torneo, toma los ganadores de SU fase más avanzada
+// ya jugada por completo y arma SU siguiente fase (Dieciseisavos, Octavos,
+// Cuartos...), respetando el orden de FASES_TORNEO en vez de dejar que el
+// admin elija la ronda de cada partido a mano. Categorías que van más
+// atrasadas que otras (por ejemplo, todavía en fase de grupos mientras otra
+// ya llegó a Cuartos) simplemente esperan su turno.
 document.getElementById("btnGenerarSiguienteFase").addEventListener("click", async () => {
   const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId });
   if (!partidos || partidos.length === 0) { toast("Todavía no armaste ningún partido"); return; }
 
-  const fasesConPartidos = FASES_TORNEO.filter((f) => partidos.some((p) => (p.ronda || "Fase de grupos") === f));
-  const faseActual = fasesConPartidos[fasesConPartidos.length - 1];
-  const indexActual = FASES_TORNEO.indexOf(faseActual);
-  if (indexActual === FASES_TORNEO.length - 1) { toast("Este torneo ya llegó a la Final"); return; }
-
-  const partidosFaseActual = partidos.filter((p) => (p.ronda || "Fase de grupos") === faseActual);
-  const sinJugar = partidosFaseActual.filter((p) => p.estado !== "jugado");
-  if (sinJugar.length > 0) { toast(`Todavía faltan cargar ${sinJugar.length} resultado(s) de "${faseActual}"`); return; }
-
-  const ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
-  if (ganadoresIds.length < 2) { toast("No hay suficientes ganadores para armar la siguiente fase"); return; }
-  if (ganadoresIds.length % 2 !== 0) { toast(`Quedaron ${ganadoresIds.length} ganadores (número impar) — resolvé eso a mano antes de generar la siguiente fase`); return; }
-
-  const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
   const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoActualId).single();
   const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoActualId);
   const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
   if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
 
-  const jugadorIds = [...new Set(parejasGanadoras.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
-  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
+  const ocupacionAcumulada = partidos.map((p) => ({ cancha_id: p.cancha_id, horario: p.horario }));
+  const grupos = agruparPorCategoria(partidos);
+  const mensajes = [];
+  let totalGenerados = 0;
 
-  const siguienteFase = FASES_TORNEO[indexActual + 1];
-  const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
-    parejas: parejasGanadoras,
-    disponibilidadPorJugador,
-    fechasDisponibles: fechasDelTorneo(torneo),
-    canchas,
-    duracionMinutos: torneo.duracion_minutos || 90,
-    ventana: ventanaDelTorneo(torneo)
-  });
+  for (const categoria of Object.keys(grupos)) {
+    const partidosCategoria = grupos[categoria];
+    const fasesConPartidos = FASES_TORNEO.filter((f) => partidosCategoria.some((p) => (p.ronda || "Fase de grupos") === f));
+    const faseActual = fasesConPartidos[fasesConPartidos.length - 1];
+    const indexActual = FASES_TORNEO.indexOf(faseActual);
+    if (indexActual === FASES_TORNEO.length - 1) continue; // esta categoría ya llegó a la Final
 
-  if (partidosGenerados.length > 0) {
-    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ronda: siguienteFase, ...p, estado: "programado" }));
-    const { error } = await sb.from("partidos").insert(filas);
-    if (error) { toast("Error: " + error.message); return; }
+    const partidosFaseActual = partidosCategoria.filter((p) => (p.ronda || "Fase de grupos") === faseActual);
+    const sinJugar = partidosFaseActual.filter((p) => p.estado !== "jugado");
+    if (sinJugar.length > 0) { mensajes.push(`${categoria}: faltan ${sinJugar.length} resultado(s) de "${faseActual}"`); continue; }
+
+    const ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
+    if (ganadoresIds.length < 2) continue;
+    if (ganadoresIds.length % 2 !== 0) { mensajes.push(`${categoria}: quedaron ${ganadoresIds.length} ganadores (número impar) — resolvé eso a mano`); continue; }
+
+    const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
+    const siguienteFase = FASES_TORNEO[indexActual + 1];
+    const { generados } = await armarPartidosParaGrupo(parejasGanadoras, categoria, siguienteFase, torneo, canchas, ocupacionAcumulada);
+    if (generados > 0) { totalGenerados += generados; mensajes.push(`${categoria}: se armó "${siguienteFase}" (${generados})`); }
   }
 
-  toast(`Se armó "${siguienteFase}": ${partidosGenerados.length} partido(s)` + (sinHorario.length ? `, ${sinHorario.length} sin horario común` : ""));
-  avisarActualizacionEnVivo();
+  toast(mensajes.length ? mensajes.join(" · ") : "Ninguna categoría está lista para avanzar todavía");
+  if (totalGenerados > 0) avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
 
@@ -1664,12 +1700,21 @@ document.querySelectorAll("#partidosVistaPills .pill").forEach((btn) => {
   });
 });
 
+document.getElementById("partidosCategoriaFiltro").addEventListener("change", (e) => {
+  partidosCategoriaFiltro = e.target.value;
+  renderPartidos(ultimosPartidos, ultimasCanchasTorneo);
+});
+
+// ultimosPartidos guarda SIEMPRE todos los partidos del torneo (todas las
+// categorías) — hace falta así de completo para detectar choques de cancha
+// entre categorías. El filtro de categoría solo afecta qué se muestra.
 function renderPartidos(partidos, canchasTorneo) {
   ultimosPartidos = partidos;
   ultimasCanchasTorneo = canchasTorneo;
-  if (vistaPartidosActual === "calendario") return renderPartidosCalendario(partidos, canchasTorneo);
-  if (vistaPartidosActual === "llave") return renderPartidosLlave(partidos);
-  return renderPartidosLista(partidos, canchasTorneo);
+  const visibles = partidosCategoriaFiltro ? partidos.filter((p) => p.categoria === partidosCategoriaFiltro) : partidos;
+  if (vistaPartidosActual === "calendario") return renderPartidosCalendario(visibles, canchasTorneo);
+  if (vistaPartidosActual === "llave") return renderPartidosLlave(visibles);
+  return renderPartidosLista(visibles, canchasTorneo);
 }
 
 // vista "tipo calendario": una tabla con las canchas del torneo como columnas
@@ -1701,6 +1746,7 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
              <div class="calendario-vs">V</div>
              <div class="calendario-equipo">${p.pareja2_nombre}</div>
              ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : ""}
+             ${!partidosCategoriaFiltro && p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
            </div>`
         : "") + "</td>";
     });
@@ -1765,7 +1811,7 @@ function renderPartidosLista(partidos, canchasTorneo) {
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
       ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre)}
-      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}</div>
+      <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : ""}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
       <div class="match-admin-panel">

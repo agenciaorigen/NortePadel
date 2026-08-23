@@ -53,13 +53,22 @@ const FRANJA_SIN_DATOS = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("23
 //    para el torneo (ej: 16:00 a 22:00). Si viene, se cruza con la franja
 //    de cada jugador (declarada o abierta) para no proponer horarios fuera
 //    del horario en que el club/torneo funciona.
-function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null }) {
+//  partidosYaProgramados: [{cancha_id, horario}] partidos que ya están
+//    ocupando cancha y horario (de otras categorías del mismo torneo, por
+//    ejemplo) para no proponerles la misma cancha a la misma hora.
+function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [] }) {
   const partidosGenerados = [];
   const sinHorario = [];
   const ocupacionCancha = {}; // cancha_id -> [{desde:Date, hasta:Date}]
   const ocupacionJugador = {}; // jugador_id -> [{desde:Date, hasta:Date}]
 
   canchas.forEach((c) => (ocupacionCancha[c.id] = []));
+  partidosYaProgramados.forEach((p) => {
+    if (!p.horario || !p.cancha_id || !ocupacionCancha[p.cancha_id]) return;
+    const desde = new Date(p.horario);
+    const hasta = new Date(desde.getTime() + duracionMinutos * 60000);
+    ocupacionCancha[p.cancha_id].push({ desde, hasta });
+  });
 
   function libre(lista, desde, hasta) {
     return !lista.some((o) => desde < o.hasta && hasta > o.desde);
