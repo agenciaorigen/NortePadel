@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v12";
+const CACHE = "norte-padel-v13";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,7 +11,7 @@ const APP_SHELL = [
   "./icon-512.png",
   "./icon-512-maskable.png",
   "./hero-cancha.jpg",
-  "./energia-pelota.jpg",
+  "./brasil-tour.jpg",
   "./destacados-fondo.jpg",
   "./pelotas.jpg"
 ];
