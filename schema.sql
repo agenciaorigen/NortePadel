@@ -93,13 +93,17 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from admins where user_id = auth.uid());
 $$;
 
--- un jugador no puede cambiar su propia categoría oficial directo (solo puede dejarla
--- pedida en categoria_pendiente); si intenta escribir en categoria igual, se ignora.
--- el admin sí puede escribir categoria libremente (para aprobar pedidos o corregir errores).
+-- un jugador no puede cambiar su propia categoría oficial ni sus puntos de ranking directo
+-- (la categoría solo puede dejarla pedida en categoria_pendiente); si intenta escribirlos igual, se ignora.
+-- el admin sí puede escribir ambos libremente (para aprobar pedidos, corregir errores o cargar
+-- puntos a mano en casos puntuales).
 create or replace function proteger_categoria_jugador() returns trigger as $$
 begin
   if not is_admin() and new.categoria is distinct from old.categoria then
     new.categoria := old.categoria;
+  end if;
+  if not is_admin() and new.puntos_ranking is distinct from old.puntos_ranking then
+    new.puntos_ranking := old.puntos_ranking;
   end if;
   return new;
 end;

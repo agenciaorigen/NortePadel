@@ -179,6 +179,9 @@ tr:first-child td { font-weight: 700; }
 .badge.orange { background: rgba(255,45,149,.14); color: #ff6fb8; border: 1px solid rgba(255,45,149,.3); }
 .badge.solid { background: var(--accent); color: var(--accent-ink); border: none; font-weight: 700; }
 
+.fila-master td { background: rgba(255,215,0,.05); }
+.fila-master td:first-child { border-left: 2px solid #ffd700; }
+
 .pill-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; }
 .pill-row::-webkit-scrollbar { display: none; }
 .pill {
@@ -202,6 +205,7 @@ tr:first-child td { font-weight: 700; }
 }
 .avatar-placeholder { display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .avatar-grande { width: 88px; height: 88px; border: 2px solid var(--accent); font-size: 30px; margin-bottom: 8px; }
+.avatar-master { border: 3px solid #ffd700; box-shadow: 0 0 0 2px rgba(255,215,0,.25); }
 
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
@@ -315,14 +319,16 @@ tr:first-child td { font-weight: 700; }
 /* ---------- Banda de energía (foto real del club) ---------- */
 .energia-banda {
   position: relative;
-  min-height: 260px;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 315 / 413;
+  margin: 0 auto 16px;
   border-radius: 16px;
   overflow: hidden;
-  margin-bottom: 16px;
-  background: url('brasil-tour.jpg') top center/cover no-repeat;
-  display: flex; align-items: center; justify-content: center;
+  background: url('brasil-tour.jpg') center/cover no-repeat;
+  display: flex; align-items: flex-end; justify-content: center;
   text-align: center;
-  padding: 32px 20px;
+  padding: 20px 20px 24px;
   border: 1px solid var(--border);
 }
 .energia-banda::before {

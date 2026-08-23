@@ -380,11 +380,13 @@ async function cargarRanking() {
   document.getElementById("rankingVacio").style.display = "none";
   completa.forEach((j, idx) => {
     const posicion = idx + 1;
-    const enTop5 = posicion <= 5;
+    const clasificaMaster = posicion <= 10;
     const tr = document.createElement("tr");
+    if (clasificaMaster) tr.className = "fila-master";
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
+    const avatarClass = clasificaMaster ? "avatar-master" : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, enTop5 ? 44 : 30)}<span>${j.nombre} ${j.apellido}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, clasificaMaster ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido}</span></div></td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
@@ -478,11 +480,12 @@ async function cargarInicio() {
   }
 }
 
-function avatarHtml(fotoUrl, size) {
+function avatarHtml(fotoUrl, size, extraClass) {
   const s = size || 44;
+  const cls = extraClass ? ` ${extraClass}` : "";
   return fotoUrl
-    ? `<img class="avatar" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
-    : `<div class="avatar avatar-placeholder" style="width:${s}px;height:${s}px">🎾</div>`;
+    ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
+    : `<div class="avatar avatar-placeholder${cls}" style="width:${s}px;height:${s}px">🎾</div>`;
 }
 
 const TAG_DESTACADO = { Damas: "Jugadora del mes", Caballeros: "Jugador del mes" };
@@ -892,13 +895,21 @@ async function cargarJugadoresAdmin() {
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
 
-// tarjetas editables (nombre, apellido, categoría) para corregir errores de registro
+document.getElementById("btnMostrarBuscarJugador")?.addEventListener("click", () => {
+  const wrap = document.getElementById("buscarJugadorWrap");
+  wrap.style.display = "block";
+  document.getElementById("buscarJugadorAdmin").focus();
+});
+
+// tarjetas editables (nombre, apellido, categoría, puntos) para corregir errores de registro
+// Solo aparecen jugadores después de buscar (para no listar a todo el club de una), tal cual "Crear torneo"
 function renderListaJugadoresAdmin() {
   const cont = document.getElementById("listaJugadoresAdmin");
   if (!cont) return;
   const q = (document.getElementById("buscarJugadorAdmin")?.value || "").trim().toLowerCase();
-  const lista = q ? cacheJugadoresAdmin.filter((j) => `${j.nombre} ${j.apellido}`.toLowerCase().includes(q)) : cacheJugadoresAdmin;
   cont.innerHTML = "";
+  if (q.length < 2) { cont.innerHTML = '<p class="empty">Escribí al menos 2 letras para buscar.</p>'; return; }
+  const lista = cacheJugadoresAdmin.filter((j) => `${j.nombre} ${j.apellido}`.toLowerCase().includes(q));
   if (lista.length === 0) { cont.innerHTML = '<p class="empty">No se encontraron jugadores.</p>'; return; }
   lista.forEach((j) => {
     const div = document.createElement("div");
@@ -911,18 +922,38 @@ function renderListaJugadoresAdmin() {
         <input type="text" class="jaNombre" value="${j.nombre}" placeholder="Nombre" />
         <input type="text" class="jaApellido" value="${j.apellido}" placeholder="Apellido" />
       </div>
-      <select class="jaCategoria" style="margin-top:8px">${opcionesCategoria}</select>
-      <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>
-      <button type="button" class="secondary small btnGuardarJugador" style="margin-top:8px">Guardar</button>
+      <div class="row" style="margin-top:8px">
+        <select class="jaCategoria">${opcionesCategoria}</select>
+        <input type="number" class="jaPuntos" value="${j.puntos_ranking}" placeholder="Puntos" style="max-width:100px" />
+      </div>
+      <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
+      <div class="row" style="margin-top:8px;gap:8px">
+        <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
+        <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
+      </div>
     `;
     div.querySelector(".btnGuardarJugador").addEventListener("click", async () => {
       const nombre = div.querySelector(".jaNombre").value.trim();
       const apellido = div.querySelector(".jaApellido").value.trim();
       const categoria = div.querySelector(".jaCategoria").value;
+      const puntos_ranking = Number(div.querySelector(".jaPuntos").value);
       if (!nombre || !apellido) { toast("Nombre y apellido no pueden quedar vacíos"); return; }
-      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria }).eq("id", j.id);
+      if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
+      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Jugador actualizado");
+      cargarJugadoresAdmin();
+      cargarRanking();
+    });
+    div.querySelector(".btnEliminarJugador").addEventListener("click", async () => {
+      const tieneHistorial = j.partidos_jugados > 0;
+      const aviso = tieneHistorial
+        ? `${j.nombre} ${j.apellido} ya jugó ${j.partidos_jugados} partido(s). Eliminarlo borra también esos partidos y sus parejas del historial, y no se puede deshacer. ¿Eliminar de todas formas?`
+        : `¿Eliminar el perfil de ${j.nombre} ${j.apellido}? No se puede deshacer.`;
+      if (!confirm(aviso)) return;
+      const { error } = await sb.from("jugadores").delete().eq("id", j.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Perfil eliminado");
       cargarJugadoresAdmin();
       cargarRanking();
     });

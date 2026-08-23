@@ -227,6 +227,7 @@
   <section id="view-ranking" class="view">
     <div class="card">
       <h2>Ranking por categoría</h2>
+      <p class="match-meta" style="margin-bottom:6px;color:#ffd700">Los que están resaltados en amarillo (con foto grande) son los primeros 10 de su categoría: clasifican al Master de fin de año.</p>
       <div class="pill-row" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
       <table id="tablaRanking">
@@ -419,10 +420,15 @@
     </div>
 
     <div class="card">
-      <h2>Jugadores registrados</h2>
-      <p class="match-meta" style="margin-bottom:6px">Podés corregir nombre, apellido o categoría de cualquier jugador (por ejemplo, si se equivocaron al registrarse).</p>
-      <input id="buscarJugadorAdmin" placeholder="Buscar por nombre o apellido..." style="margin-bottom:10px" />
-      <div id="listaJugadoresAdmin"></div>
+      <div class="torneo-card-header">
+        <h2>Jugadores registrados</h2>
+        <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>
+      </div>
+      <div id="buscarJugadorWrap" style="display:none;margin-top:10px">
+        <p class="match-meta" style="margin-bottom:6px">Buscá un jugador para corregir nombre, apellido, categoría o puntos, o para eliminar un perfil repetido/erróneo.</p>
+        <input id="buscarJugadorAdmin" placeholder="Escribí nombre o apellido..." autocomplete="off" style="margin-bottom:10px" />
+        <div id="listaJugadoresAdmin"></div>
+      </div>
     </div>
   </section>
 
