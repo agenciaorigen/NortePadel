@@ -13,6 +13,7 @@ let miJugador = null;     // fila de "jugadores" ligada al usuario logueado
 let isAdmin = false;
 let editandoPerfil = false;
 let torneoActualId = null;
+let torneoActualData = null; // torneo completo cargado en refrescarDetalleTorneo, para prefill de "Editar torneo"
 let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || null;
 let cacheComplejos = [];
 let cacheCanchas = [];
@@ -720,6 +721,7 @@ async function cargarComplejos() {
   });
 
   llenarSelect(document.getElementById("tComplejo"), cacheComplejos, (c) => c.nombre);
+  llenarSelect(document.getElementById("teComplejo"), cacheComplejos, (c) => c.nombre);
 }
 
 document.getElementById("btnCrearComplejo").addEventListener("click", async () => {
@@ -760,16 +762,22 @@ async function cargarCategorias() {
     if (valorPrevio) selectJugador.value = valorPrevio;
   }
 
+  const categoriasCheckboxHtml = (chkClass) => generosConDatos.map((g) => `
+    <div class="categorias-genero-grupo">
+      <h4>${g}</h4>
+      <div class="check-grid">
+        ${grupos[g].map((c) => `<label><input type="checkbox" class="${chkClass}" value="${c.nombre}" /> ${c.nombre}</label>`).join("")}
+      </div>
+    </div>
+  `).join("");
+
   const formTorneo = document.getElementById("tCategoriasForm");
   if (formTorneo) {
-    formTorneo.innerHTML = generosConDatos.map((g) => `
-      <div class="categorias-genero-grupo">
-        <h4>${g}</h4>
-        <div class="check-grid">
-          ${grupos[g].map((c) => `<label><input type="checkbox" class="chkTorneoCategoria" value="${c.nombre}" /> ${c.nombre}</label>`).join("")}
-        </div>
-      </div>
-    `).join("");
+    formTorneo.innerHTML = categoriasCheckboxHtml("chkTorneoCategoria");
+  }
+  const formTorneoEdit = document.getElementById("teCategoriasForm");
+  if (formTorneoEdit) {
+    formTorneoEdit.innerHTML = categoriasCheckboxHtml("chkTorneoCategoriaEdit");
   }
 
   const listaAdmin = document.getElementById("listaCategoriasAdmin");
@@ -827,6 +835,9 @@ document.getElementById("btnAgregarCategoria").addEventListener("click", async (
 
 document.getElementById("btnTodasCategorias").addEventListener("click", () => {
   document.querySelectorAll(".chkTorneoCategoria").forEach((chk) => (chk.checked = true));
+});
+document.getElementById("btnTodasCategoriasEdit")?.addEventListener("click", () => {
+  document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = true));
 });
 
 // ============================================================
@@ -890,7 +901,8 @@ async function cargarJugadoresAdmin() {
   const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
   cacheJugadoresAdmin = data || [];
   renderListaJugadoresAdmin();
-  llenarSelect(document.getElementById("dtSelectJugador"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
+  llenarSelect(document.getElementById("dtSelectJugador1"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
+  llenarSelect(document.getElementById("dtSelectJugador2"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
   llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
@@ -1105,7 +1117,8 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     fecha_inicio: fechaInicio,
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
     flyer_url: flyerUrl,
-    costo: costoTxt ? Number(costoTxt) : null
+    costo: costoTxt ? Number(costoTxt) : null,
+    duracion_minutos: Number(document.getElementById("tDuracion").value) || 90
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
@@ -1274,6 +1287,7 @@ async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
   const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", torneoActualId).single();
   if (!t) return;
+  torneoActualData = t;
 
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").textContent = t.estado;
@@ -1338,12 +1352,12 @@ async function refrescarDetalleTorneo() {
       <span>🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${isAdmin && p.estado !== "confirmada" ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
-        ${isAdmin ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" aria-label="Separar pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
+        ${isAdmin ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
       </span>
     </div>`;
-  }).join("") || '<p class="empty">Todavía no hay parejas armadas.</p>';
+  }).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
   contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
-    btn.addEventListener("click", async () => await borrarPareja(btn.dataset.id, btn.dataset.nombre));
+    btn.addEventListener("click", async () => await borrarPareja(btn.dataset.id, btn.dataset.nombre, btn.dataset.j1, btn.dataset.j2));
   });
   contParejas.querySelectorAll(".btnConfirmarPareja").forEach((btn) => {
     btn.addEventListener("click", async () => await confirmarPareja(btn.dataset.j1, btn.dataset.j2));
@@ -1365,6 +1379,71 @@ async function refrescarDetalleTorneo() {
   if (isAdmin && cacheJugadoresAdmin.length === 0) cargarJugadoresAdmin();
 }
 
+// ---------- editar torneo (nombre, sede, categorías, fechas, costo, flyer) ----------
+document.getElementById("btnMostrarEditarTorneo").addEventListener("click", async () => {
+  if (!torneoActualData) return;
+  const t = torneoActualData;
+  if (cacheCategorias.length === 0) await cargarCategorias();
+  document.getElementById("teNombre").value = t.nombre;
+  document.getElementById("teComplejo").value = t.complejo_id || "";
+  document.getElementById("teDuracion").value = t.duracion_minutos || 90;
+  document.getElementById("teFechaInicio").value = t.fecha_inicio;
+  document.getElementById("teFechaFin").value = t.fecha_fin || t.fecha_inicio;
+  document.getElementById("teCosto").value = t.costo || "";
+  document.getElementById("teFlyerArchivo").value = "";
+  const categoriasActuales = new Set(categoriasTorneoActual);
+  document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
+  const card = document.getElementById("editarTorneoCard");
+  card.style.display = "block";
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btnCancelarEditarTorneo").addEventListener("click", () => {
+  document.getElementById("editarTorneoCard").style.display = "none";
+});
+document.getElementById("btnGuardarTorneo").addEventListener("click", async () => {
+  if (!isAdmin || !torneoActualId) return;
+  const nombre = document.getElementById("teNombre").value.trim();
+  const complejoId = document.getElementById("teComplejo").value;
+  const fechaInicio = document.getElementById("teFechaInicio").value;
+  if (!nombre || !fechaInicio) { toast("Completá al menos nombre y fecha de inicio"); return; }
+
+  const categoriasElegidas = Array.from(document.querySelectorAll(".chkTorneoCategoriaEdit:checked")).map((c) => c.value);
+  if (categoriasElegidas.length === 0) { toast("Elegí al menos una categoría"); return; }
+
+  let flyerUrl = torneoActualData?.flyer_url || null;
+  const archivo = document.getElementById("teFlyerArchivo").files[0];
+  if (archivo) {
+    const path = `${Date.now()}-${archivo.name}`;
+    const { error: upErr } = await sb.storage.from("flyers").upload(path, archivo);
+    if (upErr) { toast("Error subiendo el flyer: " + upErr.message); return; }
+    const { data: pub } = sb.storage.from("flyers").getPublicUrl(path);
+    flyerUrl = pub.publicUrl;
+  }
+
+  const costoTxt = document.getElementById("teCosto").value.trim();
+  const cambios = {
+    nombre,
+    complejo_id: complejoId || null,
+    fecha_inicio: fechaInicio,
+    fecha_fin: document.getElementById("teFechaFin").value || fechaInicio,
+    flyer_url: flyerUrl,
+    costo: costoTxt ? Number(costoTxt) : null,
+    duracion_minutos: Number(document.getElementById("teDuracion").value) || 90
+  };
+  const { error } = await sb.from("torneos").update(cambios).eq("id", torneoActualId);
+  if (error) { toast("Error: " + error.message); return; }
+
+  // reemplaza las categorías del torneo por las que quedaron tildadas
+  await sb.from("torneo_categorias").delete().eq("torneo_id", torneoActualId);
+  await sb.from("torneo_categorias").insert(categoriasElegidas.map((categoria) => ({ torneo_id: torneoActualId, categoria })));
+
+  toast("Torneo actualizado");
+  document.getElementById("editarTorneoCard").style.display = "none";
+  cargarTorneos();
+  cargarInicio();
+  refrescarDetalleTorneo();
+});
+
 document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", async () => {
   const canchaId = document.getElementById("dtSelectCancha").value;
   if (!canchaId) return;
@@ -1374,16 +1453,23 @@ document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", asyn
   refrescarDetalleTorneo();
 });
 
+// Inscribe una pareja completa a mano (ej: dos amigos que se lo pidieron directo al club).
+// Siempre entran los dos juntos, nunca un jugador suelto — así nunca queda nadie sin pareja.
 document.getElementById("btnInscribir").addEventListener("click", async () => {
-  const jugadorId = document.getElementById("dtSelectJugador").value;
+  const jugador1Id = document.getElementById("dtSelectJugador1").value;
+  const jugador2Id = document.getElementById("dtSelectJugador2").value;
   const categoria = document.getElementById("dtSelectCategoriaInscribir").value;
-  if (!jugadorId) return;
-  if (!categoria) { toast("Elegí en qué categoría lo inscribís"); return; }
+  if (!jugador1Id || !jugador2Id) return;
+  if (jugador1Id === jugador2Id) { toast("Elegí dos jugadores distintos"); return; }
+  if (!categoria) { toast("Elegí en qué categoría los inscribís"); return; }
   // lo inscribe el admin a mano, así que queda confirmado directo (no hace falta el paso
-  // de "pendiente" que sí aplica cuando se anota el propio jugador desde la app)
-  const { error } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: jugadorId, categoria, estado: "confirmada" });
-  if (error) { toast("Ese jugador ya está inscripto u ocurrió un error"); return; }
-  toast("Jugador inscripto");
+  // de "pendiente" que sí aplica cuando se anotan ellos mismos desde la app)
+  const { error: e1 } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: jugador1Id, categoria, estado: "confirmada" });
+  const { error: e2 } = await sb.from("inscripciones").insert({ torneo_id: torneoActualId, jugador_id: jugador2Id, categoria, estado: "confirmada" });
+  if (e1 || e2) { toast("Alguno de los dos ya está inscripto u ocurrió un error"); return; }
+  const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoActualId, jugador1_id: jugador1Id, jugador2_id: jugador2Id });
+  if (e3) { toast("Se inscribieron pero no se pudo armar la pareja: " + e3.message); refrescarDetalleTorneo(); return; }
+  toast("Pareja inscripta");
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
@@ -1410,7 +1496,10 @@ async function confirmarPareja(jugador1Id, jugador2Id) {
   refrescarDetalleTorneo();
 }
 
-async function borrarPareja(parejaId, nombrePareja) {
+// Borra la pareja completa del torneo: los dos jugadores quedan totalmente
+// desinscriptos (no "sin pareja" sueltos) — para volver a anotarse tienen que
+// hacerlo de nuevo, siempre de a dos.
+async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
   const { data: jugado } = await sb.from("partidos").select("id")
     .eq("torneo_id", torneoActualId)
     .or(`pareja1_id.eq.${parejaId},pareja2_id.eq.${parejaId}`)
@@ -1418,45 +1507,12 @@ async function borrarPareja(parejaId, nombrePareja) {
   if (jugado) { toast(`${nombrePareja} ya jugó partidos en este torneo — sacale el resultado a mano primero`); return; }
   const { error } = await sb.from("parejas").delete().eq("id", parejaId); // borra también sus partidos pendientes (en cascada)
   if (error) { toast("Error: " + error.message); return; }
-  toast(`Se separó la pareja ${nombrePareja} — quedan inscriptos pero sin pareja`);
+  await sb.from("inscripciones").delete().eq("torneo_id", torneoActualId).eq("jugador_id", jugador1Id);
+  await sb.from("inscripciones").delete().eq("torneo_id", torneoActualId).eq("jugador_id", jugador2Id);
+  toast(`Se sacó del torneo a la pareja ${nombrePareja}`);
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 }
-
-// ---------- armar parejas automático (solo con los que todavía no tienen pareja) ----------
-document.getElementById("btnArmarParejas").addEventListener("click", async () => {
-  const { data: insc } = await sb.from("inscripciones").select("categoria, jugadores(*)").eq("torneo_id", torneoActualId);
-  const { data: parejasExistentes } = await sb.from("parejas").select("jugador1_id, jugador2_id").eq("torneo_id", torneoActualId);
-  const yaEmparejados = new Set((parejasExistentes || []).flatMap((p) => [p.jugador1_id, p.jugador2_id]));
-  const jugadoresInscritos = (insc || [])
-    .filter((i) => i.jugadores && !yaEmparejados.has(i.jugadores.id))
-    // usa la categoría con la que se anotó a ESTE torneo (no la oficial del jugador),
-    // así nunca cruza categorías distintas en un torneo que abarca varias
-    .map((i) => ({ ...i.jugadores, categoria: i.categoria || i.jugadores.categoria }));
-  if (jugadoresInscritos.length < 2) { toast("No quedan jugadores sin pareja para emparejar"); return; }
-
-  const porCategoria = {};
-  jugadoresInscritos.forEach((j) => {
-    if (!porCategoria[j.categoria]) porCategoria[j.categoria] = [];
-    porCategoria[j.categoria].push(j);
-  });
-  let parejas = [];
-  const sobrantes = [];
-  Object.values(porCategoria).forEach((grupo) => {
-    const r = armarParejasAutomatico(grupo);
-    parejas = parejas.concat(r.parejas);
-    if (r.sobrante) sobrantes.push(r.sobrante);
-  });
-  if (parejas.length === 0) { toast("No se pudieron armar parejas"); return; }
-
-  const filas = parejas.map((p) => ({ torneo_id: torneoActualId, jugador1_id: p.jugador1.id, jugador2_id: p.jugador2.id }));
-  const { error } = await sb.from("parejas").insert(filas);
-  if (error) { toast("Error: " + error.message); return; }
-
-  toast(`Se armaron ${parejas.length} parejas` + (sobrantes.length ? ` (quedaron sin par: ${sobrantes.map((s) => s.nombre).join(", ")})` : ""));
-  avisarActualizacionEnVivo();
-  refrescarDetalleTorneo();
-});
 
 // ---------- armar partidos automático ----------
 document.getElementById("btnArmarPartidos").addEventListener("click", async () => {

@@ -1,22 +1,10 @@
 // ============================================================
-// MOTOR DE ARMADO AUTOMÁTICO — parejas, partidos, horarios y canchas
+// MOTOR DE ARMADO AUTOMÁTICO — partidos, horarios y canchas
 // Heurística simple basada en disponibilidad horaria declarada por
-// cada jugador y en el nivel de ranking, sin librerías externas.
+// cada jugador, sin librerías externas. Las parejas las arman los
+// propios jugadores al anotarse (o el admin a mano) — este motor solo
+// cruza las parejas ya armadas entre sí y les busca horario y cancha.
 // ============================================================
-
-// Arma parejas balanceadas: ordena por puntos de ranking y empareja
-// jugadores consecutivos (1º con 2º, 3º con 4º, ...) para que las
-// parejas queden parejas en nivel entre sí.
-function armarParejasAutomatico(jugadoresInscritos) {
-  const ordenados = [...jugadoresInscritos].sort((a, b) => b.puntos_ranking - a.puntos_ranking);
-  const parejas = [];
-  for (let i = 0; i < ordenados.length - 1; i += 2) {
-    parejas.push({ jugador1: ordenados[i], jugador2: ordenados[i + 1] });
-  }
-  // si queda un jugador sin par, se descarta y se informa al llamador
-  const sobrante = ordenados.length % 2 === 1 ? ordenados[ordenados.length - 1] : null;
-  return { parejas, sobrante };
-}
 
 // Convierte "HH:MM:SS" o "HH:MM" a minutos desde las 00:00
 function horaAMinutos(hora) {
