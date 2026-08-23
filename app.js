@@ -22,6 +22,7 @@ let cacheTorneos = [];
 let vistaPartidosActual = "lista"; // lista | calendario | llave
 let ultimosPartidos = [];
 let ultimasCanchasTorneo = [];
+let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instagram_url)
 
 // ---------- utilidades UI ----------
 function toast(msg) {
@@ -844,6 +845,33 @@ document.getElementById("btnGuardarPuntosRonda").addEventListener("click", async
 });
 
 // ============================================================
+// CONFIGURACIÓN GENERAL (whatsapp del club, instagram)
+// ============================================================
+async function cargarConfig() {
+  const { data } = await sb.from("config").select("*");
+  configApp = {};
+  (data || []).forEach((r) => { configApp[r.clave] = r.valor; });
+  const inputWsp = document.getElementById("cfgWhatsapp");
+  const inputIg = document.getElementById("cfgInstagram");
+  if (inputWsp) inputWsp.value = configApp.whatsapp_numero || "";
+  if (inputIg) inputIg.value = configApp.instagram_url || "";
+}
+
+document.getElementById("btnGuardarConfig").addEventListener("click", async () => {
+  const whatsapp = document.getElementById("cfgWhatsapp").value.trim().replace(/\D/g, "");
+  const instagram = document.getElementById("cfgInstagram").value.trim();
+  const { error } = await sb.from("config").upsert([
+    { clave: "whatsapp_numero", valor: whatsapp || null },
+    { clave: "instagram_url", valor: instagram || null }
+  ], { onConflict: "clave" });
+  if (error) { toast("Error: " + error.message); return; }
+  toast("Configuración guardada");
+  await cargarConfig();
+  cargarNoticias();
+  if (torneoActualId) refrescarDetalleTorneo();
+});
+
+// ============================================================
 // JUGADORES (listado admin, para inscribir manualmente y jugador del mes)
 // ============================================================
 async function cargarJugadoresAdmin() {
@@ -944,7 +972,7 @@ async function cargarTorneos() {
   }
   data.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "match-card";
+    div.className = "match-card torneo-card-poster";
     div.style.cursor = "pointer";
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
@@ -989,12 +1017,14 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   const categoriasElegidas = Array.from(document.querySelectorAll(".chkTorneoCategoria:checked")).map((c) => c.value);
   if (categoriasElegidas.length === 0) { toast("Elegí al menos una categoría"); return; }
 
+  const costoTxt = document.getElementById("tCosto").value.trim();
   const torneo = {
     nombre,
     complejo_id: complejoId || null,
     fecha_inicio: fechaInicio,
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
-    flyer_url: flyerUrl
+    flyer_url: flyerUrl,
+    costo: costoTxt ? Number(costoTxt) : null
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
@@ -1011,6 +1041,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   toast("Torneo creado");
   document.getElementById("tNombre").value = "";
   document.getElementById("tFlyerArchivo").value = "";
+  document.getElementById("tCosto").value = "";
   document.querySelectorAll(".chkTorneoCategoria:checked").forEach((c) => (c.checked = false));
   cargarTorneos();
   cargarInicio();
@@ -1116,6 +1147,25 @@ async function refrescarDetalleTorneo() {
   document.getElementById("dtEstado").textContent = t.estado;
   const categorias = (t.torneo_categorias || []).map((c) => c.categoria).join(", ") || "todas las categorías";
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
+
+  const contCosto = document.getElementById("dtCosto");
+  if (t.costo && Number(t.costo) > 0) {
+    contCosto.style.display = "block";
+    contCosto.innerHTML = `<span class="badge solid">💰 Costo: $${t.costo}</span>` +
+      (configApp.whatsapp_numero ? `<button type="button" class="secondary small" id="btnPagarWhatsapp" style="margin-left:8px">💬 Coordinar pago por WhatsApp</button>` : "");
+    const btnWsp = document.getElementById("btnPagarWhatsapp");
+    if (btnWsp) {
+      btnWsp.addEventListener("click", () => {
+        const quien = miJugador ? `Soy ${miJugador.nombre} ${miJugador.apellido} y ` : "";
+        const mensaje = `Hola! ${quien}quiero coordinar el pago de mi inscripción a "${t.nombre}" ($${t.costo}).`;
+        window.open(`https://wa.me/${configApp.whatsapp_numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
+      });
+    }
+  } else {
+    contCosto.style.display = "none";
+    contCosto.innerHTML = "";
+  }
+
   const flyerImg = document.getElementById("dtFlyer");
   if (t.flyer_url) { flyerImg.src = t.flyer_url; flyerImg.style.display = "block"; }
   else flyerImg.style.display = "none";
@@ -1525,6 +1575,78 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 });
 
 // ============================================================
+// NOTICIAS (novedades del club en Inicio + botón a Instagram)
+// ============================================================
+function renderNoticiaCard(n) {
+  const imagen = n.imagen_url ? `<img src="${n.imagen_url}" alt="${n.titulo}" loading="lazy" onerror="this.style.display='none'" />` : "";
+  const contenido = `${imagen}<strong>${n.titulo}</strong>${n.texto ? `<p>${n.texto}</p>` : ""}` +
+    (n.link ? `<a href="${n.link}" target="_blank" rel="noopener noreferrer" class="link-btn">Ver más →</a>` : "");
+  return `<div class="noticia-card">${contenido}</div>`;
+}
+
+async function cargarNoticias() {
+  const { data } = await sb.from("noticias").select("*").order("created_at", { ascending: false }).limit(10);
+
+  const card = document.getElementById("noticiasCard");
+  const ig = document.getElementById("noticiasInstagram");
+  if (configApp.instagram_url) {
+    ig.innerHTML = `<a href="${configApp.instagram_url}" target="_blank" rel="noopener noreferrer" class="secondary small">📸 Seguinos en Instagram</a>`;
+  } else {
+    ig.innerHTML = "";
+  }
+  const cont = document.getElementById("noticiasContenido");
+  if (data && data.length > 0) {
+    cont.innerHTML = data.map(renderNoticiaCard).join("");
+    card.style.display = "block";
+  } else if (configApp.instagram_url) {
+    cont.innerHTML = "";
+    card.style.display = "block";
+  } else {
+    card.style.display = "none";
+  }
+
+  const admin = document.getElementById("listaNoticiasAdmin");
+  if (admin) {
+    admin.innerHTML = (data && data.length > 0)
+      ? data.map((n) => `<div class="match-card">${renderNoticiaCard(n)}<button type="button" class="secondary small danger btnBorrarNoticia" data-id="${n.id}" style="margin-top:8px">Borrar</button></div>`).join("")
+      : '<p class="empty">Todavía no cargaste noticias.</p>';
+    admin.querySelectorAll(".btnBorrarNoticia").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await sb.from("noticias").delete().eq("id", btn.dataset.id);
+        cargarNoticias();
+      });
+    });
+  }
+}
+
+document.getElementById("btnSubirNoticia").addEventListener("click", async () => {
+  const titulo = document.getElementById("ntTitulo").value.trim();
+  if (!titulo) { toast("Poné un título"); return; }
+
+  let imagenUrl = null;
+  const archivo = document.getElementById("ntArchivo").files[0];
+  if (archivo) {
+    const path = `${Date.now()}-${archivo.name}`;
+    const { error: upErr } = await sb.storage.from("noticias").upload(path, archivo);
+    if (upErr) { toast("Error subiendo la imagen: " + upErr.message); return; }
+    const { data: pub } = sb.storage.from("noticias").getPublicUrl(path);
+    imagenUrl = pub.publicUrl;
+  }
+
+  const texto = document.getElementById("ntTexto").value.trim() || null;
+  const link = document.getElementById("ntLink").value.trim() || null;
+  const { error } = await sb.from("noticias").insert({ titulo, texto, imagen_url: imagenUrl, link });
+  if (error) { toast("Error: " + error.message); return; }
+
+  toast("Noticia agregada");
+  document.getElementById("ntTitulo").value = "";
+  document.getElementById("ntTexto").value = "";
+  document.getElementById("ntLink").value = "";
+  document.getElementById("ntArchivo").value = "";
+  cargarNoticias();
+});
+
+// ============================================================
 // NOTIFICACIONES
 // ============================================================
 async function pedirPermisoNotificaciones() {
@@ -1612,7 +1734,9 @@ async function init() {
     cargarAscendidos(),
     cargarSponsors(),
     cargarRanking(),
-    cargarPuntosRonda()
+    cargarPuntosRonda(),
+    cargarConfig(),
+    cargarNoticias()
   ]);
 }
 init();

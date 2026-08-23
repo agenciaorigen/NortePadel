@@ -142,10 +142,12 @@ create table if not exists torneos (
   puntos_segundo int not null default 60,
   puntos_participacion int not null default 10,
   flyer_url text,
+  costo numeric,
   created_at timestamptz not null default now()
 );
 
 alter table torneos add column if not exists flyer_url text;
+alter table torneos add column if not exists costo numeric;
 
 -- Canchas habilitadas para cada torneo (permite reasignar por clima u otro motivo)
 create table if not exists torneo_canchas (
@@ -221,6 +223,31 @@ create table if not exists sponsors (
 );
 
 alter table sponsors add column if not exists torneo_id uuid references torneos(id) on delete cascade;
+
+-- ---------- CONFIGURACIÓN GENERAL (clave/valor, para no tener que migrar cada vez que se suma un dato global) ----------
+-- claves usadas hoy: 'whatsapp_numero' (código de país + número, solo dígitos, ej: 595981234567),
+-- 'instagram_url' (link al perfil, ej: https://instagram.com/nortepadel)
+create table if not exists config (
+  clave text primary key,
+  valor text
+);
+
+-- valores del club (si ya los cambiaste desde "Configuración general", correr esto
+-- de nuevo no los pisa: "on conflict do nothing")
+insert into config (clave, valor) values
+  ('whatsapp_numero', '5493757507816'),
+  ('instagram_url', 'https://www.instagram.com/encuentrosdepadeliguazu/')
+on conflict (clave) do nothing;
+
+-- ---------- NOTICIAS (novedades del club en Inicio; se cargan a mano, como los flyers) ----------
+create table if not exists noticias (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null,
+  texto text,
+  imagen_url text,
+  link text,
+  created_at timestamptz not null default now()
+);
 
 -- ---------- SUSCRIPCIONES A NOTIFICACIONES PUSH ----------
 create table if not exists push_subscriptions (
@@ -298,6 +325,7 @@ create index if not exists idx_push_subscriptions_jugador on push_subscriptions(
 create index if not exists idx_notificaciones_jugador on notificaciones(jugador_id);
 create index if not exists idx_historial_categoria_jugador on historial_categoria(jugador_id);
 create index if not exists idx_historial_categoria_fecha on historial_categoria(created_at);
+create index if not exists idx_noticias_fecha on noticias(created_at);
 
 -- ============================================================
 -- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
@@ -615,6 +643,8 @@ alter table push_subscriptions enable row level security;
 alter table notificaciones enable row level security;
 alter table admins enable row level security;
 alter table historial_categoria enable row level security;
+alter table config enable row level security;
+alter table noticias enable row level security;
 
 -- complejos / canchas: lectura pública, escritura solo admin
 drop policy if exists "complejos_select" on complejos;
@@ -724,6 +754,16 @@ create policy "jugador_del_mes_select" on jugador_del_mes for select using (true
 drop policy if exists "jugador_del_mes_write" on jugador_del_mes;
 create policy "jugador_del_mes_write" on jugador_del_mes for all using (is_admin()) with check (is_admin());
 
+drop policy if exists "config_select" on config;
+create policy "config_select" on config for select using (true);
+drop policy if exists "config_write" on config;
+create policy "config_write" on config for all using (is_admin()) with check (is_admin());
+
+drop policy if exists "noticias_select" on noticias;
+create policy "noticias_select" on noticias for select using (true);
+drop policy if exists "noticias_write" on noticias;
+create policy "noticias_write" on noticias for all using (is_admin()) with check (is_admin());
+
 -- push_subscriptions, notificaciones: privadas del dueño (o admin)
 drop policy if exists "push_subscriptions_all" on push_subscriptions;
 create policy "push_subscriptions_all" on push_subscriptions for all
@@ -778,6 +818,21 @@ drop policy if exists "sponsors_public_write" on storage.objects;
 drop policy if exists "sponsors_admin_write" on storage.objects;
 create policy "sponsors_admin_write" on storage.objects
   for insert with check (bucket_id = 'sponsors' and public.is_admin());
+
+-- ============================================================
+-- STORAGE: bucket público para imágenes de noticias
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('noticias', 'noticias', true)
+on conflict (id) do nothing;
+
+drop policy if exists "noticias_public_read" on storage.objects;
+create policy "noticias_public_read" on storage.objects
+  for select using (bucket_id = 'noticias');
+
+drop policy if exists "noticias_admin_write" on storage.objects;
+create policy "noticias_admin_write" on storage.objects
+  for insert with check (bucket_id = 'noticias' and public.is_admin());
 
 -- ============================================================
 -- STORAGE: bucket público para fotos de perfil de jugadores

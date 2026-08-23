@@ -96,6 +96,14 @@
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </div>
 
+    <div class="card" id="noticiasCard" style="display:none">
+      <div class="torneo-card-header">
+        <h3>📰 Noticias</h3>
+        <div id="noticiasInstagram"></div>
+      </div>
+      <div id="noticiasContenido"></div>
+    </div>
+
     <div class="card" id="sponsorsInlineCard" style="display:none">
       <h3>Con el apoyo de</h3>
       <div class="sponsor-strip" id="sponsorsInline"></div>
@@ -129,6 +137,8 @@
           <input id="tFechaFin" type="date" />
         </div>
       </div>
+      <label>Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
+      <input id="tCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
       <label>Flyer del torneo (opcional)</label>
       <input id="tFlyerArchivo" type="file" accept="image/*" />
       <button class="primary" id="btnCrearTorneo">Crear torneo</button>
@@ -148,6 +158,7 @@
       <h2 id="dtNombre" style="margin-top:12px"></h2>
       <p class="badge" id="dtEstado"></p>
       <p class="match-meta" id="dtInfo"></p>
+      <p style="margin-top:10px;display:none" id="dtCosto"></p>
       <div class="sponsor-strip" id="dtSponsors" style="margin-top:12px;display:none"></div>
     </div>
 
@@ -296,6 +307,15 @@
   <!-- ADMIN -->
   <section id="view-admin" class="view">
     <div class="card">
+      <h2>Configuración general</h2>
+      <label>WhatsApp del club (para coordinar pagos)</label>
+      <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
+      <label>Instagram (link al perfil)</label>
+      <input id="cfgInstagram" placeholder="https://instagram.com/tu_club" />
+      <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
+    </div>
+
+    <div class="card">
       <h2>Nuevo complejo</h2>
       <label>Nombre</label>
       <input id="cNombre" placeholder="Ej: Norte Padel Club" />
@@ -367,6 +387,21 @@
       <input id="spArchivo" type="file" accept="image/*" />
       <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
       <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Noticias</h2>
+      <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>
+      <label>Título</label>
+      <input id="ntTitulo" placeholder="Ej: ¡Arrancó la Apertura Norte 2026!" />
+      <label>Texto (opcional)</label>
+      <textarea id="ntTexto" rows="3" placeholder="Contá la novedad..."></textarea>
+      <label>Link (opcional, ej: al posteo de Instagram)</label>
+      <input id="ntLink" placeholder="https://..." />
+      <label>Imagen (opcional)</label>
+      <input id="ntArchivo" type="file" accept="image/*" />
+      <button class="secondary small" id="btnSubirNoticia" style="margin-top:12px">Agregar noticia</button>
+      <div id="listaNoticiasAdmin" style="margin-top:16px"></div>
     </div>
 
     <div class="card">
