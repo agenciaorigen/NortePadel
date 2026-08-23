@@ -28,6 +28,10 @@ Un PWA necesita HTTPS para poder instalarse y funcionar offline. La forma más s
 2. Te da una URL tipo `https://norte-padel.netlify.app`. Compartísela a los jugadores.
 3. Cualquiera que la abra desde el celular va a ver la opción **"Agregar a pantalla de inicio" / "Instalar app"** en el navegador (Chrome/Safari), y les queda como una app más.
 
+> **Cada vez que subas una actualización** (una carpeta nueva que te pasamos acá), de vuelta a Netlify Drop o donde la tengas publicada, tenés que subir **todos los archivos**, no solo los que cambiaron — sobre todo `sw.js`. La app queda instalada como PWA y guarda una copia local de los archivos para andar sin internet; si `sw.js` no cambia, el celular de nadie va a bajar la versión nueva aunque la hayas subido, porque sigue usando la copia vieja que tenía guardada. Por eso, cada carpeta que te entregamos con cambios ya trae el número de versión de `sw.js` actualizado (`norte-padel-v6`, `v7`, etc.) — con eso alcanza para que se actualice sola la próxima vez que cada jugador abra la app (puede tardar unos segundos, o pedirles que cierren y vuelvan a abrir la app una vez).
+
+
+
 ## 3. Convertirte en administrador
 
 Recién instalada, nadie es administrador todavía (ni siquiera vos) — es a propósito, para que nadie pueda auto-asignarse el rol desde la app. Para activarte:
