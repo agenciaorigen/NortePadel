@@ -649,6 +649,7 @@ nav.tabbar .icon { position: relative; }
    siempre la misma imagen de "En vivo") */
 .torneo-card-poster {
   position: relative;
+  padding: 20px 16px 26px;
   background:
     linear-gradient(0deg, rgba(5,7,10,.92), rgba(5,7,10,.55) 65%),
     radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%),

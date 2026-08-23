@@ -974,6 +974,9 @@ async function cargarTorneos() {
     const div = document.createElement("div");
     div.className = "match-card torneo-card-poster";
     div.style.cursor = "pointer";
+    if (t.flyer_url) {
+      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.92), rgba(5,7,10,.55) 65%), radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%), url('${t.flyer_url}')`;
+    }
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
       : catList.length > 3 ? `${catList.slice(0, 3).join(", ")} +${catList.length - 3} más`
