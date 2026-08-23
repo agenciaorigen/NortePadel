@@ -27,6 +27,11 @@ let ultimasCanchasTorneo = [];
 let partidosCategoriaFiltro = ""; // "" = todas las categorías del torneo
 let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instagram_url)
 
+// "Jugar" (reservar cancha) está armado pero pausado hasta cerrar el acuerdo con el club
+// y activar el botón en index.html — mientras tanto no se llama a sus funciones para no
+// pegarle a tablas/RPCs que todavía no se corrieron en la base de producción.
+const FEATURE_JUGAR_HABILITADA = false;
+
 // ---------- utilidades UI ----------
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -308,10 +313,11 @@ async function manejarCambioSesion(session) {
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
-  if (isAdmin) cargarJugadoresAdmin();
+  if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
   cargarEnVivo();
   cargarHeroPosicion();
   if (torneoActualId) refrescarDetalleTorneo();
+  if (FEATURE_JUGAR_HABILITADA) renderJugar();
 }
 sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
 
@@ -409,12 +415,14 @@ async function abrirPerfilJugador(jugadorId) {
   }
   cambiarVista("perfil-jugador");
 
-  const [{ data: jugadores }, { data: torneosGanados }] = await Promise.all([
+  const [{ data: jugadores }, { data: torneosGanados }, { data: estadisticasRows }] = await Promise.all([
     sb.rpc("jugadores_publicos"),
-    sb.rpc("torneos_ganados_publico", { p_jugador_id: jugadorId })
+    sb.rpc("torneos_ganados_publico", { p_jugador_id: jugadorId }),
+    sb.rpc("estadisticas_jugador", { p_jugador_id: jugadorId })
   ]);
   const j = (jugadores || []).find((x) => x.id === jugadorId);
   if (!j) { toast("No se encontró el jugador"); cambiarVista(vistaAntesDePerfilJugador); return; }
+  const est = (estadisticasRows || [])[0] || {};
 
   document.getElementById("pjFoto").innerHTML = avatarHtml(j.foto_url, 96);
   document.getElementById("pjNombre").textContent = `${j.nombre} ${j.apellido}`;
@@ -424,6 +432,14 @@ async function abrirPerfilJugador(jugadorId) {
   document.getElementById("pjGanados").textContent = j.partidos_ganados;
   document.getElementById("pjEfectividad").textContent =
     j.partidos_jugados > 0 ? Math.round((j.partidos_ganados / j.partidos_jugados) * 100) + "%" : "—";
+
+  document.getElementById("pjFinales").textContent = est.total_finales || 0;
+  document.getElementById("pjTotalTorneos").textContent = est.total_torneos || 0;
+  document.getElementById("pj6m").textContent = est.partidos_6m
+    ? `${est.ganados_6m || 0}G - ${est.partidos_6m - (est.ganados_6m || 0)}P`
+    : "sin partidos";
+  document.getElementById("pjPrimerUltimoTorneo").textContent =
+    est.primer_torneo ? `Primer torneo: ${est.primer_torneo} · Último: ${est.ultimo_torneo}` : "";
 
   const cont = document.getElementById("pjTorneosGanados");
   cont.innerHTML = (torneosGanados || []).length > 0
@@ -591,11 +607,16 @@ async function cargarCampeones() {
 // ============================================================
 // fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color
 // (se reutiliza acá y en la lista de partidos del detalle del torneo)
-function matchVsRowHtml(nombre1, nombre2) {
-  return `<div class="match-vs-row">
-    <span class="match-vs-team">${nombre1}</span>
+// ganador (opcional): 1 o 2 si ya se sabe quién ganó — resalta a esa pareja
+// en vez de mostrar los dos nombres igual, para que un partido jugado se vea
+// distinto (más "resultado") que uno todavía por jugar
+function matchVsRowHtml(nombre1, nombre2, ganador) {
+  const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
+  const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
+  return `<div class="match-vs-row ${ganador ? "jugado" : ""}">
+    <span class="match-vs-team ${cls1}">${ganador === 1 ? "🏆 " : ""}${nombre1}</span>
     <span class="match-vs-divider">V</span>
-    <span class="match-vs-team derecha">${nombre2}</span>
+    <span class="match-vs-team derecha ${cls2}">${nombre2}${ganador === 2 ? " 🏆" : ""}</span>
   </div>`;
 }
 
@@ -611,14 +632,15 @@ async function cargarEnVivo() {
   const cont = document.getElementById("enVivoContenido");
 
   if (enCurso) {
+    // se piden siempre (no solo si hay sesión) para poder mostrar horarios y
+    // tablas del torneo en curso a cualquiera que entre a "En vivo"
+    const [{ data: parejas }, { data: partidos }] = await Promise.all([
+      sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id }),
+      sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id })
+    ]);
+
     let miPartidoHtml = "";
     if (miJugador) {
-      // ninguno de los dos depende del otro (los dos solo necesitan enCurso.id):
-      // se piden juntos en vez de uno después del otro para no esperar el doble
-      const [{ data: parejas }, { data: partidos }] = await Promise.all([
-        sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id }),
-        sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id })
-      ]);
       const miPareja = (parejas || []).find((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
       if (miPareja) {
         const miPartido = (partidos || []).find((p) => p.pareja1_id === miPareja.id || p.pareja2_id === miPareja.id);
@@ -627,28 +649,75 @@ async function cargarEnVivo() {
           const esPareja1 = miPartido.pareja1_id === miPareja.id;
           const miEquipo = esPareja1 ? miPartido.pareja1_nombre : miPartido.pareja2_nombre;
           const rival = esPareja1 ? miPartido.pareja2_nombre : miPartido.pareja1_nombre;
-          miPartidoHtml = `<div class="match-card" style="border-color:var(--accent);margin-top:14px">
+          miPartidoHtml = `<div class="card" style="border-color:var(--accent)">
             <h3 style="color:var(--accent);margin-bottom:2px">Tu partido</h3>
             ${matchVsRowHtml(miEquipo, rival)}
             <div class="match-meta">🕒 ${horario} · 📍 ${miPartido.cancha_nombre || "cancha a definir"}</div>
             <span class="badge" style="margin-top:6px;display:inline-block">${miPartido.estado}</span>
           </div>`;
         } else {
-          miPartidoHtml = `<p class="match-meta" style="margin-top:12px">Todavía no tenés un horario asignado en este torneo.</p>`;
+          miPartidoHtml = `<div class="card"><p class="match-meta">Todavía no tenés un horario asignado en este torneo.</p></div>`;
         }
       } else {
-        miPartidoHtml = `<p class="match-meta" style="margin-top:12px">Todavía no estás anotado en este torneo. Andá a Torneos para inscribirte.</p>`;
+        miPartidoHtml = `<div class="card"><p class="match-meta">Todavía no estás anotado en este torneo. Andá a Torneos para inscribirte.</p></div>`;
       }
     }
+
+    // horarios del día — lo primero que alguien que entra a "En vivo" quiere ver
+    const partidosHoy = (partidos || []).filter((p) => p.horario && p.horario.slice(0, 10) === hoy)
+      .sort((a, b) => a.horario.localeCompare(b.horario));
+    const horariosHtml = partidosHoy.length > 0
+      ? partidosHoy.map((p) => {
+          const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+          return `<div class="match-card${p.estado === "jugado" ? " match-card-jugado" : ""}" style="margin-bottom:8px">
+            ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre, ganador)}
+            <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · <span class="badge">${p.estado}</span>${p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
+          </div>`;
+        }).join("")
+      : '<p class="empty">No hay partidos programados para hoy.</p>';
+
+    // tablas de posiciones de la fase de grupos (si el torneo usa ese formato)
+    const partidosDeGrupo = (partidos || []).filter((p) => p.grupo != null);
+    let tablasHtml = "";
+    if (partidosDeGrupo.length > 0) {
+      const porClave = {};
+      partidosDeGrupo.forEach((p) => {
+        const clave = `${p.categoria || "Sin categoría"} · Grupo ${p.grupo}`;
+        (porClave[clave] = porClave[clave] || []).push(p);
+      });
+      tablasHtml = Object.keys(porClave).sort().map((clave) => {
+        const partidosGrupo = porClave[clave];
+        const nombreDe = (id) => {
+          const p = partidosGrupo.find((x) => x.pareja1_id === id || x.pareja2_id === id);
+          return p ? (p.pareja1_id === id ? p.pareja1_nombre : p.pareja2_nombre) : "?";
+        };
+        const filas = calcularTablaGrupo(partidosGrupo).map((s, i) =>
+          `<tr><td>${i + 1}</td><td>${nombreDe(s.id)}</td><td>${s.ganados}</td><td>${s.setsFavor}-${s.setsContra}</td></tr>`
+        ).join("");
+        return `<div class="card">
+          <h3 style="margin-bottom:8px">📊 ${clave}</h3>
+          <table class="tabla-posiciones">
+            <thead><tr><th>#</th><th>Pareja</th><th>PG</th><th>Sets</th></tr></thead>
+            <tbody>${filas}</tbody>
+          </table>
+        </div>`;
+      }).join("");
+    }
+
     cont.innerHTML = `
       <div class="envivo-header">
         <span class="badge live"><span class="live-dot"></span>EN VIVO</span>
         <h2 class="envivo-titulo">${enCurso.nombre}</h2>
         <p class="envivo-sub">${enCurso.complejos?.nombre || "sin complejo"} · ${enCurso.fecha_inicio} al ${enCurso.fecha_fin}</p>
       </div>
+      ${miPartidoHtml}
       <div class="card">
-        ${miPartidoHtml}
-        <button class="gradient" id="btnVerTorneoEnVivo" style="margin-top:14px">Ver partidos y resultados</button>
+        <h3 style="margin-bottom:8px">🗓️ Horarios de hoy</h3>
+        ${horariosHtml}
+      </div>
+      ${tablasHtml}
+      <div class="card">
+        <button class="gradient" id="btnVerTorneoEnVivo">Ver todos los partidos</button>
       </div>
     `;
     document.getElementById("btnVerTorneoEnVivo").addEventListener("click", () => abrirTorneo(enCurso.id));
@@ -699,7 +768,12 @@ async function cargarComplejos() {
     div.innerHTML = `
       <div class="match-teams">${c.nombre}</div>
       <div class="match-meta">${c.direccion || ""}</div>
-      <div style="margin-top:8px">${canchasDelComplejo.map((k) => `<span class="badge" style="margin-right:6px">${k.nombre}</span>`).join("") || '<span class="match-meta">Sin canchas cargadas</span>'}</div>
+      <div style="margin-top:8px">${canchasDelComplejo.map((k) => `
+        <div class="row" style="align-items:center;margin-bottom:4px">
+          <span class="badge">${k.nombre}</span>
+          <input type="number" min="0" step="100" placeholder="$/hora (opcional)" class="inputCostoHora" data-cancha="${k.id}" value="${k.costo_hora ?? ""}" style="max-width:150px" />
+        </div>
+      `).join("") || '<span class="match-meta">Sin canchas cargadas</span>'}</div>
       <div class="row" style="margin-top:10px">
         <input placeholder="Nombre de cancha (ej: Cancha 3)" class="inputCancha" data-complejo="${c.id}" />
         <button class="secondary small btnAgregarCancha" data-complejo="${c.id}">Agregar cancha</button>
@@ -721,8 +795,21 @@ async function cargarComplejos() {
     });
   });
 
+  document.querySelectorAll(".inputCostoHora").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const costo_hora = input.value === "" ? null : Number(input.value);
+      const { error } = await sb.from("canchas").update({ costo_hora }).eq("id", input.dataset.cancha);
+      if (error) { toast("Error: " + error.message); return; }
+      const cancha = cacheCanchas.find((k) => k.id === input.dataset.cancha);
+      if (cancha) cancha.costo_hora = costo_hora;
+      toast("Precio actualizado");
+    });
+  });
+
   llenarSelect(document.getElementById("tComplejo"), cacheComplejos, (c) => c.nombre);
   llenarSelect(document.getElementById("teComplejo"), cacheComplejos, (c) => c.nombre);
+  llenarSelect(document.getElementById("reservaComplejo"), cacheComplejos, (c) => c.nombre);
+  actualizarCanchasReserva();
 }
 
 document.getElementById("btnCrearComplejo").addEventListener("click", async () => {
@@ -1022,6 +1109,7 @@ function estaEnVivo(t) {
 function badgeEstadoTorneo(t) {
   if (estaEnVivo(t)) return `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>`;
   if (t.estado === "inscripcion") return `<span class="badge solid">Inscripción abierta</span>`;
+  if (t.estado === "inscripcion_cerrada") return `<span class="badge orange">Inscripción cerrada</span>`;
   if (t.estado === "cancelado") return `<span class="badge orange">Cancelado</span>`;
   return `<span class="badge">${t.estado === "finalizado" ? "Finalizado" : t.estado}</span>`;
 }
@@ -1239,6 +1327,10 @@ async function renderInscribirme() {
     estado.textContent = "✅ Ya estás inscripto en este torneo.";
     buscarWrap.style.display = "none";
     btn.style.display = "none";
+  } else if (torneoActualData && torneoActualData.estado !== "inscripcion") {
+    estado.textContent = "🔒 La inscripción para este torneo está cerrada.";
+    buscarWrap.style.display = "none";
+    btn.style.display = "none";
   } else {
     estado.textContent = "";
     buscarWrap.style.display = "block";
@@ -1291,6 +1383,177 @@ document.getElementById("btnConfirmarInscripcion").addEventListener("click", asy
   refrescarDetalleTorneo();
 });
 
+// ============================================================
+// JUGAR (reservar cancha para entrenar / jugar con amigos, día a día,
+// fuera del circuito de torneos — pendiente hasta que un admin la confirma,
+// no suma puntos al ranking)
+// ============================================================
+let invitadosSeleccionados = []; // jugadores invitados a la reserva que se está armando (máx. 3)
+
+function actualizarCanchasReserva() {
+  const complejoId = document.getElementById("reservaComplejo").value;
+  const canchasDelComplejo = cacheCanchas.filter((c) => c.complejo_id === complejoId);
+  llenarSelect(document.getElementById("reservaCancha"), canchasDelComplejo, (c) => c.nombre);
+  actualizarCostoEstimado();
+}
+document.getElementById("reservaComplejo").addEventListener("change", actualizarCanchasReserva);
+
+function actualizarCostoEstimado() {
+  const cancha = cacheCanchas.find((c) => c.id === document.getElementById("reservaCancha").value);
+  const minutos = Number(document.getElementById("reservaDuracion").value) || 90;
+  const txt = document.getElementById("reservaCostoTxt");
+  txt.textContent = cancha?.costo_hora
+    ? `Costo estimado: $${Math.round((cancha.costo_hora * minutos) / 60)} (a confirmar por el club)`
+    : "Esta cancha no tiene costo configurado.";
+}
+document.getElementById("reservaCancha").addEventListener("change", actualizarCostoEstimado);
+document.getElementById("reservaDuracion").addEventListener("input", actualizarCostoEstimado);
+
+function renderInvitadosSeleccionados() {
+  document.getElementById("reservaInvitadosSeleccionados").innerHTML = invitadosSeleccionados.map((j) => `
+    <span class="badge">${j.nombre} ${j.apellido} <button type="button" class="btnQuitarInvitado" data-id="${j.id}" style="border:none;background:none;color:inherit;cursor:pointer;margin-left:4px">×</button></span>
+  `).join("");
+  document.querySelectorAll(".btnQuitarInvitado").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      invitadosSeleccionados = invitadosSeleccionados.filter((j) => j.id !== btn.dataset.id);
+      renderInvitadosSeleccionados();
+    });
+  });
+}
+
+document.getElementById("reservaBuscarAmigo").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const sugerencias = document.getElementById("reservaSugerencias");
+  if (!q) { sugerencias.innerHTML = ""; return; }
+  if (invitadosSeleccionados.length >= 3) { sugerencias.innerHTML = '<div class="suggest-item" style="color:var(--muted);cursor:default">Ya invitaste a 3 amigos (el máximo para la cancha)</div>'; return; }
+
+  const candidatos = jugadoresParaBuscar.filter((j) =>
+    j.id !== miJugador?.id && !invitadosSeleccionados.some((s) => s.id === j.id) && `${j.nombre} ${j.apellido}`.toLowerCase().includes(q)
+  ).slice(0, 6);
+
+  sugerencias.innerHTML = candidatos.length > 0
+    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${j.nombre} ${j.apellido}</button>`).join("")
+    : '<div class="suggest-item" style="color:var(--muted);cursor:default">Sin resultados</div>';
+
+  sugerencias.querySelectorAll(".suggest-item[data-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      invitadosSeleccionados.push(candidatos.find((c) => c.id === btn.dataset.id));
+      document.getElementById("reservaBuscarAmigo").value = "";
+      sugerencias.innerHTML = "";
+      renderInvitadosSeleccionados();
+    });
+  });
+});
+
+document.getElementById("btnPedirReserva").addEventListener("click", async () => {
+  const cancha_id = document.getElementById("reservaCancha").value;
+  const horarioValor = document.getElementById("reservaHorario").value;
+  if (!cancha_id) { toast("Elegí una cancha"); return; }
+  if (!horarioValor) { toast("Elegí fecha y hora"); return; }
+  const boton = document.getElementById("btnPedirReserva");
+  boton.disabled = true;
+  const { error } = await sb.rpc("reservar_cancha", {
+    p_cancha_id: cancha_id,
+    p_horario: new Date(horarioValor).toISOString(),
+    p_duracion_minutos: Number(document.getElementById("reservaDuracion").value) || 90,
+    p_invitados_ids: invitadosSeleccionados.map((j) => j.id)
+  });
+  boton.disabled = false;
+  if (error) { toast("Error: " + error.message); return; }
+  toast("¡Listo! Falta que el club confirme tu reserva 🎾");
+  document.getElementById("reservaHorario").value = "";
+  invitadosSeleccionados = [];
+  renderInvitadosSeleccionados();
+  cargarMisReservas();
+});
+
+async function cargarMisReservas() {
+  const cont = document.getElementById("listaMisReservas");
+  if (!miJugador) { cont.innerHTML = ""; return; }
+  const { data } = await sb.rpc("mis_reservas");
+  const reservas = data || [];
+  cont.innerHTML = reservas.length > 0 ? "" : '<p class="empty">Todavía no tenés reservas.</p>';
+  reservas.forEach((r) => {
+    const horario = new Date(r.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    const costoTxt = r.costo ? ` · $${r.costo}` : "";
+    const estadoBadge = { pendiente: "orange", confirmada: "", rechazada: "danger", cancelada: "danger" }[r.estado] || "";
+    const div = document.createElement("div");
+    div.className = "match-card";
+    div.innerHTML = `
+      <div class="match-teams">${r.cancha_nombre}${r.complejo_nombre ? " · " + r.complejo_nombre : ""}</div>
+      <div class="match-meta">${horario} · ${r.duracion_minutos} min${costoTxt} <span class="badge ${estadoBadge}">${r.estado}</span></div>
+      ${r.invitados ? `<div class="match-meta">Con: ${r.invitados}</div>` : ""}
+      ${r.soy_organizador && (r.estado === "pendiente" || r.estado === "confirmada") ? '<button class="secondary small danger btnCancelarReserva" style="margin-top:8px">Cancelar reserva</button>' : ""}
+    `;
+    if (r.soy_organizador) {
+      const btnCancelar = div.querySelector(".btnCancelarReserva");
+      if (btnCancelar) btnCancelar.addEventListener("click", async () => {
+        const { error } = await sb.from("reservas").update({ estado: "cancelada" }).eq("id", r.id);
+        if (error) { toast("Error: " + error.message); return; }
+        toast("Reserva cancelada");
+        cargarMisReservas();
+      });
+    }
+    cont.appendChild(div);
+  });
+}
+
+async function renderJugar() {
+  const aviso = document.getElementById("reservaLoginAviso");
+  const form = document.getElementById("reservaFormWrap");
+  if (!currentUser || !miJugador) {
+    aviso.style.display = "block";
+    form.style.display = "none";
+    document.getElementById("listaMisReservas").innerHTML = "";
+    return;
+  }
+  aviso.style.display = "none";
+  form.style.display = "block";
+  if (jugadoresParaBuscar.length === 0) {
+    const { data: jp } = await sb.rpc("jugadores_publicos");
+    jugadoresParaBuscar = jp || [];
+  }
+  cargarMisReservas();
+}
+document.getElementById("btnReservaIrAPerfil").addEventListener("click", () => cambiarVista("perfil"));
+document.querySelector('.tab[data-view="jugar"]').addEventListener("click", renderJugar);
+
+async function cargarReservasPendientesAdmin() {
+  if (!isAdmin) return;
+  const cont = document.getElementById("listaReservasPendientes");
+  const { data } = await sb.rpc("reservas_admin");
+  const pendientes = (data || []).filter((r) => r.estado === "pendiente");
+  cont.innerHTML = pendientes.length > 0 ? "" : '<p class="empty">No hay reservas pendientes.</p>';
+  pendientes.forEach((r) => {
+    const horario = new Date(r.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    const costoTxt = r.costo ? ` · $${r.costo}` : "";
+    const div = document.createElement("div");
+    div.className = "match-card";
+    div.innerHTML = `
+      <div class="match-teams">${r.cancha_nombre}${r.complejo_nombre ? " · " + r.complejo_nombre : ""}</div>
+      <div class="match-meta">${horario} · ${r.duracion_minutos} min${costoTxt}</div>
+      <div class="match-meta">Organiza: ${r.organizador_nombre}${r.organizador_telefono ? " · " + r.organizador_telefono : ""}${r.invitados ? " · Con: " + r.invitados : ""}</div>
+      <div class="match-meta" style="display:flex;gap:8px;margin-top:8px">
+        <button class="secondary small btnConfirmarReserva">Confirmar</button>
+        <button class="secondary small danger btnRechazarReserva">Rechazar</button>
+      </div>
+    `;
+    div.querySelector(".btnConfirmarReserva").addEventListener("click", async () => {
+      const { error } = await sb.from("reservas").update({ estado: "confirmada" }).eq("id", r.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Reserva confirmada");
+      cargarReservasPendientesAdmin();
+    });
+    div.querySelector(".btnRechazarReserva").addEventListener("click", async () => {
+      const { error } = await sb.from("reservas").update({ estado: "rechazada" }).eq("id", r.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Reserva rechazada");
+      cargarReservasPendientesAdmin();
+    });
+    cont.appendChild(div);
+  });
+}
+
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
   const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", torneoActualId).single();
@@ -1298,7 +1561,21 @@ async function refrescarDetalleTorneo() {
   torneoActualData = t;
 
   document.getElementById("dtNombre").textContent = t.nombre;
-  document.getElementById("dtEstado").textContent = t.estado;
+  document.getElementById("dtEstado").innerHTML = badgeEstadoTorneo(t);
+  const btnToggleInsc = document.getElementById("btnToggleInscripcion");
+  if (isAdmin && (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada")) {
+    btnToggleInsc.style.display = "inline-block";
+    btnToggleInsc.textContent = t.estado === "inscripcion" ? "🔒 Cerrar inscripción" : "🔓 Reabrir inscripción";
+    btnToggleInsc.onclick = async () => {
+      const nuevoEstado = t.estado === "inscripcion" ? "inscripcion_cerrada" : "inscripcion";
+      const { error } = await sb.from("torneos").update({ estado: nuevoEstado }).eq("id", torneoActualId);
+      if (error) { toast("Error: " + error.message); return; }
+      toast(nuevoEstado === "inscripcion_cerrada" ? "Inscripción cerrada" : "Inscripción reabierta");
+      refrescarDetalleTorneo();
+    };
+  } else {
+    btnToggleInsc.style.display = "none";
+  }
   categoriasTorneoActual = (t.torneo_categorias || []).map((c) => c.categoria);
   const categorias = categoriasTorneoActual.join(", ") || "todas las categorías";
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
@@ -1545,7 +1822,14 @@ async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
 // generada (fase de grupos o "Generar siguiente fase") queda etiquetada
 // con la fase que le toca — el admin ya no elige la ronda a mano al
 // cargar el resultado, así el cuadro respeta el orden real del torneo.
-const FASES_TORNEO = ["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
+// Nombre de ronda según la cantidad de parejas que entran a jugarla — así un
+// torneo con 4 parejas clasificadas pasa directo a "Semifinal" en vez de forzar
+// "Dieciseisavos" como si siempre hubiera 32. Si la cantidad no es una potencia
+// de 2 conocida (grupos irregulares), usa un nombre genérico en vez de inventar.
+const NOMBRES_FASE_POR_CANTIDAD = { 32: "Dieciseisavos", 16: "Octavos", 8: "Cuartos", 4: "Semifinal", 2: "Final" };
+function nombreFasePorCantidadEquipos(n) {
+  return NOMBRES_FASE_POR_CANTIDAD[n] || `Ronda de ${n}`;
+}
 
 // Días del torneo a considerar para el armado automático: si el admin marcó
 // días de la semana puntuales (ej: jueves/viernes/sábado) en Crear/Editar
@@ -1699,11 +1983,12 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
 });
 
 // Por cada categoría del torneo, toma los ganadores de SU fase más avanzada
-// ya jugada por completo y arma SU siguiente fase (Dieciseisavos, Octavos,
-// Cuartos...), respetando el orden de FASES_TORNEO en vez de dejar que el
-// admin elija la ronda de cada partido a mano. Categorías que van más
-// atrasadas que otras (por ejemplo, todavía en fase de grupos mientras otra
-// ya llegó a Cuartos) simplemente esperan su turno.
+// ya jugada por completo y arma SU siguiente fase, nombrándola según cuántas
+// parejas clasificaron (4 parejas -> Semifinal directo, sin pasar por
+// Dieciseisavos/Octavos/Cuartos como si siempre hubiera un cuadro de 32), en
+// vez de dejar que el admin elija la ronda de cada partido a mano. Categorías
+// que van más atrasadas que otras (por ejemplo, todavía en fase de grupos
+// mientras otra ya llegó a Cuartos) simplemente esperan su turno.
 document.getElementById("btnGenerarSiguienteFase").addEventListener("click", async () => {
   const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId });
   if (!partidos || partidos.length === 0) { toast("Todavía no armaste ningún partido"); return; }
@@ -1720,12 +2005,16 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
 
   for (const categoria of Object.keys(grupos)) {
     const partidosCategoria = grupos[categoria];
-    const fasesConPartidos = FASES_TORNEO.filter((f) => partidosCategoria.some((p) => (p.ronda || "Fase de grupos") === f));
-    const faseActual = fasesConPartidos[fasesConPartidos.length - 1];
-    const indexActual = FASES_TORNEO.indexOf(faseActual);
-    if (indexActual === FASES_TORNEO.length - 1) continue; // esta categoría ya llegó a la Final
-
-    const partidosFaseActual = partidosCategoria.filter((p) => (p.ronda || "Fase de grupos") === faseActual);
+    // la fase actual de esta categoría es la que se armó más recientemente
+    // (no un orden fijo de nombres: la cantidad de rondas depende de cuántas
+    // parejas hay, así que 4 parejas pasan directo a semifinal)
+    const porRonda = {};
+    partidosCategoria.forEach((p) => { const r = p.ronda || "Fase de grupos"; (porRonda[r] = porRonda[r] || []).push(p); });
+    const faseActual = Object.keys(porRonda).sort((a, b) =>
+      Math.max(...porRonda[b].map((p) => new Date(p.created_at).getTime())) -
+      Math.max(...porRonda[a].map((p) => new Date(p.created_at).getTime()))
+    )[0];
+    const partidosFaseActual = porRonda[faseActual];
     const sinJugar = partidosFaseActual.filter((p) => p.estado !== "jugado");
     if (sinJugar.length > 0) { mensajes.push(`${categoria}: faltan ${sinJugar.length} resultado(s) de "${faseActual}"`); continue; }
 
@@ -1748,7 +2037,7 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
     if (ganadoresIds.length % 2 !== 0) { mensajes.push(`${categoria}: quedaron ${ganadoresIds.length} clasificados (número impar) — resolvé eso a mano`); continue; }
 
     const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
-    const siguienteFase = FASES_TORNEO[indexActual + 1];
+    const siguienteFase = nombreFasePorCantidadEquipos(ganadoresIds.length);
     const { generados } = await armarPartidosParaGrupo({ parejas: parejasGanadoras }, categoria, siguienteFase, torneo, canchas, ocupacionAcumulada);
     if (generados > 0) { totalGenerados += generados; mensajes.push(`${categoria}: se armó "${siguienteFase}" (${generados})`); }
   }
@@ -1832,9 +2121,15 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
 // (la fase de grupos no entra acá porque no es de eliminación directa)
 function renderPartidosLlave(partidos) {
   const cont = document.getElementById("dtPartidos");
-  const RONDAS = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
-  const columnas = RONDAS.map((r) => ({ ronda: r, partidos: partidos.filter((p) => p.ronda === r) }))
-    .filter((col) => col.partidos.length > 0);
+  // las columnas se arman con los nombres de ronda que realmente existen, en el
+  // orden en que se generaron (no una lista fija) — así sirve tanto para el
+  // cuadro clásico de 16/8/4/2 como para un torneo chico que arranca directo
+  // en semifinal, o con nombres genéricos ("Ronda de 6") si el cuadro es irregular
+  const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos");
+  const nombresOrdenados = [...new Set(
+    [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
+  )];
+  const columnas = nombresOrdenados.map((r) => ({ ronda: r, partidos: eliminacion.filter((p) => p.ronda === r) }));
 
   if (columnas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos de eliminación directa. Cuando termine la fase de grupos, usá "Generar siguiente fase".</p>';
@@ -1842,8 +2137,8 @@ function renderPartidosLlave(partidos) {
   }
 
   cont.innerHTML = '<div class="llave-scroll"><div class="llave">' +
-    columnas.map((col) => `
-      <div class="llave-columna">
+    columnas.map((col, i) => `
+      <div class="llave-columna ${i === columnas.length - 1 ? "llave-final" : ""}">
         <h3>${col.ronda}</h3>
         ${col.partidos.map((p) => `
           <div class="llave-partido">
@@ -1880,12 +2175,13 @@ function renderPartidosLista(partidos, canchasTorneo) {
   }
   partidos.forEach((p) => {
     const div = document.createElement("div");
-    div.className = "match-card";
+    const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+    div.className = "match-card" + (p.estado === "jugado" ? " match-card-jugado" : "");
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
-      ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre)}
+      ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre, ganador)}
       <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
-      ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${formatearSets(p.sets)}</div>` : ""}
+      ${p.estado === "jugado" ? `<div class="sets-row">${(p.sets || []).map((s) => `<span class="set-chip ${s.p1 > s.p2 ? "gano-p1" : s.p2 > s.p1 ? "gano-p2" : ""}">${s.p1}-${s.p2}</span>`).join("") || formatearSets(p.sets)}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
       <div class="match-admin-panel">
         <p class="match-admin-label">Cargar resultado (solo admin) — ${p.ronda || "Fase de grupos"}</p>
@@ -2154,13 +2450,27 @@ async function actualizarContadorNotificaciones() {
   document.getElementById("notifCount").textContent = count ? `(${count})` : "";
 }
 
-document.getElementById("btnNotif").addEventListener("click", async () => {
+// muestra nuevas e históricas juntas en una ventana, en vez de un toast fugaz
+// que solo dejaba ver la más reciente
+async function abrirNotificaciones() {
   if (!miJugador) { toast("Iniciá sesión para ver tus notificaciones"); cambiarVista("perfil"); return; }
-  const { data } = await sb.from("notificaciones").select("*").eq("jugador_id", miJugador.id).order("created_at", { ascending: false }).limit(10);
-  if (!data || data.length === 0) { toast("No tenés notificaciones"); return; }
-  toast(data[0].mensaje);
+  const { data } = await sb.from("notificaciones").select("*").eq("jugador_id", miJugador.id).order("created_at", { ascending: false }).limit(30);
+  const lista = document.getElementById("listaNotificaciones");
+  lista.innerHTML = (data && data.length > 0)
+    ? data.map((n) => `
+      <div class="match-card${n.leido ? "" : " match-card-jugado"}" style="margin-bottom:8px">
+        <div style="font-size:13px">${n.mensaje}</div>
+        <div class="match-meta" style="margin-top:4px">${new Date(n.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}${!n.leido ? ' · <span class="badge orange">nueva</span>' : ""}</div>
+      </div>`).join("")
+    : '<p class="empty">No tenés notificaciones todavía.</p>';
+  document.getElementById("notifOverlay").style.display = "flex";
   await sb.from("notificaciones").update({ leido: true }).eq("jugador_id", miJugador.id).eq("leido", false);
   actualizarContadorNotificaciones();
+}
+document.getElementById("btnNotif").addEventListener("click", abrirNotificaciones);
+document.getElementById("btnCerrarNotif").addEventListener("click", () => { document.getElementById("notifOverlay").style.display = "none"; });
+document.getElementById("notifOverlay").addEventListener("click", (e) => {
+  if (e.target.id === "notifOverlay") document.getElementById("notifOverlay").style.display = "none";
 });
 
 let canalNotificaciones = null;

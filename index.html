@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
 <meta name="theme-color" content="#050709" />
+<!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
+     abre como acceso directo al navegador, no como app a pantalla completa -->
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Norte Padel" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
@@ -25,6 +31,16 @@
     <input id="nuevaClave2" type="password" autocomplete="new-password" minlength="6" required />
     <button class="primary" id="btnGuardarClaveNueva" style="margin-top:10px;width:100%">Guardar y continuar</button>
     <p class="match-meta" id="claveNuevaError"></p>
+  </div>
+</div>
+
+<div id="notifOverlay" class="overlay-bloqueante" style="display:none">
+  <div class="card" style="max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 style="margin:0">Notificaciones</h2>
+      <button type="button" class="secondary small" id="btnCerrarNotif">Cerrar</button>
+    </div>
+    <div id="listaNotificaciones" style="margin-top:12px"></div>
   </div>
 </div>
 
@@ -177,6 +193,39 @@
     </div>
   </section>
 
+  <!-- JUGAR (reservar cancha para entrenar / jugar con amigos, fuera de los torneos) -->
+  <section id="view-jugar" class="view">
+    <div class="card">
+      <h2>Jugar</h2>
+      <p class="match-meta">Reservá una cancha para entrenar o jugar con amigos, fuera del circuito de torneos.</p>
+      <div id="reservaLoginAviso" style="display:none">
+        <p class="match-meta">Iniciá sesión y completá tu perfil para poder reservar.</p>
+        <button class="primary" id="btnReservaIrAPerfil">Ir a Mi perfil</button>
+      </div>
+      <div id="reservaFormWrap">
+        <label>Complejo</label>
+        <select id="reservaComplejo"></select>
+        <label>Cancha</label>
+        <select id="reservaCancha"></select>
+        <div class="row">
+          <div><label>Fecha y hora</label><input id="reservaHorario" type="datetime-local" /></div>
+          <div><label>Duración (min)</label><input id="reservaDuracion" type="number" value="90" min="30" step="15" /></div>
+        </div>
+        <p class="match-meta" id="reservaCostoTxt"></p>
+        <label>Invitá a tus amigos (opcional, hasta 3 — la cancha es para 4)</label>
+        <input id="reservaBuscarAmigo" placeholder="Buscá por nombre" autocomplete="off" />
+        <div id="reservaSugerencias" class="suggest-list"></div>
+        <div id="reservaInvitadosSeleccionados" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
+        <button class="gradient" id="btnPedirReserva" style="margin-top:12px">Pedir reserva</button>
+        <p class="match-meta" style="margin-top:8px">Un admin va a confirmar la reserva (y el pago, si la cancha tiene costo). Te avisamos cuando quede lista.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Mis reservas</h3>
+      <div id="listaMisReservas"></div>
+    </div>
+  </section>
+
   <!-- DETALLE TORNEO (se muestra al elegir uno) -->
   <section id="view-torneo-detalle" class="view">
     <div class="card">
@@ -187,6 +236,7 @@
       <img id="dtFlyer" style="display:none;width:100%;border-radius:12px;margin-top:12px;border:1px solid var(--border)" />
       <h2 id="dtNombre" style="margin-top:12px"></h2>
       <p class="badge" id="dtEstado"></p>
+      <button type="button" class="secondary small admin-only" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
       <p class="match-meta" id="dtInfo"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
       <div class="sponsor-strip" id="dtSponsors" style="margin-top:12px;display:none"></div>
@@ -337,6 +387,15 @@
       </div>
     </div>
     <div class="card">
+      <h3>📈 Rendimiento</h3>
+      <div class="pj-stats">
+        <div><strong id="pjFinales"></strong><span>Finales jugadas</span></div>
+        <div><strong id="pjTotalTorneos"></strong><span>Torneos jugados</span></div>
+        <div><strong id="pj6m"></strong><span>Últimos 6 meses</span></div>
+      </div>
+      <p class="match-meta" id="pjPrimerUltimoTorneo" style="margin-top:10px"></p>
+    </div>
+    <div class="card">
       <h3>🏆 Torneos ganados</h3>
       <div id="pjTorneosGanados"></div>
     </div>
@@ -442,6 +501,13 @@
       <div id="listaSolicitudesCategoria"></div>
     </div>
 
+    <!-- pausado junto con "Jugar" (ver nav.tabbar) -->
+    <div class="card" style="display:none">
+      <h2>Reservas pendientes</h2>
+      <p class="match-meta" style="margin-bottom:6px">Pedidos de cancha para jugar/entrenar (fuera de los torneos). Confirmá cuando el pago esté ok.</p>
+      <div id="listaReservasPendientes"></div>
+    </div>
+
     <div class="card">
       <h2>Puntos por ronda</h2>
       <p class="match-meta" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedó eliminada. En la Final, el ganador suma "Campeón" y el perdedor suma "Sub".</p>
@@ -537,6 +603,12 @@
       <span id="enVivoDot" style="display:none"></span>
     </span>
     En vivo
+  </button>
+  <!-- "Jugar" (reservar cancha) queda armado pero pausado hasta cerrar el acuerdo con el
+       club — no se muestra el botón todavía. Sacar el display:none para activarlo. -->
+  <button data-view="jugar" class="tab tab-cta" style="display:none">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5-6-3.5Z" fill="currentColor" stroke="none"/></svg></span>
+    Jugar
   </button>
   <button data-view="torneos" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>

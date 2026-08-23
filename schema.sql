@@ -23,6 +23,7 @@ create table if not exists canchas (
   activa boolean not null default true,
   created_at timestamptz not null default now()
 );
+alter table canchas add column if not exists costo_hora numeric; -- precio de alquiler por hora (opcional, para "Jugar" / reservar cancha)
 
 -- ---------- JUGADORES ----------
 create table if not exists jugadores (
@@ -55,6 +56,25 @@ alter table jugadores add column if not exists categoria_pendiente text; -- cate
 drop view if exists vista_ranking;
 alter table jugadores alter column puntos_ranking type numeric(10,1) using puntos_ranking::numeric(10,1);
 alter table jugadores alter column puntos_ranking set default 0;
+
+-- ---------- RESERVAS (jugar/entrenar con amigos, día a día, fuera del circuito de torneos) ----------
+create table if not exists reservas (
+  id uuid primary key default gen_random_uuid(),
+  cancha_id uuid not null references canchas(id) on delete cascade,
+  organizador_id uuid not null references jugadores(id) on delete cascade,
+  horario timestamptz not null,
+  duracion_minutos int not null default 90,
+  costo numeric, -- foto del costo_hora de la cancha al reservar, para que un cambio de precio no altere reservas ya hechas
+  estado text not null default 'pendiente', -- pendiente, confirmada, rechazada, cancelada
+  created_at timestamptz not null default now()
+);
+
+create table if not exists reserva_invitados (
+  id uuid primary key default gen_random_uuid(),
+  reserva_id uuid not null references reservas(id) on delete cascade,
+  jugador_id uuid not null references jugadores(id) on delete cascade,
+  unique (reserva_id, jugador_id)
+);
 
 -- ---------- CATEGORIAS ----------
 -- Lista editable de categorías (6ta, 5ta, Suma12, etc.) que usan tanto
@@ -141,7 +161,7 @@ create table if not exists torneos (
   categoria text default 'abierta',
   fecha_inicio date not null,
   fecha_fin date,
-  estado text not null default 'inscripcion', -- inscripcion, en_curso, finalizado, cancelado
+  estado text not null default 'inscripcion', -- inscripcion, inscripcion_cerrada, en_curso, finalizado, cancelado
   puntos_primero int not null default 100,
   puntos_segundo int not null default 60,
   puntos_participacion int not null default 10,
@@ -503,13 +523,14 @@ create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   id uuid, ronda text, categoria text, grupo int, horario timestamptz, estado text, sets jsonb,
   cancha_id uuid, cancha_nombre text,
   pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
-  pareja1_nombre text, pareja2_nombre text
+  pareja1_nombre text, pareja2_nombre text, created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
   select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.horario, pa.estado, pa.sets,
     pa.cancha_id, c.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
     coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),
-    coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, '?')
+    coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, '?'),
+    pa.created_at
   from partidos pa
   left join canchas c on c.id = pa.cancha_id
   left join parejas p1 on p1.id = pa.pareja1_id
@@ -573,6 +594,97 @@ begin
 end;
 $$;
 
+-- ============================================================
+-- JUGAR / RESERVAR CANCHA (día a día, fuera del circuito de torneos) —
+-- reservar_cancha() arma la reserva + los invitados + les avisa, todo junto
+-- y validado server-side (nunca queda una reserva de más de 4 personas ni
+-- sin organizador). Queda "pendiente" hasta que el admin la confirma.
+-- ============================================================
+create or replace function reservar_cancha(p_cancha_id uuid, p_horario timestamptz, p_duracion_minutos int default 90, p_invitados_ids uuid[] default '{}')
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_mi_id uuid;
+  v_reserva_id uuid;
+  v_costo_hora numeric;
+  v_invitado uuid;
+begin
+  select id into v_mi_id from jugadores where auth_user_id = auth.uid();
+  if v_mi_id is null then
+    raise exception 'Completá tu perfil de jugador antes de reservar una cancha';
+  end if;
+  if p_horario is null or p_horario < now() then
+    raise exception 'Elegí un horario válido, no puede ser en el pasado';
+  end if;
+  -- una cancha de pádel es para 4: el organizador + hasta 3 invitados
+  if p_invitados_ids is not null and array_length(p_invitados_ids, 1) > 3 then
+    raise exception 'Una cancha es para 4 personas como máximo (vos + 3 invitados)';
+  end if;
+
+  select costo_hora into v_costo_hora from canchas where id = p_cancha_id;
+
+  insert into reservas (cancha_id, organizador_id, horario, duracion_minutos, costo)
+  values (p_cancha_id, v_mi_id, p_horario, p_duracion_minutos,
+    case when v_costo_hora is null then null else round(v_costo_hora * p_duracion_minutos / 60.0, 2) end)
+  returning id into v_reserva_id;
+
+  if p_invitados_ids is not null then
+    foreach v_invitado in array p_invitados_ids loop
+      if v_invitado is not null and v_invitado <> v_mi_id then
+        insert into reserva_invitados (reserva_id, jugador_id) values (v_reserva_id, v_invitado) on conflict do nothing;
+        insert into notificaciones (jugador_id, mensaje)
+        select v_invitado, (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te invitó a jugar. Te avisamos cuando el club confirme la reserva.';
+      end if;
+    end loop;
+  end if;
+
+  return v_reserva_id;
+end;
+$$;
+
+-- devuelve mis reservas (las que organicé o a las que me invitaron), con
+-- todo lo que hace falta mostrar ya resuelto (nombres, no ids sueltos)
+drop function if exists mis_reservas();
+create or replace function mis_reservas() returns table (
+  id uuid, cancha_id uuid, cancha_nombre text, complejo_nombre text,
+  organizador_id uuid, organizador_nombre text, soy_organizador boolean,
+  horario timestamptz, duracion_minutos int, costo numeric, estado text, invitados text
+) language sql stable security definer set search_path = public as $$
+  select r.id, r.cancha_id, c.nombre, co.nombre,
+    r.organizador_id, jo.nombre || ' ' || jo.apellido, jo.auth_user_id = auth.uid(),
+    r.horario, r.duracion_minutos, r.costo, r.estado,
+    coalesce((select string_agg(ji.nombre || ' ' || ji.apellido, ', ')
+      from reserva_invitados ri join jugadores ji on ji.id = ri.jugador_id where ri.reserva_id = r.id), '')
+  from reservas r
+  join canchas c on c.id = r.cancha_id
+  left join complejos co on co.id = c.complejo_id
+  join jugadores jo on jo.id = r.organizador_id
+  where jo.auth_user_id = auth.uid()
+     or exists (select 1 from reserva_invitados ri join jugadores ji on ji.id = ri.jugador_id where ri.reserva_id = r.id and ji.auth_user_id = auth.uid())
+  order by r.horario;
+$$;
+
+-- todas las reservas para el panel de admin (confirmar/rechazar) — si quien
+-- llama no es admin, devuelve vacío en vez de fallar
+drop function if exists reservas_admin();
+create or replace function reservas_admin() returns table (
+  id uuid, cancha_id uuid, cancha_nombre text, complejo_nombre text,
+  organizador_id uuid, organizador_nombre text, organizador_telefono text,
+  horario timestamptz, duracion_minutos int, costo numeric, estado text, invitados text
+) language sql stable security definer set search_path = public as $$
+  select r.id, r.cancha_id, c.nombre, co.nombre,
+    r.organizador_id, jo.nombre || ' ' || jo.apellido, jo.telefono,
+    r.horario, r.duracion_minutos, r.costo, r.estado,
+    coalesce((select string_agg(ji.nombre || ' ' || ji.apellido, ', ')
+      from reserva_invitados ri join jugadores ji on ji.id = ri.jugador_id where ri.reserva_id = r.id), '')
+  from reservas r
+  join canchas c on c.id = r.cancha_id
+  left join complejos co on co.id = c.complejo_id
+  join jugadores jo on jo.id = r.organizador_id
+  where is_admin()
+  order by r.horario;
+$$;
+
 -- si existía de una versión anterior con otras columnas, hay que tirarla antes de poder redefinirla
 drop function if exists jugador_del_mes_publico();
 -- devuelve hasta 2 filas: el/la más reciente de Damas y de Caballeros por separado,
@@ -634,6 +746,32 @@ create or replace function torneos_ganados_publico(p_jugador_id uuid) returns ta
   order by coalesce(t.fecha_fin, t.fecha_inicio) desc;
 $$;
 
+-- estadísticas ampliadas del perfil de un jugador (finales jugadas, actividad de los
+-- últimos 6 meses, primer/último torneo y total de torneos) — todo calculado a partir
+-- de partidos/inscripciones ya existentes, sin agregar columnas nuevas en jugadores.
+drop function if exists estadisticas_jugador(uuid);
+create or replace function estadisticas_jugador(p_jugador_id uuid) returns table (
+  total_finales int, partidos_6m int, ganados_6m int,
+  primer_torneo date, ultimo_torneo date, total_torneos int
+) language sql stable security definer set search_path = public as $$
+  with mis_partidos as (
+    select pa.*,
+      case when p1.jugador1_id = p_jugador_id or p1.jugador2_id = p_jugador_id then pa.pareja1_id else pa.pareja2_id end as mi_pareja_id
+    from partidos pa
+    join parejas p1 on p1.id = pa.pareja1_id
+    join parejas p2 on p2.id = pa.pareja2_id
+    where p1.jugador1_id = p_jugador_id or p1.jugador2_id = p_jugador_id
+       or p2.jugador1_id = p_jugador_id or p2.jugador2_id = p_jugador_id
+  )
+  select
+    (select count(*)::int from mis_partidos where ronda = 'Final' and estado = 'jugado'),
+    (select count(*)::int from mis_partidos where estado = 'jugado' and horario >= now() - interval '6 months'),
+    (select count(*)::int from mis_partidos where estado = 'jugado' and horario >= now() - interval '6 months' and ganador_pareja_id = mi_pareja_id),
+    (select min(t.fecha_inicio) from inscripciones i join torneos t on t.id = i.torneo_id where i.jugador_id = p_jugador_id),
+    (select max(t.fecha_inicio) from inscripciones i join torneos t on t.id = i.torneo_id where i.jugador_id = p_jugador_id),
+    (select count(distinct i.torneo_id)::int from inscripciones i where i.jugador_id = p_jugador_id);
+$$;
+
 -- jugadores que subieron de categoría este mes (para la tira rotativa de Inicio).
 -- "subir" = pasar a una categoría con "orden" más alto; si alguien ascendió más de
 -- una vez en el mes, se muestra solo la más reciente (distinct on).
@@ -684,6 +822,8 @@ alter table admins enable row level security;
 alter table historial_categoria enable row level security;
 alter table config enable row level security;
 alter table noticias enable row level security;
+alter table reservas enable row level security;
+alter table reserva_invitados enable row level security;
 
 -- complejos / canchas: lectura pública, escritura solo admin
 drop policy if exists "complejos_select" on complejos;
@@ -695,6 +835,37 @@ drop policy if exists "canchas_select" on canchas;
 create policy "canchas_select" on canchas for select using (true);
 drop policy if exists "canchas_write" on canchas;
 create policy "canchas_write" on canchas for all using (is_admin()) with check (is_admin());
+
+-- reservas: cada uno ve las suyas (las que organizó o a las que lo invitaron) y el
+-- admin las ve todas. El alta real de una reserva pasa por reservar_cancha() (más
+-- abajo), no por un insert directo, para validar todo server-side de una. El
+-- organizador SÍ puede cancelar su propia reserva directo (estado -> 'cancelada'),
+-- pero no puede confirmarla él mismo: eso queda reservado al admin.
+drop policy if exists "reservas_select" on reservas;
+create policy "reservas_select" on reservas for select using (
+  is_admin()
+  or exists (select 1 from jugadores j where j.id = reservas.organizador_id and j.auth_user_id = auth.uid())
+  or exists (select 1 from reserva_invitados ri join jugadores j on j.id = ri.jugador_id where ri.reserva_id = reservas.id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "reservas_admin_write" on reservas;
+create policy "reservas_admin_write" on reservas for all using (is_admin()) with check (is_admin());
+drop policy if exists "reservas_organizador_cancela" on reservas;
+create policy "reservas_organizador_cancela" on reservas for update
+  using (exists (select 1 from jugadores j where j.id = reservas.organizador_id and j.auth_user_id = auth.uid()))
+  with check (estado = 'cancelada');
+
+-- ojo: esta policy NO mira la tabla reservas (aunque el organizador también
+-- debería poder ver sus invitados) porque reservas_select ya mira
+-- reserva_invitados — cruzarlas en las dos direcciones genera recursión
+-- infinita en Postgres. El organizador ve sus invitados igual, a través de
+-- mis_reservas()/reservas_admin() (funciones security definer, sin RLS).
+drop policy if exists "reserva_invitados_select" on reserva_invitados;
+create policy "reserva_invitados_select" on reserva_invitados for select using (
+  is_admin()
+  or exists (select 1 from jugadores j where j.id = reserva_invitados.jugador_id and j.auth_user_id = auth.uid())
+);
+drop policy if exists "reserva_invitados_write" on reserva_invitados;
+create policy "reserva_invitados_write" on reserva_invitados for all using (is_admin()) with check (is_admin());
 
 -- categorias: lectura pública, solo admin agrega/borra
 drop policy if exists "categorias_select" on categorias;

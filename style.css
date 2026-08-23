@@ -177,6 +177,7 @@ tr:first-child td { font-weight: 700; }
   border: 1px solid rgba(180,255,57,.25);
 }
 .badge.orange { background: rgba(255,45,149,.14); color: #ff6fb8; border: 1px solid rgba(255,45,149,.3); }
+.badge.danger { background: rgba(255,77,109,.14); color: var(--danger); border: 1px solid rgba(255,77,109,.3); }
 .badge.solid { background: var(--accent); color: var(--accent-ink); border: none; font-weight: 700; }
 
 .fila-master td { background: rgba(255,215,0,.05); }
@@ -475,15 +476,29 @@ tr:first-child td { font-weight: 700; }
 .calendario-partido.jugado .calendario-vs { color: var(--accent); }
 
 /* ---------- Vista llave (eliminación directa) ---------- */
-.llave-scroll { overflow-x: auto; padding-bottom: 6px; }
-.llave { display: flex; gap: 22px; }
+.llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
+.llave { display: flex; gap: 40px; }
 .llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 150px; }
 .llave-columna h3 { text-align: center; }
 .llave-partido {
   background: #0e182c; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+  position: relative;
+}
+/* líneas que conectan cada partido con la próxima ronda, tipo cuadro de fútbol */
+.llave-columna:not(:last-child) .llave-partido::after {
+  content: ""; position: absolute; top: 50%; right: -20px; width: 20px; height: 2px; background: var(--border);
+}
+.llave-columna:not(:first-child) .llave-partido::before {
+  content: ""; position: absolute; top: 50%; left: -20px; width: 20px; height: 2px; background: var(--border);
 }
 .llave-equipo { padding: 3px 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .llave-equipo.ganador { color: var(--accent); }
+
+.tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.tabla-posiciones td { padding: 6px; border-bottom: 1px solid var(--border); }
+.tabla-posiciones tr:last-child td { border-bottom: none; }
+.tabla-posiciones tr:first-child td { color: var(--accent); font-weight: 700; }
 
 .check-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
 .check-grid label {
@@ -573,6 +588,10 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .match-vs-team { flex: 1; font-weight: 700; font-size: 12.5px; line-height: 1.35; }
 .match-vs-team.derecha { text-align: right; }
 .match-vs-divider { font-weight: 800; color: var(--accent); font-size: 13px; flex-shrink: 0; }
+/* cuando el partido ya tiene resultado, la barra cambia de color y resalta al ganador */
+.match-vs-row.jugado { background: linear-gradient(90deg, var(--accent-2), var(--accent-teal)); }
+.match-vs-team.ganador { color: #fff; }
+.match-vs-team.perdedor { opacity: .55; }
 
 .badge.live {
   background: rgba(255,45,149,.16);
@@ -623,6 +642,15 @@ nav.tabbar .icon { position: relative; }
 }
 .match-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .match-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+/* partido con resultado cargado: se distingue con un filo de color, no solo texto */
+.match-card-jugado { border-color: var(--accent-teal); }
+.sets-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.set-chip {
+  font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+}
+.set-chip.gano-p1 { border-color: var(--accent); color: var(--accent); }
+.set-chip.gano-p2 { border-color: var(--accent-teal); color: var(--accent-teal); }
 .match-actions { display: flex; gap: 8px; margin-top: 10px; }
 
 /* panel de carga de resultado: separado visualmente del partido/calendario público, solo admin */
@@ -708,6 +736,20 @@ nav.tabbar button {
 nav.tabbar button.active { color: var(--accent); font-weight: 600; }
 nav.tabbar .icon { display: block; }
 nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
+
+/* "Jugar" queda en el medio de la barra, destacado como acción principal
+   (reservar cancha) en vez de una pestaña más */
+nav.tabbar button.tab-cta { color: var(--accent-ink); }
+nav.tabbar button.tab-cta .icon {
+  background: var(--accent);
+  border-radius: 50%;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: -14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); }
+nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600; }
 
 .overlay-bloqueante {
   position: fixed; inset: 0; z-index: 200;
