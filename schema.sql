@@ -508,29 +508,32 @@ begin
   if v_mi_id is null then
     raise exception 'Completá tu perfil de jugador antes de inscribirte';
   end if;
+  -- nadie se anota solo: la pareja es obligatoria (se valida acá también, no solo en la app,
+  -- para que no se pueda saltear llamando a la función directo)
+  if p_pareja_jugador_id is null or p_pareja_jugador_id = v_mi_id then
+    raise exception 'Elegí con quién vas a jugar antes de inscribirte: no te podés anotar solo/a';
+  end if;
 
   insert into inscripciones (torneo_id, jugador_id)
   values (p_torneo_id, v_mi_id)
   on conflict (torneo_id, jugador_id) do nothing;
 
-  if p_pareja_jugador_id is not null and p_pareja_jugador_id <> v_mi_id then
-    insert into inscripciones (torneo_id, jugador_id)
-    values (p_torneo_id, p_pareja_jugador_id)
-    on conflict (torneo_id, jugador_id) do nothing;
+  insert into inscripciones (torneo_id, jugador_id)
+  values (p_torneo_id, p_pareja_jugador_id)
+  on conflict (torneo_id, jugador_id) do nothing;
 
-    -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
-    if not exists (
-      select 1 from parejas
-      where torneo_id = p_torneo_id
-        and (jugador1_id in (v_mi_id, p_pareja_jugador_id) or jugador2_id in (v_mi_id, p_pareja_jugador_id))
-    ) then
-      insert into parejas (torneo_id, jugador1_id, jugador2_id) values (p_torneo_id, v_mi_id, p_pareja_jugador_id);
-    end if;
-
-    insert into notificaciones (jugador_id, mensaje)
-    select p_pareja_jugador_id,
-      (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te anotó como su pareja en un torneo. ¡Ya quedaste inscripto!';
+  -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
+  if not exists (
+    select 1 from parejas
+    where torneo_id = p_torneo_id
+      and (jugador1_id in (v_mi_id, p_pareja_jugador_id) or jugador2_id in (v_mi_id, p_pareja_jugador_id))
+  ) then
+    insert into parejas (torneo_id, jugador1_id, jugador2_id) values (p_torneo_id, v_mi_id, p_pareja_jugador_id);
   end if;
+
+  insert into notificaciones (jugador_id, mensaje)
+  select p_pareja_jugador_id,
+    (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te anotó como su pareja en un torneo. ¡Ya quedaste inscripto!';
 end;
 $$;
 

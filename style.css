@@ -155,6 +155,8 @@ button.gradient {
   cursor: pointer;
 }
 
+button:disabled { opacity: .55; cursor: not-allowed; }
+
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }

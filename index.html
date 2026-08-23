@@ -178,12 +178,19 @@
       <h3>Anotarme</h3>
       <p class="match-meta" id="inscripcionEstado"></p>
       <div id="buscarParejaWrap">
-        <label>¿Con quién vas a jugar? (buscala/lo y anotamos a los dos)</label>
+        <label>¿Con quién vas a jugar? No te podés anotar solo/a: buscala/lo para anotarlos a los dos juntos</label>
         <input id="buscarPareja" placeholder="Escribí el nombre de tu pareja" autocomplete="off" />
         <div id="sugerenciasPareja" class="suggest-list"></div>
         <p class="match-meta" id="parejaSeleccionadaTxt"></p>
       </div>
-      <button class="gradient" id="btnInscribirme" style="margin-top:12px">Inscribirme</button>
+      <button class="gradient" id="btnInscribirme" style="margin-top:12px" disabled>Elegí tu pareja para continuar</button>
+      <div id="confirmarInscripcionWrap" style="display:none">
+        <div class="match-card">
+          <p id="confirmarInscripcionResumen"></p>
+        </div>
+        <button class="gradient" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
+        <button class="secondary small" id="btnCambiarPareja" style="margin-top:8px">Cambiar pareja</button>
+      </div>
       <p class="match-meta" style="margin-top:8px">Vamos a usar los días y horarios que configuraste en tu perfil.</p>
     </div>
 
@@ -406,6 +413,8 @@
 
     <div class="card">
       <h2>Jugadores registrados</h2>
+      <p class="match-meta" style="margin-bottom:6px">Podés corregir nombre, apellido o categoría de cualquier jugador (por ejemplo, si se equivocaron al registrarse).</p>
+      <input id="buscarJugadorAdmin" placeholder="Buscar por nombre o apellido..." style="margin-bottom:10px" />
       <div id="listaJugadoresAdmin"></div>
     </div>
   </section>

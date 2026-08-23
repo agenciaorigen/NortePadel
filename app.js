@@ -876,24 +876,53 @@ document.getElementById("btnGuardarConfig").addEventListener("click", async () =
 // ============================================================
 async function cargarJugadoresAdmin() {
   if (!isAdmin) return;
+  if (cacheCategorias.length === 0) await cargarCategorias();
   const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
   cacheJugadoresAdmin = data || [];
-  const cont = document.getElementById("listaJugadoresAdmin");
-  if (cont) {
-    cont.innerHTML = "";
-    if (cacheJugadoresAdmin.length === 0) cont.innerHTML = '<p class="empty">Todavía no hay jugadores registrados.</p>';
-    cacheJugadoresAdmin.forEach((j) => {
-      const div = document.createElement("div");
-      div.className = "match-card";
-      div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria}</span></div>
-        <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>`;
-      cont.appendChild(div);
-    });
-  }
+  renderListaJugadoresAdmin();
   llenarSelect(document.getElementById("dtSelectJugador"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
   llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
+
+// tarjetas editables (nombre, apellido, categoría) para corregir errores de registro
+function renderListaJugadoresAdmin() {
+  const cont = document.getElementById("listaJugadoresAdmin");
+  if (!cont) return;
+  const q = (document.getElementById("buscarJugadorAdmin")?.value || "").trim().toLowerCase();
+  const lista = q ? cacheJugadoresAdmin.filter((j) => `${j.nombre} ${j.apellido}`.toLowerCase().includes(q)) : cacheJugadoresAdmin;
+  cont.innerHTML = "";
+  if (lista.length === 0) { cont.innerHTML = '<p class="empty">No se encontraron jugadores.</p>'; return; }
+  lista.forEach((j) => {
+    const div = document.createElement("div");
+    div.className = "match-card";
+    const nombresCategoria = cacheCategorias.map((c) => c.nombre);
+    if (!nombresCategoria.includes(j.categoria)) nombresCategoria.push(j.categoria); // por si la categoría ya no existe
+    const opcionesCategoria = nombresCategoria.map((n) => `<option value="${n}" ${n === j.categoria ? "selected" : ""}>${n}</option>`).join("");
+    div.innerHTML = `
+      <div class="row">
+        <input type="text" class="jaNombre" value="${j.nombre}" placeholder="Nombre" />
+        <input type="text" class="jaApellido" value="${j.apellido}" placeholder="Apellido" />
+      </div>
+      <select class="jaCategoria" style="margin-top:8px">${opcionesCategoria}</select>
+      <div class="match-meta">${j.email || ""} ${j.telefono || ""} · ${j.puntos_ranking} pts</div>
+      <button type="button" class="secondary small btnGuardarJugador" style="margin-top:8px">Guardar</button>
+    `;
+    div.querySelector(".btnGuardarJugador").addEventListener("click", async () => {
+      const nombre = div.querySelector(".jaNombre").value.trim();
+      const apellido = div.querySelector(".jaApellido").value.trim();
+      const categoria = div.querySelector(".jaCategoria").value;
+      if (!nombre || !apellido) { toast("Nombre y apellido no pueden quedar vacíos"); return; }
+      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria }).eq("id", j.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Jugador actualizado");
+      cargarJugadoresAdmin();
+      cargarRanking();
+    });
+    cont.appendChild(div);
+  });
+}
+document.getElementById("buscarJugadorAdmin")?.addEventListener("input", renderListaJugadoresAdmin);
 
 // ============================================================
 // SOLICITUDES DE CATEGORÍA (pedidas por el jugador, las aprueba el admin)
@@ -1065,6 +1094,9 @@ let jugadoresParaBuscar = [];
 document.getElementById("buscarPareja").addEventListener("input", (e) => {
   parejaSeleccionada = null;
   document.getElementById("parejaSeleccionadaTxt").textContent = "";
+  const btnInsc = document.getElementById("btnInscribirme");
+  btnInsc.disabled = true;
+  btnInsc.textContent = "Elegí tu pareja para continuar";
   const q = e.target.value.trim().toLowerCase();
   const sugerencias = document.getElementById("sugerenciasPareja");
   if (!q) { sugerencias.innerHTML = ""; return; }
@@ -1083,6 +1115,9 @@ document.getElementById("buscarPareja").addEventListener("input", (e) => {
       document.getElementById("buscarPareja").value = `${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido}`;
       document.getElementById("parejaSeleccionadaTxt").textContent = `✓ Vas a jugar con ${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido}`;
       sugerencias.innerHTML = "";
+      const btnInsc = document.getElementById("btnInscribirme");
+      btnInsc.disabled = false;
+      btnInsc.textContent = "Inscribirme";
     });
   });
 });
@@ -1091,10 +1126,12 @@ async function renderInscribirme() {
   const estado = document.getElementById("inscripcionEstado");
   const btn = document.getElementById("btnInscribirme");
   const buscarWrap = document.getElementById("buscarParejaWrap");
+  document.getElementById("confirmarInscripcionWrap").style.display = "none";
 
   if (!currentUser) {
     estado.textContent = "Iniciá sesión para poder inscribirte.";
     buscarWrap.style.display = "none";
+    btn.style.display = "block";
     btn.textContent = "Iniciar sesión";
     btn.disabled = false;
     btn.onclick = () => cambiarVista("perfil");
@@ -1103,6 +1140,7 @@ async function renderInscribirme() {
   if (!miJugador) {
     estado.textContent = "Completá tu perfil de jugador antes de inscribirte.";
     buscarWrap.style.display = "none";
+    btn.style.display = "block";
     btn.textContent = "Completar perfil";
     btn.disabled = false;
     btn.onclick = () => cambiarVista("perfil");
@@ -1116,30 +1154,53 @@ async function renderInscribirme() {
   if (data) {
     estado.textContent = "✅ Ya estás inscripto en este torneo.";
     buscarWrap.style.display = "none";
-    btn.textContent = "Ya estás anotado";
-    btn.disabled = true;
-    btn.onclick = null;
+    btn.style.display = "none";
   } else {
     estado.textContent = "";
     buscarWrap.style.display = "block";
-    btn.textContent = "Inscribirme";
-    btn.disabled = false;
-    btn.onclick = async () => {
-      const { error } = await sb.rpc("inscribirse_con_pareja", {
-        p_torneo_id: torneoActualId,
-        p_pareja_jugador_id: parejaSeleccionada ? parejaSeleccionada.id : null
-      });
-      if (error) { toast("Error: " + error.message); return; }
-      toast(parejaSeleccionada ? "¡Listo, se anotaron los dos! 🎾" : "¡Listo, quedaste inscripto! 🎾");
-      parejaSeleccionada = null;
-      document.getElementById("buscarPareja").value = "";
-      document.getElementById("parejaSeleccionadaTxt").textContent = "";
-      avisarActualizacionEnVivo();
-      renderInscribirme();
-      refrescarDetalleTorneo();
-    };
+    btn.style.display = "block";
+    btn.textContent = parejaSeleccionada ? "Inscribirme" : "Elegí tu pareja para continuar";
+    btn.disabled = !parejaSeleccionada;
+    btn.onclick = () => mostrarConfirmarInscripcion();
   }
 }
+
+// paso 2: confirmación antes de anotar de verdad (acá se va a sumar el pago más adelante)
+function mostrarConfirmarInscripcion() {
+  if (!parejaSeleccionada) { toast("Elegí primero con quién vas a jugar"); return; }
+  const t = cacheTorneos.find((x) => x.id === torneoActualId);
+  const costoTxt = t?.costo ? ` · Costo: $${t.costo}` : "";
+  document.getElementById("confirmarInscripcionResumen").textContent =
+    `¿Anotamos a vos y a ${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido} en "${t?.nombre || "este torneo"}"?${costoTxt}`;
+  document.getElementById("buscarParejaWrap").style.display = "none";
+  document.getElementById("btnInscribirme").style.display = "none";
+  document.getElementById("confirmarInscripcionWrap").style.display = "block";
+}
+
+document.getElementById("btnCambiarPareja").addEventListener("click", () => {
+  document.getElementById("confirmarInscripcionWrap").style.display = "none";
+  document.getElementById("buscarParejaWrap").style.display = "block";
+  document.getElementById("btnInscribirme").style.display = "block";
+});
+
+document.getElementById("btnConfirmarInscripcion").addEventListener("click", async () => {
+  if (!parejaSeleccionada) { toast("Elegí primero con quién vas a jugar"); return; }
+  const boton = document.getElementById("btnConfirmarInscripcion");
+  boton.disabled = true;
+  const { error } = await sb.rpc("inscribirse_con_pareja", {
+    p_torneo_id: torneoActualId,
+    p_pareja_jugador_id: parejaSeleccionada.id
+  });
+  boton.disabled = false;
+  if (error) { toast("Error: " + error.message); return; }
+  toast("¡Listo, se anotaron los dos! 🎾");
+  parejaSeleccionada = null;
+  document.getElementById("buscarPareja").value = "";
+  document.getElementById("parejaSeleccionadaTxt").textContent = "";
+  avisarActualizacionEnVivo();
+  renderInscribirme();
+  refrescarDetalleTorneo();
+});
 
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
