@@ -1111,6 +1111,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   if (categoriasElegidas.length === 0) { toast("Elegí al menos una categoría"); return; }
 
   const costoTxt = document.getElementById("tCosto").value.trim();
+  const diasElegidos = Array.from(document.querySelectorAll(".chkDiaTorneo:checked")).map((c) => Number(c.value));
   const torneo = {
     nombre,
     complejo_id: complejoId || null,
@@ -1118,7 +1119,10 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     fecha_fin: document.getElementById("tFechaFin").value || fechaInicio,
     flyer_url: flyerUrl,
     costo: costoTxt ? Number(costoTxt) : null,
-    duracion_minutos: Number(document.getElementById("tDuracion").value) || 90
+    duracion_minutos: Number(document.getElementById("tDuracion").value) || 90,
+    dias_semana: diasElegidos.length ? diasElegidos : null,
+    hora_desde: document.getElementById("tHoraDesde").value || null,
+    hora_hasta: document.getElementById("tHoraHasta").value || null
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
@@ -1390,6 +1394,10 @@ document.getElementById("btnMostrarEditarTorneo").addEventListener("click", asyn
   document.getElementById("teFechaInicio").value = t.fecha_inicio;
   document.getElementById("teFechaFin").value = t.fecha_fin || t.fecha_inicio;
   document.getElementById("teCosto").value = t.costo || "";
+  const diasActuales = new Set(t.dias_semana || []);
+  document.querySelectorAll(".chkDiaTorneoEdit").forEach((chk) => (chk.checked = diasActuales.has(Number(chk.value))));
+  document.getElementById("teHoraDesde").value = t.hora_desde ? t.hora_desde.slice(0, 5) : "";
+  document.getElementById("teHoraHasta").value = t.hora_hasta ? t.hora_hasta.slice(0, 5) : "";
   document.getElementById("teFlyerArchivo").value = "";
   const categoriasActuales = new Set(categoriasTorneoActual);
   document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
@@ -1421,6 +1429,7 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
   }
 
   const costoTxt = document.getElementById("teCosto").value.trim();
+  const diasElegidosEdit = Array.from(document.querySelectorAll(".chkDiaTorneoEdit:checked")).map((c) => Number(c.value));
   const cambios = {
     nombre,
     complejo_id: complejoId || null,
@@ -1428,7 +1437,10 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
     fecha_fin: document.getElementById("teFechaFin").value || fechaInicio,
     flyer_url: flyerUrl,
     costo: costoTxt ? Number(costoTxt) : null,
-    duracion_minutos: Number(document.getElementById("teDuracion").value) || 90
+    duracion_minutos: Number(document.getElementById("teDuracion").value) || 90,
+    dias_semana: diasElegidosEdit.length ? diasElegidosEdit : null,
+    hora_desde: document.getElementById("teHoraDesde").value || null,
+    hora_hasta: document.getElementById("teHoraHasta").value || null
   };
   const { error } = await sb.from("torneos").update(cambios).eq("id", torneoActualId);
   if (error) { toast("Error: " + error.message); return; }
@@ -1515,43 +1527,130 @@ async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
 }
 
 // ---------- armar partidos automático ----------
-document.getElementById("btnArmarPartidos").addEventListener("click", async () => {
-  const { data: parejasDb } = await sb.from("parejas").select("*").eq("torneo_id", torneoActualId);
-  if (!parejasDb || parejasDb.length < 2) { toast("Armá primero al menos 2 parejas"); return; }
+// Orden de fases que el torneo va recorriendo: cada tanda de partidos
+// generada (fase de grupos o "Generar siguiente fase") queda etiquetada
+// con la fase que le toca — el admin ya no elige la ronda a mano al
+// cargar el resultado, así el cuadro respeta el orden real del torneo.
+const FASES_TORNEO = ["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
 
-  const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoActualId).single();
-  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoActualId);
-  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
-  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
+// Días del torneo a considerar para el armado automático: si el admin marcó
+// días de la semana puntuales (ej: jueves/viernes/sábado) en Crear/Editar
+// torneo, sólo se usan esos días dentro del rango de fechas; si no marcó
+// ninguno, se usa el rango completo como antes.
+function fechasDelTorneo(torneo) {
+  const fechas = [];
+  const inicio = new Date(torneo.fecha_inicio + "T00:00:00");
+  const fin = new Date((torneo.fecha_fin || torneo.fecha_inicio) + "T00:00:00");
+  const dias = torneo.dias_semana && torneo.dias_semana.length ? new Set(torneo.dias_semana) : null;
+  for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+    if (!dias || dias.has(d.getDay())) fechas.push(new Date(d));
+  }
+  return fechas;
+}
 
-  const jugadorIds = [...new Set(parejasDb.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+function ventanaDelTorneo(torneo) {
+  return torneo.hora_desde && torneo.hora_hasta
+    ? { desde: horaAMinutos(torneo.hora_desde), hasta: horaAMinutos(torneo.hora_hasta) }
+    : null;
+}
+
+async function jugadoresDisponibilidad(jugadorIds) {
   const { data: dispRows } = await sb.from("disponibilidad").select("*").in("jugador_id", jugadorIds);
   const disponibilidadPorJugador = {};
   (dispRows || []).forEach((d) => {
     if (!disponibilidadPorJugador[d.jugador_id]) disponibilidadPorJugador[d.jugador_id] = [];
     disponibilidadPorJugador[d.jugador_id].push(d);
   });
+  return disponibilidadPorJugador;
+}
 
-  const fechasDisponibles = [];
-  const inicio = new Date(torneo.fecha_inicio + "T00:00:00");
-  const fin = new Date((torneo.fecha_fin || torneo.fecha_inicio) + "T00:00:00");
-  for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) fechasDisponibles.push(new Date(d));
+document.getElementById("btnArmarPartidos").addEventListener("click", async () => {
+  const { data: parejasDb } = await sb.from("parejas").select("*").eq("torneo_id", torneoActualId);
+  if (!parejasDb || parejasDb.length < 2) { toast("Armá primero al menos 2 parejas"); return; }
+
+  // evita duplicar partidos si se apreta el botón más de una vez: solo arma
+  // fase de grupos para las parejas que todavía no tienen ningún partido
+  const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id").eq("torneo_id", torneoActualId);
+  const yaJuegan = new Set((partidosExistentes || []).flatMap((p) => [p.pareja1_id, p.pareja2_id]));
+  const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id));
+  if (parejasSinPartido.length < 2) { toast("Todas las parejas ya tienen un partido de fase de grupos asignado"); return; }
+
+  const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoActualId).single();
+  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoActualId);
+  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
+  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
+  if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
+
+  const jugadorIds = [...new Set(parejasSinPartido.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
 
   const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
-    parejas: parejasDb,
+    parejas: parejasSinPartido,
     disponibilidadPorJugador,
-    fechasDisponibles,
+    fechasDisponibles: fechasDelTorneo(torneo),
     canchas,
-    duracionMinutos: torneo.duracion_minutos || 90
+    duracionMinutos: torneo.duracion_minutos || 90,
+    ventana: ventanaDelTorneo(torneo)
   });
 
   if (partidosGenerados.length > 0) {
-    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ...p, estado: "programado" }));
+    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ronda: "Fase de grupos", ...p, estado: "programado" }));
     const { error } = await sb.from("partidos").insert(filas);
     if (error) { toast("Error: " + error.message); return; }
   }
 
   toast(`Se programaron ${partidosGenerados.length} partidos` + (sinHorario.length ? `, ${sinHorario.length} quedaron sin horario común` : ""));
+  avisarActualizacionEnVivo();
+  refrescarDetalleTorneo();
+});
+
+// Toma los ganadores de la fase más avanzada ya jugada por completo y arma
+// la siguiente fase del cuadro (Dieciseisavos, Octavos, Cuartos...),
+// respetando el orden de FASES_TORNEO en vez de dejar que el admin elija
+// la ronda de cada partido a mano.
+document.getElementById("btnGenerarSiguienteFase").addEventListener("click", async () => {
+  const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId });
+  if (!partidos || partidos.length === 0) { toast("Todavía no armaste ningún partido"); return; }
+
+  const fasesConPartidos = FASES_TORNEO.filter((f) => partidos.some((p) => (p.ronda || "Fase de grupos") === f));
+  const faseActual = fasesConPartidos[fasesConPartidos.length - 1];
+  const indexActual = FASES_TORNEO.indexOf(faseActual);
+  if (indexActual === FASES_TORNEO.length - 1) { toast("Este torneo ya llegó a la Final"); return; }
+
+  const partidosFaseActual = partidos.filter((p) => (p.ronda || "Fase de grupos") === faseActual);
+  const sinJugar = partidosFaseActual.filter((p) => p.estado !== "jugado");
+  if (sinJugar.length > 0) { toast(`Todavía faltan cargar ${sinJugar.length} resultado(s) de "${faseActual}"`); return; }
+
+  const ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
+  if (ganadoresIds.length < 2) { toast("No hay suficientes ganadores para armar la siguiente fase"); return; }
+  if (ganadoresIds.length % 2 !== 0) { toast(`Quedaron ${ganadoresIds.length} ganadores (número impar) — resolvé eso a mano antes de generar la siguiente fase`); return; }
+
+  const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
+  const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoActualId).single();
+  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoActualId);
+  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
+  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
+
+  const jugadorIds = [...new Set(parejasGanadoras.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
+
+  const siguienteFase = FASES_TORNEO[indexActual + 1];
+  const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
+    parejas: parejasGanadoras,
+    disponibilidadPorJugador,
+    fechasDisponibles: fechasDelTorneo(torneo),
+    canchas,
+    duracionMinutos: torneo.duracion_minutos || 90,
+    ventana: ventanaDelTorneo(torneo)
+  });
+
+  if (partidosGenerados.length > 0) {
+    const filas = partidosGenerados.map((p) => ({ torneo_id: torneoActualId, ronda: siguienteFase, ...p, estado: "programado" }));
+    const { error } = await sb.from("partidos").insert(filas);
+    if (error) { toast("Error: " + error.message); return; }
+  }
+
+  toast(`Se armó "${siguienteFase}": ${partidosGenerados.length} partido(s)` + (sinHorario.length ? `, ${sinHorario.length} sin horario común` : ""));
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
 });
@@ -1625,7 +1724,7 @@ function renderPartidosLlave(partidos) {
     .filter((col) => col.partidos.length > 0);
 
   if (columnas.length === 0) {
-    cont.innerHTML = '<p class="empty">Todavía no hay partidos de eliminación directa. Asignales una ronda (Cuartos, Semifinal, etc.) al cargar el resultado.</p>';
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos de eliminación directa. Cuando termine la fase de grupos, usá "Generar siguiente fase".</p>';
     return;
   }
 
@@ -1670,17 +1769,10 @@ function renderPartidosLista(partidos, canchasTorneo) {
       ${p.estado === "jugado" ? `<div class="match-meta">Sets: ${JSON.stringify(p.sets || [])}</div>` : ""}
       ${isAdmin && p.estado !== "jugado" ? `
       <div class="match-admin-panel">
-        <p class="match-admin-label">Cargar resultado (solo admin)</p>
-        <div class="match-actions">
-          <select class="selectRonda" data-p="${p.id}">
-            ${["Fase de grupos", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"].map((r) =>
-              `<option value="${r}" ${(p.ronda || "Fase de grupos") === r ? "selected" : ""}>${r}</option>`
-            ).join("")}
-          </select>
-        </div>
+        <p class="match-admin-label">Cargar resultado (solo admin) — ${p.ronda || "Fase de grupos"}</p>
         <div class="match-actions">
           <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
-          <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}">Cargar resultado</button>
+          <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">Cargar resultado</button>
         </div>
         <div class="match-actions">
           <select class="selectReasignar" data-p="${p.id}">
@@ -1718,17 +1810,16 @@ function renderPartidosLista(partidos, canchasTorneo) {
         toast("El resultado tiene que tener un ganador (no puede empatar en sets)"); return;
       }
       const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
-      const ronda = document.querySelector(`.selectRonda[data-p="${partidoId}"]`).value;
 
       const { error } = await sb.from("partidos").update({
-        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId, ronda
+        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
       }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       toast("Resultado cargado, ranking actualizado ✅");
       avisarActualizacionEnVivo();
       refrescarDetalleTorneo();
       cargarRanking();
-      if (ronda === "Final") cargarCampeones();
+      if (btn.dataset.ronda === "Final") cargarCampeones();
     });
   });
 

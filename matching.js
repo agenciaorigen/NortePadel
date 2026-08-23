@@ -49,7 +49,11 @@ const FRANJA_SIN_DATOS = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("23
 //  fechasDisponibles: [Date] días del torneo a considerar
 //  canchas: [{id, nombre}]
 //  duracionMinutos: duración estimada de cada partido
-function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90 }) {
+//  ventana: {desde, hasta} en minutos — horario del día que puso el admin
+//    para el torneo (ej: 16:00 a 22:00). Si viene, se cruza con la franja
+//    de cada jugador (declarada o abierta) para no proponer horarios fuera
+//    del horario en que el club/torneo funciona.
+function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null }) {
   const partidosGenerados = [];
   const sinHorario = [];
   const ocupacionCancha = {}; // cancha_id -> [{desde:Date, hasta:Date}]
@@ -66,17 +70,22 @@ function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisp
       const diaSemana = fecha.getDay();
       const disponibilidades = jugadoresIds.map((jid) => {
         const todasSusFranjas = disponibilidadPorJugador[jid] || [];
+        let franja;
         // nunca cargó disponibilidad -> se asume que puede jugar (franja abierta),
         // en vez de bloquear el partido por falta de datos
-        if (todasSusFranjas.length === 0) return FRANJA_SIN_DATOS;
-        const franjas = todasSusFranjas.filter((f) => f.dia_semana === diaSemana);
-        if (franjas.length === 0) return null;
-        // tomamos la franja más amplia del día para ese jugador
-        return franjas.reduce((max, f) => {
-          const desde = horaAMinutos(f.hora_desde);
-          const hasta = horaAMinutos(f.hora_hasta);
-          return hasta - desde > max.hasta - max.desde ? { desde, hasta } : max;
-        }, { desde: 0, hasta: 0 });
+        if (todasSusFranjas.length === 0) {
+          franja = FRANJA_SIN_DATOS;
+        } else {
+          const franjas = todasSusFranjas.filter((f) => f.dia_semana === diaSemana);
+          if (franjas.length === 0) return null;
+          // tomamos la franja más amplia del día para ese jugador
+          franja = franjas.reduce((max, f) => {
+            const desde = horaAMinutos(f.hora_desde);
+            const hasta = horaAMinutos(f.hora_hasta);
+            return hasta - desde > max.hasta - max.desde ? { desde, hasta } : max;
+          }, { desde: 0, hasta: 0 });
+        }
+        return ventana ? interseccion(franja, ventana) : franja;
       });
       if (disponibilidades.some((d) => !d)) continue;
       const comun = franjaComunDia(disponibilidades);

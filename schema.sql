@@ -153,6 +153,9 @@ create table if not exists torneos (
 alter table torneos add column if not exists flyer_url text;
 alter table torneos add column if not exists costo numeric;
 alter table torneos add column if not exists duracion_minutos int not null default 90;
+alter table torneos add column if not exists dias_semana int[]; -- días de semana permitidos (0=domingo..6=sábado); null = todos los días del rango
+alter table torneos add column if not exists hora_desde time; -- horario del día desde el que se puede programar (opcional)
+alter table torneos add column if not exists hora_hasta time; -- horario del día hasta el que se puede programar (opcional)
 
 -- Canchas habilitadas para cada torneo (permite reasignar por clima u otro motivo)
 create table if not exists torneo_canchas (

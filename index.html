@@ -133,6 +133,20 @@
       <select id="tComplejo"></select>
       <label>Duración partido (min)</label>
       <input id="tDuracion" type="number" value="90" />
+      <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
+      <div class="check-grid" id="tDiasForm">
+        <label><input type="checkbox" class="chkDiaTorneo" value="4" /> Jue</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="5" /> Vie</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="6" /> Sáb</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="0" /> Dom</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="1" /> Lun</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="2" /> Mar</label>
+        <label><input type="checkbox" class="chkDiaTorneo" value="3" /> Mié</label>
+      </div>
+      <div class="row">
+        <div><label>Horario desde</label><input id="tHoraDesde" type="time" /></div>
+        <div><label>Horario hasta</label><input id="tHoraHasta" type="time" /></div>
+      </div>
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
       <div class="check-grid" id="tCategoriasForm"></div>
       <div class="row">
@@ -177,6 +191,20 @@
       <select id="teComplejo"></select>
       <label>Duración partido (min)</label>
       <input id="teDuracion" type="number" value="90" />
+      <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
+      <div class="check-grid" id="teDiasForm">
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="4" /> Jue</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="5" /> Vie</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="6" /> Sáb</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="0" /> Dom</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="1" /> Lun</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="2" /> Mar</label>
+        <label><input type="checkbox" class="chkDiaTorneoEdit" value="3" /> Mié</label>
+      </div>
+      <div class="row">
+        <div><label>Horario desde</label><input id="teHoraDesde" type="time" /></div>
+        <div><label>Horario hasta</label><input id="teHoraHasta" type="time" /></div>
+      </div>
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategoriasEdit">seleccionar todas</button></label>
       <div class="check-grid" id="teCategoriasForm"></div>
       <div class="row">
@@ -244,7 +272,8 @@
 
     <div class="card partidos-poster">
       <h3>Partidos</h3>
-      <button class="primary admin-only" id="btnArmarPartidos">Armar partidos automáticamente</button>
+      <button class="primary admin-only" id="btnArmarPartidos">Armar fase de grupos automáticamente</button>
+      <button class="secondary admin-only" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
       <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
         <button class="pill active" data-vista="lista">Lista</button>
         <button class="pill" data-vista="calendario">Calendario</button>
