@@ -505,7 +505,7 @@ tr:first-child td { font-weight: 700; }
   padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
 }
 .pareja-row:last-child { border-bottom: none; }
-.pareja-row button {
+.pareja-row .btnBorrarPareja {
   background: none; border: none; cursor: pointer;
   font-size: 17px; line-height: 1; padding: 0 2px; flex-shrink: 0;
 }

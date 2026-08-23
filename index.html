@@ -170,7 +170,9 @@
       <h3>Anotarme</h3>
       <p class="match-meta" id="inscripcionEstado"></p>
       <div id="buscarParejaWrap">
-        <label>¿Con quién vas a jugar? No te podés anotar solo/a: buscala/lo para anotarlos a los dos juntos</label>
+        <label>¿En qué categoría van a jugar este torneo?</label>
+        <select id="anotarmeCategoria"><option value="">Elegí la categoría</option></select>
+        <label style="margin-top:10px">¿Con quién vas a jugar? No te podés anotar solo/a: buscala/lo para anotarlos a los dos juntos</label>
         <input id="buscarPareja" placeholder="Escribí el nombre de tu pareja" autocomplete="off" />
         <div id="sugerenciasPareja" class="suggest-list"></div>
         <p class="match-meta" id="parejaSeleccionadaTxt"></p>
@@ -194,6 +196,7 @@
         <button class="secondary small" id="btnArmarParejas" style="margin-top:12px">Armar parejas automáticamente</button>
         <label>Inscribir jugador manualmente</label>
         <select id="dtSelectJugador"></select>
+        <select id="dtSelectCategoriaInscribir" style="margin-top:6px"><option value="">Elegí la categoría</option></select>
         <button class="secondary small" id="btnInscribir">Inscribir</button>
       </div>
     </div>

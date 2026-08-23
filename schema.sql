@@ -182,6 +182,10 @@ create table if not exists inscripciones (
   created_at timestamptz not null default now(),
   unique (torneo_id, jugador_id)
 );
+-- categoría en la que juega ESE torneo puntual (un torneo puede abarcar varias, ej "de 2da a 8va")
+-- y si el admin ya confirmó el pago/la categoría, o todavía está pendiente de revisión
+alter table inscripciones add column if not exists categoria text;
+alter table inscripciones add column if not exists estado text not null default 'pendiente';
 
 -- ---------- PARTIDOS ----------
 create table if not exists partidos (
@@ -451,22 +455,25 @@ create or replace function jugadores_publicos() returns table (
 $$;
 
 create or replace function inscriptos_publicos(p_torneo_id uuid) returns table (
-  jugador_id uuid, nombre text, apellido text, categoria text
+  jugador_id uuid, nombre text, apellido text, categoria text, categoria_torneo text, estado text
 ) language sql stable security definer set search_path = public as $$
-  select j.id, j.nombre, j.apellido, j.categoria
+  select j.id, j.nombre, j.apellido, j.categoria, i.categoria, i.estado
   from inscripciones i join jugadores j on j.id = i.jugador_id
   where i.torneo_id = p_torneo_id
   order by j.apellido;
 $$;
 
 create or replace function parejas_publicas(p_torneo_id uuid) returns table (
-  id uuid, jugador1_id uuid, jugador2_id uuid, jugador1_nombre text, jugador2_nombre text
+  id uuid, jugador1_id uuid, jugador2_id uuid, jugador1_nombre text, jugador2_nombre text,
+  categoria text, estado text
 ) language sql stable security definer set search_path = public as $$
   select p.id, p.jugador1_id, p.jugador2_id,
-    j1.nombre || ' ' || j1.apellido, j2.nombre || ' ' || j2.apellido
+    j1.nombre || ' ' || j1.apellido, j2.nombre || ' ' || j2.apellido,
+    i1.categoria, coalesce(i1.estado, 'pendiente')
   from parejas p
   join jugadores j1 on j1.id = p.jugador1_id
   join jugadores j2 on j2.id = p.jugador2_id
+  left join inscripciones i1 on i1.torneo_id = p.torneo_id and i1.jugador_id = p.jugador1_id
   where p.torneo_id = p_torneo_id;
 $$;
 
@@ -498,7 +505,7 @@ $$;
 -- Permite que un jugador se anote a sí mismo y, si busca a otro jugador
 -- ya registrado, anote a los dos juntos y arme la pareja automáticamente.
 -- ============================================================
-create or replace function inscribirse_con_pareja(p_torneo_id uuid, p_pareja_jugador_id uuid default null)
+create or replace function inscribirse_con_pareja(p_torneo_id uuid, p_pareja_jugador_id uuid default null, p_categoria text default null)
 returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -513,13 +520,20 @@ begin
   if p_pareja_jugador_id is null or p_pareja_jugador_id = v_mi_id then
     raise exception 'Elegí con quién vas a jugar antes de inscribirte: no te podés anotar solo/a';
   end if;
+  -- la categoría también es obligatoria, y tiene que ser una de las que compiten
+  -- en este torneo puntual (un torneo puede abarcar varias)
+  if p_categoria is null or not exists (
+    select 1 from torneo_categorias where torneo_id = p_torneo_id and categoria = p_categoria
+  ) then
+    raise exception 'Elegí en qué categoría van a jugar este torneo';
+  end if;
 
-  insert into inscripciones (torneo_id, jugador_id)
-  values (p_torneo_id, v_mi_id)
+  insert into inscripciones (torneo_id, jugador_id, categoria)
+  values (p_torneo_id, v_mi_id, p_categoria)
   on conflict (torneo_id, jugador_id) do nothing;
 
-  insert into inscripciones (torneo_id, jugador_id)
-  values (p_torneo_id, p_pareja_jugador_id)
+  insert into inscripciones (torneo_id, jugador_id, categoria)
+  values (p_torneo_id, p_pareja_jugador_id, p_categoria)
   on conflict (torneo_id, jugador_id) do nothing;
 
   -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
@@ -740,6 +754,9 @@ drop policy if exists "inscripciones_delete" on inscripciones;
 create policy "inscripciones_delete" on inscripciones for delete using (
   is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
 );
+-- solo el admin confirma una inscripción (pago + categoría verificados)
+drop policy if exists "inscripciones_update" on inscripciones;
+create policy "inscripciones_update" on inscripciones for update using (is_admin()) with check (is_admin());
 
 -- flyers (legacy), sponsors, jugador_del_mes: lectura pública, escritura admin
 drop policy if exists "flyers_select" on flyers;
