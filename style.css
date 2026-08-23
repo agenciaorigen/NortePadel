@@ -279,11 +279,15 @@ tr:first-child td { font-weight: 700; }
 
 /* ---------- Banda con leyenda en movimiento ---------- */
 .marquee-banda {
+  display: block;
+  width: 100%;
   overflow: hidden;
   background: var(--accent);
+  border: none;
   border-radius: 10px;
   margin-bottom: 16px;
   padding: 8px 0;
+  cursor: pointer;
 }
 .marquee-track {
   display: flex; gap: 14px; width: max-content;

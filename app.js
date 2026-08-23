@@ -19,6 +19,7 @@ let cacheCanchas = [];
 let cacheJugadoresAdmin = [];
 let cacheCategorias = [];
 let cacheTorneos = [];
+let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
 let vistaPartidosActual = "lista"; // lista | calendario | llave
 let ultimosPartidos = [];
 let ultimasCanchasTorneo = [];
@@ -46,6 +47,10 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
+document.getElementById("marqueeBanda").addEventListener("click", () => {
+  if (torneoDestacadoId) abrirTorneo(torneoDestacadoId);
+  else cambiarVista("torneos");
+});
 
 // agrupa categorías tipo "6ta Damas" / "6ta Caballeros" por género; lo que no matchea
 // (categorías genéricas viejas, sin género) cae en "Otras" para no perderlas de vista
@@ -594,6 +599,8 @@ async function cargarEnVivo() {
   const { data: torneos } = await sb.from("torneos").select("*, complejos(nombre, direccion)").order("fecha_inicio");
   const enCurso = (torneos || []).find((t) => t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy);
   const proximo = (torneos || []).filter((t) => t.fecha_inicio > hoy).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
+  // guardado para que la banda "Inscribite ya" de Inicio lleve directo a este torneo
+  torneoDestacadoId = (enCurso || proximo)?.id || null;
 
   document.getElementById("enVivoDot").style.display = enCurso ? "block" : "none";
   const cont = document.getElementById("enVivoContenido");
@@ -1029,6 +1036,17 @@ async function cargarTorneos() {
   });
 }
 
+// el form de crear torneo queda escondido por defecto (puede haber muchos torneos
+// en la lista) y solo se muestra cuando el admin lo pide
+document.getElementById("btnMostrarCrearTorneo").addEventListener("click", () => {
+  const card = document.getElementById("crearTorneoCard");
+  card.style.display = "block";
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btnCancelarCrearTorneo").addEventListener("click", () => {
+  document.getElementById("crearTorneoCard").style.display = "none";
+});
+
 document.getElementById("btnCrearTorneo").addEventListener("click", async () => {
   if (!isAdmin) { toast("Solo un administrador puede crear torneos"); return; }
   const nombre = document.getElementById("tNombre").value.trim();
@@ -1075,6 +1093,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   document.getElementById("tFlyerArchivo").value = "";
   document.getElementById("tCosto").value = "";
   document.querySelectorAll(".chkTorneoCategoria:checked").forEach((c) => (c.checked = false));
+  document.getElementById("crearTorneoCard").style.display = "none";
   cargarTorneos();
   cargarInicio();
   abrirTorneo(data.id);
@@ -1476,6 +1495,15 @@ function renderPartidosLlave(partidos) {
     `).join("") + "</div></div>";
 }
 
+// convierte un horario guardado (ISO, UTC) al formato que espera un input
+// datetime-local (hora local, sin zona) para poder mostrarlo precargado
+function toDatetimeLocalValue(horarioISO) {
+  if (!horarioISO) return "";
+  const d = new Date(horarioISO);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function renderPartidosLista(partidos, canchasTorneo) {
   const cont = document.getElementById("dtPartidos");
   cont.innerHTML = "";
@@ -1510,6 +1538,10 @@ function renderPartidosLista(partidos, canchasTorneo) {
             ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
           </select>
           <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
+        </div>
+        <div class="match-actions">
+          <input type="datetime-local" class="inputHorario" data-p="${p.id}" value="${toDatetimeLocalValue(p.horario)}" style="flex:1" />
+          <button class="secondary small btnCambiarHorario" data-p="${p.id}">Cambiar horario</button>
         </div>
       </div>` : ""}
     `;
@@ -1555,9 +1587,35 @@ function renderPartidosLista(partidos, canchasTorneo) {
     btn.addEventListener("click", async () => {
       const partidoId = btn.dataset.p;
       const nuevaCancha = document.querySelector(`.selectReasignar[data-p="${partidoId}"]`).value;
+      const partido = ultimosPartidos.find((x) => x.id === partidoId);
+      if (partido?.horario && hayConflictoCancha(ultimosPartidos, partidoId, nuevaCancha, partido.horario)) {
+        toast("Esa cancha ya tiene otro partido a esa hora — elegí otra cancha o cambiá primero el horario");
+        return;
+      }
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       toast("Cancha reasignada");
+      avisarActualizacionEnVivo();
+      refrescarDetalleTorneo();
+    });
+  });
+
+  // mover un partido a otro horario (por ejemplo, si un equipo avisa que no llega
+  // a la hora que tenía asignada) — reusa el mismo chequeo de choques de cancha
+  document.querySelectorAll(".btnCambiarHorario").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const partidoId = btn.dataset.p;
+      const valor = document.querySelector(`.inputHorario[data-p="${partidoId}"]`).value;
+      if (!valor) { toast("Elegí una fecha y hora"); return; }
+      const nuevoHorarioISO = new Date(valor).toISOString();
+      const partido = ultimosPartidos.find((x) => x.id === partidoId);
+      if (partido?.cancha_id && hayConflictoCancha(ultimosPartidos, partidoId, partido.cancha_id, nuevoHorarioISO)) {
+        toast("Esa cancha ya tiene otro partido a esa hora — elegí otro horario");
+        return;
+      }
+      const { error } = await sb.from("partidos").update({ horario: nuevoHorarioISO }).eq("id", partidoId);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Horario cambiado");
       avisarActualizacionEnVivo();
       refrescarDetalleTorneo();
     });
@@ -1778,7 +1836,10 @@ function avisarActualizacionEnVivo() {
 // PWA: service worker + instalación
 // ============================================================
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  // updateViaCache: "none" fuerza a que el navegador siempre pida sw.js fresco a la red
+  // al revisar si hay una versión nueva, sin importar el cache que use el hosting — así
+  // el número de versión de más arriba (CACHE) siempre se nota apenas se sube.
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {}));
 }
 
 // ============================================================

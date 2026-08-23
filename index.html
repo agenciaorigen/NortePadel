@@ -58,12 +58,12 @@
       <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
     </div>
 
-    <div class="marquee-banda" aria-hidden="true">
-      <div class="marquee-track">
+    <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
+      <div class="marquee-track" aria-hidden="true">
         <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
         <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
       </div>
-    </div>
+    </button>
 
     <div class="energia-banda">
       <div class="energia-texto">
@@ -117,7 +117,15 @@
 
   <!-- TORNEOS -->
   <section id="view-torneos" class="view">
-    <div class="card admin-only" id="crearTorneoCard">
+    <div class="card">
+      <div class="torneo-card-header">
+        <h2>Torneos</h2>
+        <button type="button" class="secondary small admin-only" id="btnMostrarCrearTorneo">+ Crear torneo</button>
+      </div>
+      <div id="listaTorneos"></div>
+    </div>
+
+    <div class="card admin-only" id="crearTorneoCard" style="display:none">
       <h2>Crear torneo</h2>
       <label>Nombre</label>
       <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
@@ -142,11 +150,7 @@
       <label>Flyer del torneo (opcional)</label>
       <input id="tFlyerArchivo" type="file" accept="image/*" />
       <button class="primary" id="btnCrearTorneo">Crear torneo</button>
-    </div>
-
-    <div class="card">
-      <h2>Torneos</h2>
-      <div id="listaTorneos"></div>
+      <button type="button" class="secondary small" id="btnCancelarCrearTorneo" style="margin-top:8px">Cancelar</button>
     </div>
   </section>
 
@@ -160,18 +164,6 @@
       <p class="match-meta" id="dtInfo"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
       <div class="sponsor-strip" id="dtSponsors" style="margin-top:12px;display:none"></div>
-    </div>
-
-    <div class="card">
-      <h3>Quiénes se anotaron</h3>
-      <div id="dtParejas"></div>
-      <div id="dtSinPareja"></div>
-      <div class="admin-only">
-        <button class="secondary small" id="btnArmarParejas" style="margin-top:12px">Armar parejas automáticamente</button>
-        <label>Inscribir jugador manualmente</label>
-        <select id="dtSelectJugador"></select>
-        <button class="secondary small" id="btnInscribir">Inscribir</button>
-      </div>
     </div>
 
     <div class="card" id="inscribirseCard">
@@ -192,6 +184,18 @@
         <button class="secondary small" id="btnCambiarPareja" style="margin-top:8px">Cambiar pareja</button>
       </div>
       <p class="match-meta" style="margin-top:8px">Vamos a usar los días y horarios que configuraste en tu perfil.</p>
+    </div>
+
+    <div class="card">
+      <h3>Quiénes se anotaron</h3>
+      <div id="dtParejas"></div>
+      <div id="dtSinPareja"></div>
+      <div class="admin-only">
+        <button class="secondary small" id="btnArmarParejas" style="margin-top:12px">Armar parejas automáticamente</button>
+        <label>Inscribir jugador manualmente</label>
+        <select id="dtSelectJugador"></select>
+        <button class="secondary small" id="btnInscribir">Inscribir</button>
+      </div>
     </div>
 
     <div class="card">
