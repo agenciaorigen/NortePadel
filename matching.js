@@ -31,6 +31,13 @@ function franjaComunDia(disponibilidadesDelDia) {
   return comun;
 }
 
+// Franja "abierta" que se usa para un jugador que nunca cargó sus horarios
+// disponibles en el perfil (ej: lo anotó el admin a mano) — en vez de
+// bloquear el partido por falta de datos, se asume que puede jugar en el
+// horario habitual del club. Si el jugador SÍ cargó disponibilidad pero no
+// para ese día puntual, eso sigue contando como "no puede ese día".
+const FRANJA_SIN_DATOS = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("23:00") };
+
 // Arma los partidos de un torneo: empareja parejas entre sí (round-robin
 // simple, cada pareja juega contra la siguiente disponible), busca un
 // horario común entre los 4 jugadores y asigna una cancha libre en ese
@@ -58,7 +65,11 @@ function armarPartidosAutomatico({ parejas, disponibilidadPorJugador, fechasDisp
     for (const fecha of fechasDisponibles) {
       const diaSemana = fecha.getDay();
       const disponibilidades = jugadoresIds.map((jid) => {
-        const franjas = (disponibilidadPorJugador[jid] || []).filter((f) => f.dia_semana === diaSemana);
+        const todasSusFranjas = disponibilidadPorJugador[jid] || [];
+        // nunca cargó disponibilidad -> se asume que puede jugar (franja abierta),
+        // en vez de bloquear el partido por falta de datos
+        if (todasSusFranjas.length === 0) return FRANJA_SIN_DATOS;
+        const franjas = todasSusFranjas.filter((f) => f.dia_semana === diaSemana);
         if (franjas.length === 0) return null;
         // tomamos la franja más amplia del día para ese jugador
         return franjas.reduce((max, f) => {

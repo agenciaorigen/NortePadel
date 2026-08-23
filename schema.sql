@@ -459,6 +459,9 @@ create or replace function jugadores_publicos() returns table (
   from jugadores where activo = true;
 $$;
 
+-- si existía de una versión anterior con otras columnas de salida, hay que tirarla:
+-- Postgres no deja cambiarle la firma a una función con "or replace"
+drop function if exists inscriptos_publicos(uuid);
 create or replace function inscriptos_publicos(p_torneo_id uuid) returns table (
   jugador_id uuid, nombre text, apellido text, categoria text, categoria_torneo text, estado text
 ) language sql stable security definer set search_path = public as $$
@@ -468,6 +471,7 @@ create or replace function inscriptos_publicos(p_torneo_id uuid) returns table (
   order by j.apellido;
 $$;
 
+drop function if exists parejas_publicas(uuid);
 create or replace function parejas_publicas(p_torneo_id uuid) returns table (
   id uuid, jugador1_id uuid, jugador2_id uuid, jugador1_nombre text, jugador2_nombre text,
   categoria text, estado text
@@ -482,6 +486,7 @@ create or replace function parejas_publicas(p_torneo_id uuid) returns table (
   where p.torneo_id = p_torneo_id;
 $$;
 
+drop function if exists partidos_publicos(uuid);
 create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   id uuid, ronda text, horario timestamptz, estado text, sets jsonb,
   cancha_id uuid, cancha_nombre text,
