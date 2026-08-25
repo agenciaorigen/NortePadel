@@ -1,30 +1,18 @@
 :root {
-  /* Paleta "club deportivo premium": fondo casi negro, superficies apenas más
-     claras, cards con un salto de contraste sutil — nada de negro puro
-     azulado ni bordes duros. Un solo acento fuerte (verde lima de la marca),
-     el resto son estados (ok/warn/danger) que nunca compiten con él. */
-  --bg: #0B0D0D;
-  --bg-elev: #151818;
-  --card: #202424;
-  --accent: #b4ff39;       /* verde pelota de pádel — marca */
-  --accent-ink: #0e1400;   /* texto sobre el verde */
-  --accent-2: #ff2d95;     /* uso puntual: EN VIVO */
-  --accent-3: #6a3dff;     /* uso puntual: ganador en la llave */
-  --accent-teal: #10b3a3;  /* uso puntual: fila de partido "order of play" */
-  --text: #F5F5F5;
-  --muted: #9B9F9F;
-  --border: rgba(245,245,245,.09);
-  --state-ok: #6fe08a;
-  --state-warn: #ffc24d;
-  --danger: #ff5c6c;
+  --bg: #050709;
+  --bg-elev: #0a0d12;
+  --card: #10141c;
+  --accent: #b4ff39;       /* verde pelota de pádel */
+  --accent-ink: #0c1400;   /* texto sobre el verde */
+  --accent-2: #ff2d95;     /* magenta */
+  --accent-3: #6a3dff;     /* violeta/azul */
+  --accent-teal: #0f9e96;  /* filas de partidos tipo "order of play" */
+  --text: #f5f7fb;
+  --muted: #8b93a7;
+  --border: #232838;
+  --danger: #ff4d6d;
+  --ok: #22c55e;
   --gradient: linear-gradient(135deg, var(--accent-2), var(--accent-3));
-  /* radios redondeados, tipo app deportiva moderna (no revista/no formulario) */
-  --radius-sm: 12px;
-  --radius: 16px;
-  --radius-lg: 20px;
-  /* sombras muy sutiles: solo para separar del fondo, nunca un "dashboard viejo" */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
-  --shadow: 0 6px 20px rgba(0,0,0,.35);
 }
 
 * { box-sizing: border-box; }
@@ -35,14 +23,14 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  padding-bottom: 78px;
+  padding-bottom: 70px;
 }
-/* fondo de toda la app: la foto de la cancha, difuminada y bien oscurecida (en vez del negro liso) */
+/* fondo de toda la app: la foto de la cancha, difuminada y bien oscurecida (en vez del negro/azul liso) */
 body::before {
   content: "";
   position: fixed; inset: -12px;
   background: url('destacados-fondo.jpg') center/cover no-repeat;
-  filter: blur(8px) brightness(.24) saturate(1.05);
+  filter: blur(6px) brightness(.32) saturate(1.05);
   transform: scale(1.08);
   z-index: -2;
 }
@@ -50,7 +38,7 @@ body::after {
   content: "";
   position: fixed; inset: 0;
   background: var(--bg);
-  opacity: .66;
+  opacity: .55;
   z-index: -1;
 }
 
@@ -74,30 +62,29 @@ header.topbar .logo-ring {
   background: var(--gradient);
   flex-shrink: 0;
 }
-header.topbar img { width: 100%; height: 100%; border-radius: 50%; display: block; background: var(--bg); }
+header.topbar img { width: 100%; height: 100%; border-radius: 50%; display: block; background: #05070a; }
 header.topbar h1 {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 700;
   margin: 0;
   flex: 1;
-  letter-spacing: -.01em;
+  letter-spacing: .01em;
 }
 header.topbar h1 span { color: var(--accent); }
 header.topbar button {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: rgba(180,255,57,.12);
+  border: 1px solid rgba(180,255,57,.3);
+  color: var(--accent);
   padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 header.topbar button svg { display: block; }
-header.topbar button:hover { border-color: var(--accent); color: var(--accent); }
 
 main { padding: 16px; max-width: 720px; margin: 0 auto; }
 
@@ -107,122 +94,101 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: var(--shadow-sm);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 14px;
 }
 
-/* bloque "liviano": agrupa una sección de Inicio sin ponerle una caja encima —
-   la separación se hace con espacio y una línea fina, no con un card más.
-   Se usa donde el contenido ya tiene su propio fondo (fotos) o es una tira
-   corta que no necesita quedar embolsada. */
-.seccion { margin: 0 0 26px; }
-.seccion > h3 { margin-bottom: 12px; }
+h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--text); letter-spacing: .01em; }
+h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 
-h2 { font-size: 19px; font-weight: 800; margin: 0 0 14px; color: var(--text); letter-spacing: -.01em; }
-h3 { font-size: 12.5px; font-weight: 700; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
-
-label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
 input, select, textarea {
   width: 100%;
-  padding: 11px 13px;
-  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  border-radius: 10px;
   border: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: #0a0e16;
   color: var(--text);
   font-size: 14px;
 }
-input::placeholder { color: #6b6f6f; }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+input::placeholder { color: #57607a; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
 
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
 
-/* ---------- Botones: exactamente 3 estilos ----------
-   Primary (fondo lima, acción principal) / Secondary (superficie oscura +
-   borde, acción alternativa) / Tertiary (solo texto, acción menor). "danger"
-   y "small" son variantes de tamaño/semántica sobre estos tres, no estilos nuevos. */
 button.primary {
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 700;
   border: none;
-  padding: 13px 18px;
-  border-radius: var(--radius-sm);
-  font-size: 14.5px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
   margin-top: 14px;
   width: 100%;
   cursor: pointer;
+  letter-spacing: .01em;
 }
 button.primary:active { transform: scale(.98); }
 button.secondary {
-  background: var(--bg-elev);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 10px 15px;
-  border-radius: var(--radius-sm);
-  font-size: 13.5px;
-  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
   cursor: pointer;
 }
-button.secondary:hover { border-color: var(--accent); color: var(--accent); }
-button.tertiary {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-weight: 600;
-  font-size: 13.5px;
-  padding: 6px 2px;
-  cursor: pointer;
-}
-button.small { padding: 8px 12px; font-size: 12px; border-radius: 10px; }
+button.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
 button.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+button.gradient {
+  background: var(--gradient);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  width: 100%;
+  cursor: pointer;
+}
 
-button:disabled { opacity: .5; cursor: not-allowed; }
+button:disabled { opacity: .55; cursor: not-allowed; }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 tr:first-child td { font-weight: 700; }
 
 .pos-1 { color: #ffd700; }
 .pos-2 { color: #c9d3e0; }
 .pos-3 { color: #ff9d5c; }
 
-/* ---------- Badges: chicos, elegantes, solo metadata — nunca sobredimensionados ---------- */
 .badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-  background: rgba(245,245,245,.07);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  background: rgba(180,255,57,.14);
+  color: var(--accent);
+  border: 1px solid rgba(180,255,57,.25);
 }
-.badge.orange { background: rgba(255,194,77,.14); color: var(--state-warn); border: 1px solid rgba(255,194,77,.3); }
-.badge.danger { background: rgba(255,92,108,.14); color: var(--danger); border: 1px solid rgba(255,92,108,.3); }
+.badge.orange { background: rgba(255,45,149,.14); color: #ff6fb8; border: 1px solid rgba(255,45,149,.3); }
+.badge.danger { background: rgba(255,77,109,.14); color: var(--danger); border: 1px solid rgba(255,77,109,.3); }
 .badge.solid { background: var(--accent); color: var(--accent-ink); border: none; font-weight: 700; }
-
-/* ranking público: menos "tabla" y más lista de leaderboard */
-#tablaRanking th { border-bottom: 2px solid var(--border); }
-#tablaRanking td { padding: 12px 6px; border-bottom: 1px solid var(--border); }
-#tablaRanking tr:last-child td { border-bottom: none; }
-.tabla-posiciones td { border-bottom: 1px solid var(--border); }
 
 .fila-master td { background: rgba(255,215,0,.05); }
 .fila-master td:first-child { border-left: 2px solid #ffd700; }
 
-/* ---------- Chips / filtros ---------- */
 .pill-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 4px; }
 .pill-row::-webkit-scrollbar { display: none; }
 .pill {
   flex-shrink: 0;
   border: 1px solid var(--border);
-  background: var(--bg-elev);
+  background: transparent;
   color: var(--muted);
   padding: 7px 14px;
   border-radius: 999px;
@@ -236,27 +202,17 @@ tr:first-child td { font-weight: 700; }
 /* ---------- Avatares / fotos de perfil ---------- */
 .avatar {
   width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
-  background: var(--bg-elev); border: 2px solid var(--card); flex-shrink: 0;
+  background: #1a2236; border: 2px solid var(--card); flex-shrink: 0;
 }
 .avatar-placeholder { display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .avatar-grande { width: 88px; height: 88px; border: 2px solid var(--accent); font-size: 30px; margin-bottom: 8px; }
 .avatar-master { border: 3px solid #ffd700; box-shadow: 0 0 0 2px rgba(255,215,0,.25); }
 
-.avatar-wrap { position: relative; display: inline-block; flex-shrink: 0; }
-.avatar-wrap .avatar { display: block; }
-.avatar-zoom-icon {
-  position: absolute; right: -2px; bottom: -2px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--accent); color: var(--accent-ink);
-  border: 2px solid var(--card);
-  display: flex; align-items: center; justify-content: center;
-  pointer-events: none;
-}
-
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
 .pj-header .avatar { border: 2px solid var(--accent); font-size: 34px; }
-.pj-header h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+.pj-header h2 { margin: 0 0 6px; }
+/* medallero: 🥇 campeón / 🥈 subcampeón, al lado de la categoría en el header del perfil */
 .pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pj-medalla {
   font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
@@ -264,65 +220,40 @@ tr:first-child td { font-weight: 700; }
 }
 .pj-medalla-oro { background: rgba(255,196,0,.14); color: #ffcf4d; border-color: rgba(255,196,0,.35); }
 .pj-medalla-plata { background: rgba(200,208,224,.12); color: #d7dceb; border-color: rgba(200,208,224,.3); }
-
-/* ---------- Stats: número grande y bold, sin aros ni decoración —
-   "64 PAREJAS" al estilo de una app deportiva, no un dashboard viejo.
-   Mismo componente para Inicio del torneo, Dashboard de admin y Perfil. ---------- */
 .pj-stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 18px;
-  margin-top: 6px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-top: 18px; text-align: center;
 }
-.pj-stats > div { text-align: left; }
-.pj-stats strong {
-  display: block; font-size: clamp(22px, 6vw, 32px); font-weight: 800; line-height: 1;
-  letter-spacing: -.02em; color: var(--text);
-}
-.pj-stats span {
-  display: block; font-size: 11px; color: var(--muted); text-transform: uppercase;
-  letter-spacing: .05em; margin-top: 6px; font-weight: 600;
-}
+.pj-stats > div { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 4px; }
+.pj-stats strong { display: block; font-size: 18px; }
+.pj-stats span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .pj-torneo-item {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 12px 0; border-bottom: 1px solid var(--border);
+  padding: 10px 0; border-bottom: 1px solid var(--border);
 }
 .pj-torneo-item:last-child { border-bottom: none; }
-
-/* ---------- Hero de Inicio del torneo: portada tipo revista, con la foto
-   real de la cancha — así la pantalla "home" de un torneo pesa como tal y no
-   arranca directo con formularios/listas ---------- */
-.torneo-hero {
-  position: relative;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  min-height: 190px;
-  margin-bottom: 16px;
-  background:
-    linear-gradient(0deg, rgba(11,13,13,.96), rgba(11,13,13,.3) 70%),
-    url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
-  box-shadow: var(--shadow);
-  display: flex; align-items: flex-end;
-  padding: 22px;
-}
-.torneo-hero-overlay { position: relative; z-index: 1; }
-.torneo-hero-overlay .badge { margin-bottom: 10px; }
-.torneo-hero-overlay h2 { margin: 0; font-size: 24px; line-height: 1.15; }
-@media (min-width: 960px) {
-  .torneo-hero { min-height: 260px; padding: 38px; }
-  .torneo-hero-overlay h2 { font-size: 34px; }
-}
 
 /* ---------- Hero Inicio ---------- */
 .hero-club {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-lg);
-  padding: 30px 22px 28px;
-  margin-bottom: 20px;
+  border-radius: 20px;
+  padding: 28px 20px 26px;
+  margin-bottom: 16px;
   background:
-    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.4) 60%),
+    linear-gradient(0deg, rgba(5,7,10,.9), rgba(5,7,10,.35) 60%),
+    radial-gradient(120% 100% at 15% -10%, rgba(180,255,57,.28), transparent 55%),
     url('hero-cancha.jpg') center/cover no-repeat,
-    var(--bg);
-  box-shadow: var(--shadow);
+    #05070a;
+  border: 1px solid var(--border);
+}
+.hero-club::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: .35;
+  pointer-events: none;
 }
 .hero-club-titulo {
   position: relative;
@@ -330,11 +261,11 @@ tr:first-child td { font-weight: 700; }
   line-height: 1.05;
   font-weight: 800;
   margin: 0 0 10px;
-  letter-spacing: -.02em;
-  max-width: 85%;
+  letter-spacing: -.01em;
+  max-width: 80%;
 }
 .hero-club-titulo span { color: var(--accent); }
-.hero-club-sub { position: relative; color: #cfd2d2; font-size: 14px; margin: 0 0 18px; max-width: 34ch; }
+.hero-club-sub { position: relative; color: var(--muted); font-size: 14px; margin: 0 0 18px; max-width: 34ch; }
 .hero-club-cta {
   position: relative;
   display: inline-flex; align-items: center; gap: 8px;
@@ -347,10 +278,10 @@ tr:first-child td { font-weight: 700; }
 .hero-club-cta:hover span { transform: translateX(3px); }
 .hero-club-widget {
   position: absolute; top: 18px; right: 18px;
-  background: rgba(21,24,24,.85);
+  background: rgba(10,13,18,.85);
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 14px;
   padding: 8px 12px;
   display: flex; flex-direction: column; align-items: flex-end;
   text-align: right;
@@ -366,15 +297,15 @@ tr:first-child td { font-weight: 700; }
   overflow: hidden;
   background: var(--accent);
   border: none;
-  border-radius: var(--radius-sm);
-  margin-bottom: 20px;
-  padding: 9px 0;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  padding: 8px 0;
   cursor: pointer;
 }
 .marquee-track {
   display: flex; gap: 14px; width: max-content;
   color: var(--accent-ink);
-  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   animation: marquee-scroll 16s linear infinite;
 }
 .marquee-dot { opacity: .5; }
@@ -392,7 +323,7 @@ tr:first-child td { font-weight: 700; }
 .ascendidos-set { display: flex; gap: 18px; padding-right: 18px; }
 .ascendido-item { flex-shrink: 0; width: 88px; text-align: center; cursor: pointer; }
 .ascendido-item strong { display: block; font-size: 11.5px; font-weight: 700; margin-top: 6px; line-height: 1.25; }
-.ascendido-item span { display: block; font-size: 10px; color: var(--accent); font-weight: 700; margin-top: 2px; text-transform: uppercase; letter-spacing: .02em; }
+.ascendido-item span { display: block; font-size: 10.5px; color: var(--accent); font-weight: 600; margin-top: 2px; }
 
 /* ---------- Banda de energía (foto real del club) ---------- */
 .energia-banda {
@@ -400,45 +331,45 @@ tr:first-child td { font-weight: 700; }
   width: 100%;
   max-width: 340px;
   aspect-ratio: 315 / 413;
-  margin: 0 auto 20px;
-  border-radius: var(--radius-lg);
+  margin: 0 auto 16px;
+  border-radius: 16px;
   overflow: hidden;
   background: url('brasil-tour.jpg') center/cover no-repeat;
   display: flex; align-items: flex-end; justify-content: center;
   text-align: center;
   padding: 20px 20px 24px;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 }
 .energia-banda::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(11,13,13,.5), rgba(11,13,13,.9));
+  background: linear-gradient(180deg, rgba(5,7,10,.55), rgba(5,7,10,.85));
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
   font-size: 22px; font-weight: 800; margin: 0 0 8px;
-  color: var(--text); text-transform: none; letter-spacing: -.01em; line-height: 1.1;
+  text-transform: uppercase; letter-spacing: .01em;
 }
-.energia-texto p { font-size: 13px; color: #d8dbdb; margin: 0; }
+.energia-texto p { font-size: 13px; color: #dfe4ee; margin: 0; }
 
 /* ---------- Banda de "Jugadores del mes" (deja ver el fondo general de la app) ---------- */
 .destacados-band {
   position: relative;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   overflow: hidden;
-  padding: 18px 16px 20px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow);
+  padding: 16px 14px 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
   background:
-    linear-gradient(0deg, rgba(11,13,13,.8), rgba(11,13,13,.5)),
-    url('pelotas.jpg') center/cover no-repeat, var(--bg);
+    linear-gradient(0deg, rgba(5,7,10,.75), rgba(5,7,10,.55)),
+    url('pelotas.jpg') center/cover no-repeat, #05070a;
 }
 .destacados-overline {
   position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: space-between;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--muted);
-  margin: 0 0 14px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--accent);
+  margin-bottom: 12px;
 }
 .destacados-grid {
   position: relative; z-index: 1;
@@ -447,13 +378,14 @@ tr:first-child td { font-weight: 700; }
 
 .destacado-card {
   position: relative;
-  border-radius: var(--radius);
+  border-radius: 14px;
   overflow: hidden;
   min-height: 190px;
   display: flex; flex-direction: column; justify-content: space-between;
-  padding: 14px;
+  padding: 12px;
   background-size: cover;
   background-position: center;
+  border: 1px solid var(--border);
 }
 .destacado-card::before {
   content: "";
@@ -461,62 +393,62 @@ tr:first-child td { font-weight: 700; }
   background: linear-gradient(0deg, rgba(0,0,0,.88), rgba(0,0,0,.1) 60%);
 }
 .destacado-card.vacio {
-  background: rgba(32,36,36,.6);
+  background: rgba(16,20,28,.55);
   align-items: center;
   justify-content: center;
   text-align: center;
-  border: 1px dashed var(--border);
+  border-style: dashed;
 }
 .destacado-card.vacio::before { content: none; }
 .destacado-card.vacio .destacado-icono { font-size: 26px; margin-bottom: 6px; opacity: .8; }
 .destacado-tag {
   position: relative; z-index: 1; align-self: flex-start;
-  background: rgba(21,24,24,.8);
+  background: rgba(10,13,18,.75);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 4px 10px;
   font-size: 10.5px; font-weight: 700;
 }
 .destacado-stat { position: relative; z-index: 1; }
-.destacado-stat strong { display: block; font-size: 27px; font-weight: 800; line-height: 1; letter-spacing: -.01em; }
-.destacado-stat span { font-size: 10.5px; color: #d8dbdb; text-transform: uppercase; letter-spacing: .04em; }
+.destacado-stat strong { display: block; font-size: 26px; font-weight: 800; line-height: 1; }
+.destacado-stat span { font-size: 10.5px; color: #dfe4ee; text-transform: uppercase; letter-spacing: .04em; }
 .destacado-info { position: relative; z-index: 1; }
 .destacado-info strong {
   display: block; font-size: 17px; font-weight: 800;
-  letter-spacing: -.01em; line-height: 1.15;
+  text-transform: uppercase; letter-spacing: .01em;
 }
-.destacado-info span { font-size: 10.5px; color: #d8dbdb; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
+.destacado-info span { font-size: 11px; color: #dfe4ee; }
 
 /* ---------- Flyer destacado (próximo torneo) ---------- */
 .flyer-destacado {
   position: relative;
   min-height: 220px;
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   overflow: hidden;
   margin-bottom: 12px;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
   background-size: cover;
   background-position: center top;
   display: flex; align-items: flex-end;
-  padding: 18px;
+  padding: 16px;
 }
 .flyer-destacado::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,.82), transparent 45%);
+  background: linear-gradient(0deg, rgba(0,0,0,.8), transparent 45%);
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
-  display: block; font-size: 22px; font-weight: 800;
-  letter-spacing: -.01em; line-height: 1.15;
+  display: block; font-size: 24px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .01em; line-height: 1.15;
 }
-.flyer-destacado-info span { font-size: 12px; color: #d8dbdb; }
+.flyer-destacado-info span { font-size: 12px; color: #dfe4ee; }
 
 .campeones-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
 .campeon-card {
   flex-shrink: 0; width: 140px; text-align: center;
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;
+  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 10px;
 }
 .campeon-avatares { display: flex; justify-content: center; margin-bottom: 6px; }
 .campeon-avatares .avatar { width: 48px; height: 48px; margin-left: -12px; }
@@ -534,106 +466,64 @@ tr:first-child td { font-weight: 700; }
 }
 .categorias-genero-grupo .check-grid { margin: 0 0 4px; }
 
-/* ---------- Vista calendario (SLOT = fecha + hora + cancha) ----------
-   Desktop: CSS Grid que se reacomoda al ancho disponible (auto-fit/minmax)
-   en vez de una tabla de ancho fijo con scroll horizontal — con 2 canchas o
-   con 8, nunca corta contenido. Mobile: agenda vertical (.calendario-agenda),
-   ver más abajo — el scroll horizontal no es la solución principal en
-   ningún tamaño de pantalla. */
-.calendario-hora { color: var(--muted); font-weight: 700; white-space: nowrap; font-size: 12px; }
+/* ---------- Vista calendario (canchas × horarios) ---------- */
+.tabla-calendario { font-size: 12px; white-space: nowrap; }
+.tabla-calendario th, .tabla-calendario td { padding: 6px; vertical-align: top; }
+.tabla-calendario th {
+  background: rgba(5,7,10,.7); color: var(--text); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em; border-radius: 6px;
+}
+.calendario-hora { color: var(--muted); font-weight: 600; white-space: nowrap; }
 .calendario-partido {
-  background: var(--accent-teal); color: #fff; border-radius: var(--radius-sm);
-  padding: 9px 11px; line-height: 1.35; width: 100%; height: 100%; white-space: normal; font-weight: 600;
-  font-size: 12.5px;
+  background: var(--accent-teal); color: #fff; border-radius: 8px;
+  padding: 8px 10px; line-height: 1.35; width: 150px; white-space: normal; font-weight: 600;
 }
-.calendario-partido.jugado { background: var(--bg-elev); border: 1px solid var(--border); color: var(--text); font-weight: 500; }
+.calendario-partido.jugado { background: #0e182c; border: 1px solid rgba(180,255,57,.4); color: var(--text); font-weight: 400; }
 .calendario-equipo { word-break: break-word; }
-.calendario-vs { display: block; text-align: center; color: rgba(255,255,255,.75); font-weight: 700; font-size: 10.5px; margin: 3px 0; text-transform: uppercase; }
+.calendario-vs { display: block; text-align: center; color: var(--accent); font-weight: 800; font-size: 11px; margin: 3px 0; }
 .calendario-partido.jugado .calendario-vs { color: var(--accent); }
-/* planilla editable (Administración): huecos libres para soltar un partido arrastrado,
-   partido arrastrándose y bandeja de "sin horario" arriba de la grilla */
-.calendario-vacia { min-height: 56px; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
-.calendario-partido[draggable] { cursor: grab; }
-.calendario-partido.arrastrando { opacity: .4; }
-.calendario-partido.pendiente { background: var(--accent-3); }
-.planilla-bandeja {
-  display: flex; flex-wrap: wrap; gap: 8px; padding: 12px;
-  border: 1px dashed var(--accent-3); border-radius: var(--radius-sm); margin-bottom: 14px;
-}
-.planilla-bandeja:empty { display: none; }
-
-/* cancha bloqueada: nunca lleva data-horario/data-cancha, así que ya queda
-   afuera como drop-target sin tocar nada de la lógica de drag&drop */
-.calendario-bloqueada {
-  min-height: 56px; border-radius: var(--radius-sm); background: rgba(255,92,108,.08);
-  border: 1px dashed rgba(255,92,108,.4); color: var(--danger); font-size: 10.5px;
-  font-weight: 600; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 4px; line-height: 1.25;
-}
-
-.calendario-grid-scroll { overflow-x: auto; }
-.calendario-grid {
-  display: grid;
-  grid-template-columns: 64px repeat(var(--calendario-cols, 1), minmax(120px, 1fr));
-  gap: 8px;
-  align-items: stretch;
-}
-.calendario-grid-cabecera {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text); background: var(--bg-elev); border-radius: var(--radius-sm);
-  padding: 9px 4px; text-align: center; display: flex; align-items: center; justify-content: center;
-}
-
-/* ---------- Calendario en mobile: agenda vertical fecha → hora → cancha ---------- */
-.calendario-agenda-fecha {
-  font-weight: 800; letter-spacing: -.005em; font-size: 14px;
-  color: var(--text); margin: 20px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
-}
-.calendario-agenda-fecha:first-child { margin-top: 0; }
-.calendario-agenda-hora {
-  display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
-  font-weight: 700; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em;
-}
-.calendario-agenda-item { margin-bottom: 8px; }
-.calendario-agenda-item .calendario-partido,
-.calendario-agenda-item .calendario-bloqueada { min-height: 0; }
 
 /* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
 .llave { display: flex; gap: 32px; }
 .llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 178px; }
 .llave-columna h3 {
-  text-align: center; font-size: 12px;
+  text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
   color: var(--muted); margin-bottom: 2px;
 }
+/* separa visualmente el bloque de zonas (grupos) del bloque de eliminación directa */
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;
+  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px;
+  position: relative;
 }
-.llave-fecha { margin: 0 0 6px; padding: 0; }
+/* líneas que conectan cada partido con la próxima ronda, tipo cuadro de fútbol — solo entre
+   columnas de eliminación directa, no tiene sentido entre zonas ni cruzando a eliminación */
+.llave-columna:not(.llave-zona):not(.llave-separador):not(:last-child) .llave-partido::after {
+  content: ""; position: absolute; top: 50%; right: -16px; width: 16px; height: 2px; background: var(--border);
+}
+.llave-columna:not(.llave-zona):not(.llave-separador):not(:first-child) .llave-partido::before {
+  content: ""; position: absolute; top: 50%; left: -16px; width: 16px; height: 2px; background: var(--border);
+}
 .llave-fila {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  padding: 5px; border-radius: 8px; font-size: 12.5px; color: var(--muted);
+  padding: 3px 4px; border-radius: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted);
 }
-.llave-jugadores { display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
-.llave-jugador { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; }
-.llave-jugador strong { display: block; font-weight: 700; color: var(--text); font-size: 12.5px; }
-.llave-jugador span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.llave-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .llave-sets { display: flex; gap: 3px; flex-shrink: 0; }
 .llave-set {
   min-width: 18px; text-align: center; font-size: 11.5px; font-weight: 700; line-height: 1.5;
-  border-radius: 6px; background: var(--bg-elev); color: var(--muted);
+  border-radius: 5px; background: rgba(255,255,255,.04); color: var(--muted);
 }
 /* ganador resaltado en violeta/lila, no en el verde de acento general — así se distingue
    de un vistazo esta vista del resto de la app */
-.llave-fila.ganador { background: rgba(106,61,255,.16); }
-.llave-fila.ganador .llave-jugador strong { color: #cabdff; }
+.llave-fila.ganador { background: rgba(106,61,255,.16); color: #cabdff; }
 .llave-fila.ganador .llave-set { background: rgba(106,61,255,.32); color: #dcd3ff; }
 .llave-meta { margin-top: 6px; padding: 0 4px; }
 
 .tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 4px 6px; border-bottom: 1px solid var(--border); }
-.tabla-posiciones td { padding: 7px 6px; border-bottom: 1px solid var(--border); }
+.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.tabla-posiciones td { padding: 6px; border-bottom: 1px solid var(--border); }
 .tabla-posiciones tr:last-child td { border-bottom: none; }
 .tabla-posiciones tr:first-child td { color: var(--accent); font-weight: 700; }
 
@@ -651,36 +541,16 @@ tr:first-child td { font-weight: 700; }
   font-weight: 600; cursor: pointer; padding: 0; margin-left: 6px;
 }
 
-/* etiquetas de jugador (uso interno del admin) */
-.etiqueta-dot {
-  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-  margin-right: 5px; vertical-align: middle; flex-shrink: 0;
-}
-#etqColorNueva { width: 44px; padding: 2px; flex: 0 0 auto; }
-
 .pill.removable { display: flex; align-items: center; gap: 6px; }
 .pill.removable button {
   background: none; border: none; color: inherit; cursor: pointer;
   font-size: 14px; line-height: 1; padding: 0;
 }
 
-/* ---------- Disponibilidad: colapsada por defecto (🟢 completa), solo
-   despliega la lista de restricciones si el jugador toca 🔴 ---------- */
-.disp-toggle .pill[data-disp="restringida"].active {
-  background: var(--danger); border-color: var(--danger); color: #fff;
-}
-.disp-restricciones-wrap { margin-top: 12px; }
-.disp-lista-restricciones { margin-bottom: 8px; }
-.disp-nueva-restriccion {
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 12px; margin: 8px 0;
-  background: var(--bg-elev);
-}
-
 /* ---------- Parejas anotadas en un torneo ---------- */
 .pareja-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
 }
 .pareja-row:last-child { border-bottom: none; }
 .pareja-row .btnBorrarPareja {
@@ -692,15 +562,17 @@ tr:first-child td { font-weight: 700; }
 .admin-only { display: none; }
 body.is-admin .admin-only { display: block; }
 
-header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---------- Torneo: Resultados (vista pública, default para todos) vs Organizar
+   (gestión del torneo — solo admin, y solo entrando explícitamente a este modo) ---------- */
+.organizar-only { display: none; }
+body.modo-organizar .organizar-only { display: block; }
+/* en modo Organizar el toggle se pinta violeta/lila (mismo acento que usa la vista Llave)
+   para que se note de un vistazo que se está en la parte de gestión, no en los resultados */
+#torneoModoPills .pill[data-modo="organizar"].active {
+  background: var(--accent-3); color: #fff; border-color: var(--accent-3);
+}
 
-/* ---------- Barra de contexto de un torneo (persiste arriba de las 8
-   pantallas públicas/jugador de ese torneo: Inicio, Categorías, Jugadores,
-   Calendario, Resultados, Inscripción, Mi inscripción, Mi disponibilidad) ---------- */
-#torneoContextBar { margin-bottom: 16px; }
-.torneo-context-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.torneo-context-top h2 { margin: 0; flex: 1; min-width: 140px; }
-#torneoSubnav.pill-row { margin-top: 10px; }
+header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Buscador de pareja ---------- */
 .suggest-list { position: relative; }
@@ -708,31 +580,31 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
   display: block;
   width: 100%;
   text-align: left;
-  background: var(--bg-elev);
+  background: #0a0e16;
   border: 1px solid var(--border);
   border-top: none;
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 13px;
   color: var(--text);
   cursor: pointer;
 }
-.suggest-item:first-child { border-top: 1px solid var(--border); border-radius: var(--radius-sm) var(--radius-sm) 0 0; margin-top: -1px; }
-.suggest-item:hover { background: var(--card); }
-.suggest-item:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.suggest-item:first-child { border-top: 1px solid var(--border); border-radius: 0 0 0 0; margin-top: -1px; }
+.suggest-item:hover { background: #111827; }
+.suggest-item:last-child { border-radius: 0 0 10px 10px; }
 
 /* fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color */
 .match-vs-row {
   display: flex; align-items: center; gap: 10px;
   background: var(--accent-teal); color: #fff;
-  border-radius: var(--radius-sm); padding: 13px 15px; margin: 10px 0;
+  border-radius: 10px; padding: 12px 14px; margin: 10px 0;
 }
 .match-vs-team { flex: 1; font-weight: 700; font-size: 12.5px; line-height: 1.35; }
 .match-vs-team.derecha { text-align: right; }
-.match-vs-divider { font-weight: 800; color: var(--accent-ink); background: rgba(255,255,255,.85); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+.match-vs-divider { font-weight: 800; color: var(--accent); font-size: 13px; flex-shrink: 0; }
 /* cuando el partido ya tiene resultado, la barra cambia de color y resalta al ganador */
-.match-vs-row.jugado { background: var(--bg-elev); border: 1px solid var(--border); }
-.match-vs-team.ganador { color: var(--accent); }
-.match-vs-team.perdedor { opacity: .55; color: var(--text); }
+.match-vs-row.jugado { background: linear-gradient(90deg, var(--accent-2), var(--accent-teal)); }
+.match-vs-team.ganador { color: #fff; }
+.match-vs-team.perdedor { opacity: .55; }
 
 .badge.live {
   background: rgba(255,45,149,.16);
@@ -756,7 +628,7 @@ nav.tabbar .icon { position: relative; }
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  padding: 7px 4px;
+  padding: 6px 4px;
   border-bottom: 1px solid var(--border);
 }
 .day-picker:last-child { border-bottom: none; }
@@ -768,25 +640,20 @@ nav.tabbar .icon { position: relative; }
 .day-picker input[type="time"] { width: 100%; padding: 7px 6px; font-size: 12.5px; }
 .day-picker .sep { color: var(--muted); font-size: 11px; text-align: center; }
 
-/* ---------- Tarjeta de partido: categoría/fase, hora/cancha, parejas VS, estado ---------- */
 .match-card {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 12px;
-  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #0e182c;
 }
 .match-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
-.match-meta { color: var(--muted); font-size: 12px; margin-top: 5px; }
-.match-meta.meta-caption { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
+.match-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
 /* partido con resultado cargado: se distingue con un filo de color, no solo texto */
-.match-card-jugado { border-color: rgba(180,255,57,.35); }
-.match-card.clickeable { cursor: pointer; transition: border-color .15s, transform .1s; }
-.match-card.clickeable:hover { border-color: var(--accent); }
-.match-card.clickeable:active { transform: scale(.995); }
-.sets-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.match-card-jugado { border-color: var(--accent-teal); }
+.sets-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .set-chip {
-  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
   background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
 }
 .set-chip.gano-p1 { border-color: var(--accent); color: var(--accent); }
@@ -795,10 +662,10 @@ nav.tabbar .icon { position: relative; }
 
 /* panel de carga de resultado: separado visualmente del partido/calendario público, solo admin */
 .match-admin-panel {
-  background: var(--bg-elev);
+  background: rgba(5,7,10,.6);
   border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
+  border-radius: 10px;
+  padding: 10px;
   margin-top: 10px;
 }
 .match-admin-panel .match-actions:first-of-type { margin-top: 0; }
@@ -810,19 +677,20 @@ nav.tabbar .icon { position: relative; }
 /* tarjeta "Partidos" (Lista / Calendario / Llave) con fondo tipo póster */
 .card.partidos-poster {
   position: relative;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(11,13,13,.88), rgba(11,13,13,.96) 45%),
-    url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
+    linear-gradient(180deg, rgba(5,7,10,.85), rgba(5,7,10,.94) 45%),
+    radial-gradient(120% 90% at 15% -10%, rgba(15,158,150,.3), transparent 55%),
+    url('hero-cancha.jpg') center/cover no-repeat, #05070a;
 }
+.partidos-poster > h3 { text-transform: uppercase; letter-spacing: .03em; }
 
 .torneo-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.torneo-nombre { font-weight: 700; font-size: 15.5px; letter-spacing: -.005em; }
+.torneo-nombre { font-weight: 700; font-size: 15.5px; }
 .torneo-lugar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-top: 8px; font-size: 13px; color: var(--text);
 }
-.torneo-lugar span { letter-spacing: .01em; font-weight: 600; font-size: 12px; }
 .torneo-maps-link { color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: none; }
 .torneo-maps-link:hover { text-decoration: underline; }
 
@@ -830,36 +698,31 @@ nav.tabbar .icon { position: relative; }
    siempre la misma imagen de "En vivo") */
 .torneo-card-poster {
   position: relative;
-  padding: 22px 18px 26px;
+  padding: 20px 16px 26px;
   background:
-    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.5) 65%),
-    url('pelotas.jpg') center/cover no-repeat, var(--bg);
+    linear-gradient(0deg, rgba(5,7,10,.92), rgba(5,7,10,.55) 65%),
+    radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%),
+    url('pelotas.jpg') center/cover no-repeat, #05070a;
 }
-.torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.torneo-card-poster .torneo-nombre { font-size: 16px; text-transform: uppercase; letter-spacing: .01em; }
 .torneo-card-poster .torneo-lugar,
-.torneo-card-poster .match-meta { color: #d8dbdb; }
-/* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
-   (el resto del contenido queda abajo, empujado con flex) */
-.torneo-card-flyer { min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end; }
+.torneo-card-poster .match-meta { color: #dfe4ee; }
 
 .flyer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.flyer-grid img { width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.flyer-grid img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
 
 /* ---------- Noticias ---------- */
-.noticia-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
+.noticia-card { border-bottom: 1px solid var(--border); padding: 12px 0; }
 .noticia-card:last-child { border-bottom: none; }
-.noticia-card img { width: 100%; border-radius: var(--radius-sm); margin-bottom: 8px; display: block; }
+.noticia-card img { width: 100%; border-radius: 10px; margin-bottom: 8px; display: block; }
 .noticia-card strong { display: block; font-size: 14px; margin-bottom: 4px; }
 .noticia-card p { font-size: 13px; color: var(--muted); margin: 0 0 6px; line-height: 1.4; }
 
-/* ---------- Nav: barra inferior en mobile, sidebar en desktop —
-   se busca sensación de app nativa: fondo elevado, ítem activo con
-   una píldora de superficie detrás del icono, nada de bordes duros. ---------- */
 nav.tabbar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   display: flex;
-  background: var(--bg-elev);
+  background: var(--card);
   border-top: 1px solid var(--border);
   z-index: 10;
 }
@@ -868,97 +731,69 @@ nav.tabbar button {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 9px 2px 8px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 10px 2px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
 }
-nav.tabbar button.active { color: var(--accent); font-weight: 700; }
-nav.tabbar .icon { display: flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 999px; transition: background .15s; }
-nav.tabbar button.active .icon { background: rgba(180,255,57,.14); }
+nav.tabbar button.active { color: var(--accent); font-weight: 600; }
+nav.tabbar .icon { display: block; }
 nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
 
 /* "Jugar" queda en el medio de la barra, destacado como acción principal
    (reservar cancha) en vez de una pestaña más */
-nav.tabbar button.tab-cta { color: var(--text); }
+nav.tabbar button.tab-cta { color: var(--accent-ink); }
 nav.tabbar button.tab-cta .icon {
   background: var(--accent);
   border-radius: 50%;
   width: 34px; height: 34px;
-  padding: 0;
   display: flex; align-items: center; justify-content: center;
   margin-top: -14px;
-  box-shadow: var(--shadow);
-  color: var(--accent-ink);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
 }
-nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); color: #fff; }
-nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 700; }
-
-/* En mobile la barra inferior queda con lo esencial (Inicio/Calendario/Resultados/
-   Perfil + "Más"), como una app nativa; Torneos/Ranking/Administración pasan a vivir
-   en el menú de "Más" para no amontonar la barra. En PC hay lugar de sobra: se
-   muestran todos los accesos juntos y "Más" no hace falta. */
-nav.tabbar button.tab-desktop-only { display: none; }
-nav.tabbar button.tab-mobile-only { display: flex; }
-/* Administración: además de desktop-only, solo se muestra si sos admin — se resuelve
-   con esta regla (más específica por ID) más el body.is-admin que ya se togglea en
-   manejarCambioSesion, sin tocar el estilo desde JS. */
-#btnAdminPanel { display: none; }
+nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); }
+nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600; }
 
 .overlay-bloqueante {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(11,13,13,.92);
+  background: rgba(5, 7, 9, 0.92);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
 }
 .overlay-bloqueante .card { max-width: 360px; width: 100%; }
 
-/* ---------- Foto de jugador ampliada (lightbox) ---------- */
-.avatar-clickable { cursor: zoom-in; }
-.overlay-foto { flex-direction: column; gap: 14px; }
-.overlay-foto img { max-width: min(90vw, 420px); max-height: 70vh; border-radius: var(--radius-lg); object-fit: contain; }
-.overlay-foto button { align-self: flex-end; margin-right: 5vw; }
-
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
 .toast {
   position: fixed;
-  bottom: 86px; left: 50%; transform: translateX(-50%);
-  background: var(--card); border: 1px solid var(--accent);
-  color: var(--text); padding: 11px 18px; border-radius: var(--radius-sm);
+  bottom: 78px; left: 50%; transform: translateX(-50%);
+  background: #0f2f2e; border: 1px solid var(--accent);
+  color: var(--text); padding: 10px 16px; border-radius: 10px;
   font-size: 13px; z-index: 50; max-width: 90%; text-align: center;
-  box-shadow: var(--shadow);
 }
 .sets-input { display: flex; gap: 6px; }
 .sets-input input { text-align: center; }
 
-/* ---------- Sponsors / publicidad: acompañan, no dominan ----------
-   Se integran como "PRESENTAN" + logos chicos — nunca como el elemento
-   más grande de la pantalla. Fondo blanco solo detrás del logo en sí
-   (muchos logos son PNG transparentes y necesitan contraste para leerse),
-   nunca como panel grande. */
-.sponsor-strip { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px; align-items: center; }
+/* ---------- Sponsors / publicidad ---------- */
+.sponsor-strip { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px; align-items: center; }
 .sponsor-strip.vertical { flex-direction: column; align-items: stretch; overflow-x: visible; }
 .sponsor-strip a, .sponsor-strip span.sponsor-item {
   flex-shrink: 0;
   display: block;
   background: #fff;
-  border-radius: var(--radius-sm);
-  padding: 7px 12px;
+  border-radius: 10px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
   color: inherit;
   text-decoration: none;
 }
 .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { flex-shrink: 1; text-align: center; }
-.sponsor-strip img { height: 40px; max-width: 140px; object-fit: contain; display: block; filter: grayscale(35%); opacity: .92; transition: filter .15s, opacity .15s; }
+.sponsor-strip img { height: 56px; max-width: 180px; object-fit: contain; display: block; filter: grayscale(35%); opacity: .92; transition: filter .15s, opacity .15s; }
 .sponsor-strip a:hover img { filter: grayscale(0%); opacity: 1; }
 .sponsor-caption { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; }
-.sponsor-label {
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
-  color: var(--muted); margin: 0 0 10px;
-}
 
 /* ============================================================
    ESCRITORIO: nav lateral + columna de publicidad fija
@@ -966,49 +801,44 @@ nav.tabbar button.tab-mobile-only { display: flex; }
 #sidebarAds { display: none; }
 
 @media (min-width: 960px) {
-  body { padding-bottom: 0; padding-left: 88px; }
+  body { padding-bottom: 0; padding-left: 92px; }
 
-  header.topbar { padding: 16px 32px; }
-  header.topbar h1 { font-size: 18px; }
+  header.topbar { padding: 16px 28px; }
+  header.topbar h1 { font-size: 19px; }
 
   nav.tabbar {
     position: fixed;
     left: 0; top: 0; bottom: 0; right: auto;
-    width: 88px;
+    width: 92px;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 6px;
     padding-top: 96px;
     border-top: none;
     border-right: 1px solid var(--border);
   }
-  nav.tabbar button { flex: none; padding: 10px 4px; }
-  nav.tabbar .icon svg { width: 20px; height: 20px; }
-  nav.tabbar button.tab-desktop-only { display: flex; }
-  nav.tabbar button.tab-mobile-only { display: none; }
-  body.is-admin #btnAdminPanel { display: flex; }
+  nav.tabbar button { flex: none; padding: 12px 4px; }
+  nav.tabbar .icon svg { width: 21px; height: 21px; }
 
   .app-body {
     max-width: 1440px;
     margin: 0 auto;
-    padding: 32px 40px 60px;
+    padding: 28px 40px 60px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 32px;
     align-items: start;
   }
   main { padding: 0; max-width: none; margin: 0; }
 
-  .hero-club { padding: 44px 44px 40px; min-height: 300px; }
-  .hero-club-titulo { font-size: 46px; max-width: 60%; }
+  .hero-club { padding: 40px 40px 36px; min-height: 280px; }
+  .hero-club-titulo { font-size: 44px; max-width: 60%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
-  .destacados-band { padding: 24px 26px 28px; }
-  .destacado-card { min-height: 240px; padding: 20px; }
+  .destacados-band { padding: 22px 24px 26px; }
+  .destacado-card { min-height: 240px; padding: 18px; }
   .destacado-stat strong { font-size: 34px; }
-  .destacado-info strong { font-size: 21px; }
-
-  .pj-stats strong { font-size: clamp(26px, 2.4vw, 40px); }
+  .destacado-info strong { font-size: 22px; }
 
   #sidebarAds {
     display: flex;
@@ -1019,28 +849,29 @@ nav.tabbar button.tab-mobile-only { display: flex; }
     height: calc(100vh - 110px);
   }
 
-  /* la columna de escritorio tiene aire de sobra, pero los sponsors siguen
-     siendo un acompañamiento chico — no se agranda el logo, se agranda el espacio */
-  .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { padding: 14px; }
+  /* la columna de escritorio tiene mucho más aire que la tira horizontal de mobile:
+     los logos de sponsors aprovechan el ancho en vez de quedar chicos con margen de sobra */
+  .sponsor-strip img { height: 84px; max-width: 100%; }
+  .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { padding: 16px; }
 
   /* si hay pocos sponsors cargados, que ocupen todo el alto libre de la columna
      en vez de quedar arriba con espacio vacío abajo */
   #sidebarSponsorsCard { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  #sidebarSponsorsCard .sponsor-strip.vertical { flex: 1; justify-content: center; gap: 20px; }
+  #sidebarSponsorsCard .sponsor-strip.vertical { flex: 1; justify-content: center; gap: 22px; }
   #sidebarSponsorsCard .sponsor-strip.vertical a,
   #sidebarSponsorsCard .sponsor-strip.vertical span.sponsor-item {
     flex: 1; display: flex; align-items: center; justify-content: center;
   }
-  #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 130px; }
+  #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 240px; }
 
   /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
-  #listaJugadores, #listaComplejos, #listaTorneos, #admPartidosLista {
+  #listaJugadores, #listaComplejos, #listaTorneos, #dtPartidos {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 12px;
     align-content: start;
   }
   .flyer-grid { grid-template-columns: repeat(3, 1fr); }
 
-  .card { padding: 24px; }
+  .card { padding: 22px; }
 }
