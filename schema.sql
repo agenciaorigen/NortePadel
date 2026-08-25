@@ -746,6 +746,27 @@ create or replace function torneos_ganados_publico(p_jugador_id uuid) returns ta
   order by coalesce(t.fecha_fin, t.fecha_inicio) desc;
 $$;
 
+-- torneos en los que un jugador llegó a la Final pero NO ganó (subcampeón) — para la
+-- medalla de plata del perfil. Mismo criterio que torneos_ganados_publico de arriba,
+-- pero del lado perdedor de la Final en vez del ganador.
+drop function if exists finales_perdidas_publico(uuid);
+create or replace function finales_perdidas_publico(p_jugador_id uuid) returns table (
+  torneo_id uuid, torneo_nombre text, fecha date, categoria text,
+  companero_nombre text, companero_apellido text
+) language sql stable security definer set search_path = public as $$
+  select t.id, t.nombre, coalesce(t.fecha_fin, t.fecha_inicio), t.categoria,
+    case when p.jugador1_id = p_jugador_id then j2.nombre else j1.nombre end,
+    case when p.jugador1_id = p_jugador_id then j2.apellido else j1.apellido end
+  from partidos pt
+  join torneos t on t.id = pt.torneo_id
+  join parejas p on p.id = (case when pt.pareja1_id = pt.ganador_pareja_id then pt.pareja2_id else pt.pareja1_id end)
+  join jugadores j1 on j1.id = p.jugador1_id
+  join jugadores j2 on j2.id = p.jugador2_id
+  where pt.ronda = 'Final' and pt.estado = 'jugado' and pt.ganador_pareja_id is not null
+    and (p.jugador1_id = p_jugador_id or p.jugador2_id = p_jugador_id)
+  order by coalesce(t.fecha_fin, t.fecha_inicio) desc;
+$$;
+
 -- estadísticas ampliadas del perfil de un jugador (finales jugadas, actividad de los
 -- últimos 6 meses, primer/último torneo y total de torneos) — todo calculado a partir
 -- de partidos/inscripciones ya existentes, sin agregar columnas nuevas en jugadores.

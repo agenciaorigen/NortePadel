@@ -126,11 +126,6 @@
     </div>
   </section>
 
-  <!-- EN VIVO -->
-  <section id="view-envivo" class="view">
-    <div id="enVivoContenido"></div>
-  </section>
-
   <!-- TORNEOS -->
   <section id="view-torneos" class="view">
     <div class="card">
@@ -231,18 +226,22 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
-        <button type="button" class="secondary small admin-only" id="btnMostrarEditarTorneo">✏️ Editar torneo</button>
+        <button type="button" class="secondary small organizar-only" id="btnMostrarEditarTorneo">✏️ Editar torneo</button>
       </div>
       <img id="dtFlyer" style="display:none;width:100%;border-radius:12px;margin-top:12px;border:1px solid var(--border)" />
       <h2 id="dtNombre" style="margin-top:12px"></h2>
       <p class="badge" id="dtEstado"></p>
-      <button type="button" class="secondary small admin-only" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
+      <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
       <p class="match-meta" id="dtInfo"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
       <div class="sponsor-strip" id="dtSponsors" style="margin-top:12px;display:none"></div>
+      <div class="pill-row admin-only" id="torneoModoPills" style="margin-top:14px">
+        <button type="button" class="pill active" data-modo="resultados">Resultados</button>
+        <button type="button" class="pill" data-modo="organizar">🛠 Organizar</button>
+      </div>
     </div>
 
-    <div class="card admin-only" id="editarTorneoCard" style="display:none">
+    <div class="card organizar-only" id="editarTorneoCard" style="display:none">
       <h2>Editar torneo</h2>
       <label>Nombre</label>
       <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
@@ -319,7 +318,7 @@
       <h3>Quiénes se anotaron</h3>
       <div id="dtParejas"></div>
       <div id="dtSinPareja"></div>
-      <div class="admin-only">
+      <div class="organizar-only">
         <label style="margin-top:12px">Inscribir una pareja manualmente</label>
         <select id="dtSelectJugador1"></select>
         <select id="dtSelectJugador2" style="margin-top:6px"></select>
@@ -331,7 +330,7 @@
     <div class="card">
       <h3>Canchas</h3>
       <div id="dtCanchas"></div>
-      <div class="admin-only">
+      <div class="organizar-only">
         <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
         <select id="dtSelectCancha"></select>
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
@@ -340,8 +339,8 @@
 
     <div class="card partidos-poster">
       <h3>Partidos</h3>
-      <button class="primary admin-only" id="btnArmarPartidos">Armar fase de grupos automáticamente</button>
-      <button class="secondary admin-only" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
+      <button class="primary organizar-only" id="btnArmarPartidos">Armar fase de grupos automáticamente</button>
+      <button class="secondary organizar-only" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
       <label style="margin-top:12px">Categoría</label>
       <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
       <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
@@ -377,6 +376,7 @@
         <div>
           <h2 id="pjNombre"></h2>
           <span class="badge" id="pjCategoria"></span>
+          <div class="pj-trofeos" id="pjTrofeos" style="display:none"></div>
         </div>
       </div>
       <div class="pj-stats">
@@ -398,6 +398,10 @@
     <div class="card">
       <h3>🏆 Torneos ganados</h3>
       <div id="pjTorneosGanados"></div>
+    </div>
+    <div class="card" id="pjSubcampeonatosCard" style="display:none">
+      <h3>🥈 Subcampeonatos</h3>
+      <div id="pjSubcampeonatos"></div>
     </div>
   </section>
 
@@ -596,13 +600,6 @@
   <button data-view="inicio" class="tab active">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h12v-9"/></svg></span>
     Inicio
-  </button>
-  <button data-view="envivo" class="tab">
-    <span class="icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 8.8a5.7 5.7 0 0 0 0 6.4"/><path d="M16.2 8.8a5.7 5.7 0 0 1 0 6.4"/><path d="M4.8 5.8a10 10 0 0 0 0 12.4"/><path d="M19.2 5.8a10 10 0 0 1 0 12.4"/></svg>
-      <span id="enVivoDot" style="display:none"></span>
-    </span>
-    En vivo
   </button>
   <!-- "Jugar" (reservar cancha) queda armado pero pausado hasta cerrar el acuerdo con el
        club — no se muestra el botón todavía. Sacar el display:none para activarlo. -->

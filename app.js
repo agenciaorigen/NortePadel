@@ -21,6 +21,7 @@ let cacheJugadoresAdmin = [];
 let cacheCategorias = [];
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
+let modoTorneoDetalle = "resultados"; // resultados | organizar — separa la vista pública de la gestión del torneo (solo admin)
 let vistaPartidosActual = "lista"; // lista | calendario | llave
 let ultimosPartidos = [];
 let ultimasCanchasTorneo = [];
@@ -314,7 +315,7 @@ async function manejarCambioSesion(session) {
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
-  cargarEnVivo();
+  calcularTorneoDestacado();
   cargarHeroPosicion();
   if (torneoActualId) refrescarDetalleTorneo();
   if (FEATURE_JUGAR_HABILITADA) renderJugar();
@@ -415,9 +416,10 @@ async function abrirPerfilJugador(jugadorId) {
   }
   cambiarVista("perfil-jugador");
 
-  const [{ data: jugadores }, { data: torneosGanados }, { data: estadisticasRows }] = await Promise.all([
+  const [{ data: jugadores }, { data: torneosGanados }, { data: finalesPerdidas }, { data: estadisticasRows }] = await Promise.all([
     sb.rpc("jugadores_publicos"),
     sb.rpc("torneos_ganados_publico", { p_jugador_id: jugadorId }),
+    sb.rpc("finales_perdidas_publico", { p_jugador_id: jugadorId }),
     sb.rpc("estadisticas_jugador", { p_jugador_id: jugadorId })
   ]);
   const j = (jugadores || []).find((x) => x.id === jugadorId);
@@ -449,6 +451,31 @@ async function abrirPerfilJugador(jugadorId) {
         <span class="match-meta">${t.fecha || ""}</span>
       </div>`).join("")
     : '<p class="empty">Todavía no ganó ningún torneo.</p>';
+
+  // medallero: 🥇 por cada torneo ganado, 🥈 por cada final perdida — resumen arriba del
+  // todo del perfil, y el detalle de subcampeonatos en su propia tarjeta más abajo
+  const cantOro = (torneosGanados || []).length;
+  const cantPlata = (finalesPerdidas || []).length;
+  const trofeos = document.getElementById("pjTrofeos");
+  if (cantOro > 0 || cantPlata > 0) {
+    trofeos.style.display = "flex";
+    trofeos.innerHTML = [
+      cantOro > 0 ? `<span class="pj-medalla pj-medalla-oro">🥇 ${cantOro > 1 ? `${cantOro} veces campeón` : "Campeón"}</span>` : "",
+      cantPlata > 0 ? `<span class="pj-medalla pj-medalla-plata">🥈 ${cantPlata > 1 ? `${cantPlata} veces subcampeón` : "Subcampeón"}</span>` : ""
+    ].join("");
+  } else {
+    trofeos.style.display = "none";
+    trofeos.innerHTML = "";
+  }
+
+  const contSub = document.getElementById("pjSubcampeonatos");
+  const cardSub = document.getElementById("pjSubcampeonatosCard");
+  cardSub.style.display = cantPlata > 0 ? "block" : "none";
+  contSub.innerHTML = (finalesPerdidas || []).map((t) => `
+    <div class="pj-torneo-item">
+      <div><strong>🥈 ${t.torneo_nombre}</strong><div class="match-meta">con ${t.companero_nombre} ${t.companero_apellido}${t.categoria ? " · " + t.categoria : ""}</div></div>
+      <span class="match-meta">${t.fecha || ""}</span>
+    </div>`).join("");
 }
 document.getElementById("btnVolverPerfilJugador").addEventListener("click", () => cambiarVista(vistaAntesDePerfilJugador));
 
@@ -620,123 +647,15 @@ function matchVsRowHtml(nombre1, nombre2, ganador) {
   </div>`;
 }
 
-async function cargarEnVivo() {
+// Antes alimentaba la vista separada "En vivo" (sacada de la app: Torneos ya cumple esa
+// función). Se mantiene solo para calcular torneoDestacadoId, que es a dónde lleva la
+// banda "Inscribite ya" de Inicio.
+async function calcularTorneoDestacado() {
   const hoy = new Date().toISOString().slice(0, 10);
   const { data: torneos } = await sb.from("torneos").select("*, complejos(nombre, direccion)").order("fecha_inicio");
   const enCurso = (torneos || []).find((t) => t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy);
   const proximo = (torneos || []).filter((t) => t.fecha_inicio > hoy).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
-  // guardado para que la banda "Inscribite ya" de Inicio lleve directo a este torneo
   torneoDestacadoId = (enCurso || proximo)?.id || null;
-
-  document.getElementById("enVivoDot").style.display = enCurso ? "block" : "none";
-  const cont = document.getElementById("enVivoContenido");
-
-  if (enCurso) {
-    // se piden siempre (no solo si hay sesión) para poder mostrar horarios y
-    // tablas del torneo en curso a cualquiera que entre a "En vivo"
-    const [{ data: parejas }, { data: partidos }] = await Promise.all([
-      sb.rpc("parejas_publicas", { p_torneo_id: enCurso.id }),
-      sb.rpc("partidos_publicos", { p_torneo_id: enCurso.id })
-    ]);
-
-    let miPartidoHtml = "";
-    if (miJugador) {
-      const miPareja = (parejas || []).find((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
-      if (miPareja) {
-        const miPartido = (partidos || []).find((p) => p.pareja1_id === miPareja.id || p.pareja2_id === miPareja.id);
-        if (miPartido) {
-          const horario = miPartido.horario ? new Date(miPartido.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "a definir";
-          const esPareja1 = miPartido.pareja1_id === miPareja.id;
-          const miEquipo = esPareja1 ? miPartido.pareja1_nombre : miPartido.pareja2_nombre;
-          const rival = esPareja1 ? miPartido.pareja2_nombre : miPartido.pareja1_nombre;
-          miPartidoHtml = `<div class="card" style="border-color:var(--accent)">
-            <h3 style="color:var(--accent);margin-bottom:2px">Tu partido</h3>
-            ${matchVsRowHtml(miEquipo, rival)}
-            <div class="match-meta">🕒 ${horario} · 📍 ${miPartido.cancha_nombre || "cancha a definir"}</div>
-            <span class="badge" style="margin-top:6px;display:inline-block">${miPartido.estado}</span>
-          </div>`;
-        } else {
-          miPartidoHtml = `<div class="card"><p class="match-meta">Todavía no tenés un horario asignado en este torneo.</p></div>`;
-        }
-      } else {
-        miPartidoHtml = `<div class="card"><p class="match-meta">Todavía no estás anotado en este torneo. Andá a Torneos para inscribirte.</p></div>`;
-      }
-    }
-
-    // horarios del día — lo primero que alguien que entra a "En vivo" quiere ver
-    const partidosHoy = (partidos || []).filter((p) => p.horario && p.horario.slice(0, 10) === hoy)
-      .sort((a, b) => a.horario.localeCompare(b.horario));
-    const horariosHtml = partidosHoy.length > 0
-      ? partidosHoy.map((p) => {
-          const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
-          return `<div class="match-card${p.estado === "jugado" ? " match-card-jugado" : ""}" style="margin-bottom:8px">
-            ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre, ganador)}
-            <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · <span class="badge">${p.estado}</span>${p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
-          </div>`;
-        }).join("")
-      : '<p class="empty">No hay partidos programados para hoy.</p>';
-
-    // tablas de posiciones de la fase de grupos (si el torneo usa ese formato)
-    const partidosDeGrupo = (partidos || []).filter((p) => p.grupo != null);
-    let tablasHtml = "";
-    if (partidosDeGrupo.length > 0) {
-      const porClave = {};
-      partidosDeGrupo.forEach((p) => {
-        const clave = `${p.categoria || "Sin categoría"} · Grupo ${p.grupo}`;
-        (porClave[clave] = porClave[clave] || []).push(p);
-      });
-      tablasHtml = Object.keys(porClave).sort().map((clave) => {
-        const partidosGrupo = porClave[clave];
-        const nombreDe = (id) => {
-          const p = partidosGrupo.find((x) => x.pareja1_id === id || x.pareja2_id === id);
-          return p ? (p.pareja1_id === id ? p.pareja1_nombre : p.pareja2_nombre) : "?";
-        };
-        const filas = calcularTablaGrupo(partidosGrupo).map((s, i) =>
-          `<tr><td>${i + 1}</td><td>${nombreDe(s.id)}</td><td>${s.ganados}</td><td>${s.setsFavor}-${s.setsContra}</td></tr>`
-        ).join("");
-        return `<div class="card">
-          <h3 style="margin-bottom:8px">📊 ${clave}</h3>
-          <table class="tabla-posiciones">
-            <thead><tr><th>#</th><th>Pareja</th><th>PG</th><th>Sets</th></tr></thead>
-            <tbody>${filas}</tbody>
-          </table>
-        </div>`;
-      }).join("");
-    }
-
-    cont.innerHTML = `
-      <div class="envivo-header">
-        <span class="badge live"><span class="live-dot"></span>EN VIVO</span>
-        <h2 class="envivo-titulo">${enCurso.nombre}</h2>
-        <p class="envivo-sub">${enCurso.complejos?.nombre || "sin complejo"} · ${enCurso.fecha_inicio} al ${enCurso.fecha_fin}</p>
-      </div>
-      ${miPartidoHtml}
-      <div class="card">
-        <h3 style="margin-bottom:8px">🗓️ Horarios de hoy</h3>
-        ${horariosHtml}
-      </div>
-      ${tablasHtml}
-      <div class="card">
-        <button class="gradient" id="btnVerTorneoEnVivo">Ver todos los partidos</button>
-      </div>
-    `;
-    document.getElementById("btnVerTorneoEnVivo").addEventListener("click", () => abrirTorneo(enCurso.id));
-  } else if (proximo) {
-    const direccion = proximo.complejos?.direccion ? ` (${proximo.complejos.direccion})` : "";
-    cont.innerHTML = `
-      <div class="envivo-header">
-        <span class="envivo-sub">No hay ningún torneo en curso ahora mismo</span>
-        <h2 class="envivo-titulo">Próximo: ${proximo.nombre}</h2>
-        <p class="envivo-sub">📅 ${proximo.fecha_inicio} · 📍 ${proximo.complejos?.nombre || "a confirmar"}${direccion}</p>
-      </div>
-      <div class="card">
-        <button class="secondary small" id="btnVerProximo">Ver torneo</button>
-      </div>
-    `;
-    document.getElementById("btnVerProximo").addEventListener("click", () => abrirTorneo(proximo.id));
-  } else {
-    cont.innerHTML = '<div class="card"><p class="empty">Todavía no hay torneos programados.</p></div>';
-  }
 }
 
 document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
@@ -1241,10 +1160,26 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
 
 async function abrirTorneo(id) {
   torneoActualId = id;
+  // al entrar a un torneo siempre se arranca en Resultados, incluso para un admin —
+  // Organizar es un modo al que se entra a propósito, no el default
+  cambiarModoTorneoDetalle("resultados");
   cambiarVista("torneo-detalle");
   await refrescarDetalleTorneo();
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
+
+// ---------- Resultados vs Organizar (torneo-detalle) ----------
+function cambiarModoTorneoDetalle(modo) {
+  modoTorneoDetalle = modo;
+  document.body.classList.toggle("modo-organizar", modo === "organizar");
+  document.querySelectorAll("#torneoModoPills .pill").forEach((b) => b.classList.toggle("active", b.dataset.modo === modo));
+  // el botón de abrir/cerrar inscripción y el panel de carga de resultado/cancha/horario
+  // de cada partido dependen del modo actual — se refresca todo el detalle del torneo
+  if (torneoActualId) refrescarDetalleTorneo();
+}
+document.querySelectorAll("#torneoModoPills .pill").forEach((btn) => {
+  btn.addEventListener("click", () => cambiarModoTorneoDetalle(btn.dataset.modo));
+});
 
 // ---------- buscador de pareja al inscribirse ----------
 let parejaSeleccionada = null;
@@ -1563,7 +1498,7 @@ async function refrescarDetalleTorneo() {
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").innerHTML = badgeEstadoTorneo(t);
   const btnToggleInsc = document.getElementById("btnToggleInscripcion");
-  if (isAdmin && (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada")) {
+  if (isAdmin && modoTorneoDetalle === "organizar" && (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada")) {
     btnToggleInsc.style.display = "inline-block";
     btnToggleInsc.textContent = t.estado === "inscripcion" ? "🔒 Cerrar inscripción" : "🔓 Reabrir inscripción";
     btnToggleInsc.onclick = async () => {
@@ -1640,8 +1575,8 @@ async function refrescarDetalleTorneo() {
     return `<div class="pareja-row">
       <span>🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-        ${isAdmin && p.estado !== "confirmada" ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
-        ${isAdmin ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
+        ${isAdmin && modoTorneoDetalle === "organizar" && p.estado !== "confirmada" ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
+        ${isAdmin && modoTorneoDetalle === "organizar" ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
       </span>
     </div>`;
   }).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
@@ -1656,7 +1591,7 @@ async function refrescarDetalleTorneo() {
   contSinPareja.innerHTML = sinPareja.length === 0 ? "" : `
     <p class="match-meta" style="margin:12px 0 6px">Todavía sin pareja:</p>
     ${sinPareja.map((i) =>
-      `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${i.estado && i.estado !== "confirmada" ? " · pendiente" : ""}${isAdmin ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
+      `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${i.estado && i.estado !== "confirmada" ? " · pendiente" : ""}${isAdmin && modoTorneoDetalle === "organizar" ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
     ).join("")}`;
   contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
     btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
@@ -2117,38 +2052,75 @@ function renderPartidosCalendario(partidos, canchasTorneo) {
   cont.innerHTML = html;
 }
 
-// vista "llave": cuadro de eliminación directa, una columna por ronda de bracket
-// (la fase de grupos no entra acá porque no es de eliminación directa)
+// tarjeta compacta de un partido para la vista Llave: nombres + resultado set por
+// set en línea, fecha/hora y cancha — el ganador se resalta en violeta/lila.
+function llavePartidoCardHtml(p) {
+  const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+  const sets = p.sets || [];
+  const setsHtml = (lado) => sets.map((s) => `<span class="llave-set">${lado === 1 ? s.p1 : s.p2}</span>`).join("");
+  const horario = p.horario
+    ? new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "horario a definir";
+  return `
+    <div class="llave-partido">
+      <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
+        <span class="llave-nombre">${p.pareja1_nombre}</span>
+        <span class="llave-sets">${setsHtml(1)}</span>
+      </div>
+      <div class="llave-fila ${ganador === 2 ? "ganador" : ""}">
+        <span class="llave-nombre">${p.pareja2_nombre}</span>
+        <span class="llave-sets">${setsHtml(2)}</span>
+      </div>
+      <div class="match-meta llave-meta">🕒 ${horario} · 📍 Local: ${p.cancha_nombre || "a definir"}</div>
+    </div>`;
+}
+
+// vista "llave": columnas de Zona (fase de grupos, una por número de grupo) seguidas
+// de las columnas de eliminación directa (una por ronda de bracket), lado a lado como
+// en un cuadro de torneo — reutiliza el mismo formato de tarjeta en ambos bloques.
 function renderPartidosLlave(partidos) {
   const cont = document.getElementById("dtPartidos");
-  // las columnas se arman con los nombres de ronda que realmente existen, en el
-  // orden en que se generaron (no una lista fija) — así sirve tanto para el
-  // cuadro clásico de 16/8/4/2 como para un torneo chico que arranca directo
-  // en semifinal, o con nombres genéricos ("Ronda de 6") si el cuadro es irregular
-  const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos");
+
+  const grupales = partidos.filter((p) => p.grupo != null);
+  const gruposOrdenados = [...new Set(grupales.map((p) => p.grupo))].sort((a, b) => a - b);
+  const columnasZona = gruposOrdenados.map((g) => ({
+    titulo: `Zona ${g}`, zona: true,
+    partidos: grupales.filter((p) => p.grupo === g)
+  }));
+
+  // las columnas de eliminación se arman con los nombres de ronda que realmente existen,
+  // en el orden en que se generaron (no una lista fija) — así sirve tanto para el cuadro
+  // clásico de 16/8/4/2 como para un torneo chico que arranca directo en semifinal, o con
+  // nombres genéricos ("Ronda de 6") si el cuadro es irregular
+  const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null);
   const nombresOrdenados = [...new Set(
     [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
   )];
-  const columnas = nombresOrdenados.map((r) => ({ ronda: r, partidos: eliminacion.filter((p) => p.ronda === r) }));
+  const columnasRonda = nombresOrdenados.map((r) => ({
+    titulo: r, zona: false,
+    partidos: eliminacion.filter((p) => p.ronda === r)
+  }));
+
+  const columnas = [...columnasZona, ...columnasRonda];
 
   if (columnas.length === 0) {
-    cont.innerHTML = '<p class="empty">Todavía no hay partidos de eliminación directa. Cuando termine la fase de grupos, usá "Generar siguiente fase".</p>';
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
     return;
   }
 
   cont.innerHTML = '<div class="llave-scroll"><div class="llave">' +
-    columnas.map((col, i) => `
-      <div class="llave-columna ${i === columnas.length - 1 ? "llave-final" : ""}">
-        <h3>${col.ronda}</h3>
-        ${col.partidos.map((p) => `
-          <div class="llave-partido">
-            <div class="llave-equipo ${p.ganador_pareja_id === p.pareja1_id ? "ganador" : ""}">${p.pareja1_nombre}</div>
-            <div class="llave-equipo ${p.ganador_pareja_id === p.pareja2_id ? "ganador" : ""}">${p.pareja2_nombre}</div>
-            <div class="match-meta" style="text-align:center">${p.estado === "jugado" ? "✔️ jugado" : (p.cancha_nombre || "sin cancha")}</div>
-          </div>
-        `).join("")}
-      </div>
-    `).join("") + "</div></div>";
+    columnas.map((col, i) => {
+      // separador visual entre el bloque de zonas y el de eliminación directa
+      const esPrimeraDeEliminacion = !col.zona && columnasZona.length > 0 && i === columnasZona.length;
+      const clases = ["llave-columna"];
+      if (col.zona) clases.push("llave-zona");
+      if (esPrimeraDeEliminacion) clases.push("llave-separador");
+      return `
+      <div class="${clases.join(" ")}">
+        <h3>${col.titulo}</h3>
+        ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
+      </div>`;
+    }).join("") + "</div></div>";
 }
 
 // convierte los sets guardados ([{p1,p2}, ...]) a texto legible "6-3, 6-4"
@@ -2182,9 +2154,9 @@ function renderPartidosLista(partidos, canchasTorneo) {
       ${matchVsRowHtml(p.pareja1_nombre, p.pareja2_nombre, ganador)}
       <div class="match-meta">📍 ${p.cancha_nombre || "sin cancha"} · 🕒 ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? `<div class="sets-row">${(p.sets || []).map((s) => `<span class="set-chip ${s.p1 > s.p2 ? "gano-p1" : s.p2 > s.p1 ? "gano-p2" : ""}">${s.p1}-${s.p2}</span>`).join("") || formatearSets(p.sets)}</div>` : ""}
-      ${isAdmin && p.estado !== "jugado" ? `
+      ${isAdmin && modoTorneoDetalle === "organizar" && p.estado !== "jugado" ? `
       <div class="match-admin-panel">
-        <p class="match-admin-label">Cargar resultado (solo admin) — ${p.ronda || "Fase de grupos"}</p>
+        <p class="match-admin-label">Cargar resultado (modo Organizar) — ${p.ronda || "Fase de grupos"}</p>
         <div class="match-actions">
           <input class="setInput" data-p="${p.id}" placeholder="Ej: 6-3,6-4" style="flex:1" />
           <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">Cargar resultado</button>
@@ -2492,7 +2464,7 @@ const canalEnVivo = sb.channel("norte-padel-en-vivo");
 canalEnVivo
   .on("broadcast", { event: "actualizado" }, () => {
     cargarRanking();
-    cargarEnVivo();
+    calcularTorneoDestacado();
     if (torneoActualId) refrescarDetalleTorneo();
   })
   .subscribe();
@@ -2517,7 +2489,7 @@ if ("serviceWorker" in navigator) {
 // nota de velocidad: no hace falta pedir la sesión ni llamar a manejarCambioSesion()
 // acá — sb.auth.onAuthStateChange() ya se dispara solo, una vez, apenas se suscribe
 // (con la sesión que haya en ese momento), y manejarCambioSesion() ya llama a
-// cargarEnVivo(); pedirla de nuevo acá solo duplicaba esas llamadas en cada carga.
+// calcularTorneoDestacado(); pedirla de nuevo acá solo duplicaba esas llamadas en cada carga.
 async function init() {
   await Promise.all([cargarCategorias(), cargarTorneos()]);
   await Promise.all([

@@ -212,6 +212,14 @@ tr:first-child td { font-weight: 700; }
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
 .pj-header .avatar { border: 2px solid var(--accent); font-size: 34px; }
 .pj-header h2 { margin: 0 0 6px; }
+/* medallero: 🥇 campeón / 🥈 subcampeón, al lado de la categoría en el header del perfil */
+.pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pj-medalla {
+  font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.pj-medalla-oro { background: rgba(255,196,0,.14); color: #ffcf4d; border-color: rgba(255,196,0,.35); }
+.pj-medalla-plata { background: rgba(200,208,224,.12); color: #d7dceb; border-color: rgba(200,208,224,.3); }
 .pj-stats {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   margin-top: 18px; text-align: center;
@@ -475,24 +483,43 @@ tr:first-child td { font-weight: 700; }
 .calendario-vs { display: block; text-align: center; color: var(--accent); font-weight: 800; font-size: 11px; margin: 3px 0; }
 .calendario-partido.jugado .calendario-vs { color: var(--accent); }
 
-/* ---------- Vista llave (eliminación directa) ---------- */
+/* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
-.llave { display: flex; gap: 40px; }
-.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 150px; }
-.llave-columna h3 { text-align: center; }
+.llave { display: flex; gap: 32px; }
+.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 178px; }
+.llave-columna h3 {
+  text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); margin-bottom: 2px;
+}
+/* separa visualmente el bloque de zonas (grupos) del bloque de eliminación directa */
+.llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
-  background: #0e182c; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px;
   position: relative;
 }
-/* líneas que conectan cada partido con la próxima ronda, tipo cuadro de fútbol */
-.llave-columna:not(:last-child) .llave-partido::after {
-  content: ""; position: absolute; top: 50%; right: -20px; width: 20px; height: 2px; background: var(--border);
+/* líneas que conectan cada partido con la próxima ronda, tipo cuadro de fútbol — solo entre
+   columnas de eliminación directa, no tiene sentido entre zonas ni cruzando a eliminación */
+.llave-columna:not(.llave-zona):not(.llave-separador):not(:last-child) .llave-partido::after {
+  content: ""; position: absolute; top: 50%; right: -16px; width: 16px; height: 2px; background: var(--border);
 }
-.llave-columna:not(:first-child) .llave-partido::before {
-  content: ""; position: absolute; top: 50%; left: -20px; width: 20px; height: 2px; background: var(--border);
+.llave-columna:not(.llave-zona):not(.llave-separador):not(:first-child) .llave-partido::before {
+  content: ""; position: absolute; top: 50%; left: -16px; width: 16px; height: 2px; background: var(--border);
 }
-.llave-equipo { padding: 3px 0; font-size: 13px; font-weight: 600; color: var(--muted); }
-.llave-equipo.ganador { color: var(--accent); }
+.llave-fila {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 3px 4px; border-radius: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.llave-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.llave-sets { display: flex; gap: 3px; flex-shrink: 0; }
+.llave-set {
+  min-width: 18px; text-align: center; font-size: 11.5px; font-weight: 700; line-height: 1.5;
+  border-radius: 5px; background: rgba(255,255,255,.04); color: var(--muted);
+}
+/* ganador resaltado en violeta/lila, no en el verde de acento general — así se distingue
+   de un vistazo esta vista del resto de la app */
+.llave-fila.ganador { background: rgba(106,61,255,.16); color: #cabdff; }
+.llave-fila.ganador .llave-set { background: rgba(106,61,255,.32); color: #dcd3ff; }
+.llave-meta { margin-top: 6px; padding: 0 4px; }
 
 .tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
@@ -535,6 +562,16 @@ tr:first-child td { font-weight: 700; }
 .admin-only { display: none; }
 body.is-admin .admin-only { display: block; }
 
+/* ---------- Torneo: Resultados (vista pública, default para todos) vs Organizar
+   (gestión del torneo — solo admin, y solo entrando explícitamente a este modo) ---------- */
+.organizar-only { display: none; }
+body.modo-organizar .organizar-only { display: block; }
+/* en modo Organizar el toggle se pinta violeta/lila (mismo acento que usa la vista Llave)
+   para que se note de un vistazo que se está en la parte de gestión, no en los resultados */
+#torneoModoPills .pill[data-modo="organizar"].active {
+  background: var(--accent-3); color: #fff; border-color: var(--accent-3);
+}
+
 header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Buscador de pareja ---------- */
@@ -554,30 +591,6 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .suggest-item:first-child { border-top: 1px solid var(--border); border-radius: 0 0 0 0; margin-top: -1px; }
 .suggest-item:hover { background: #111827; }
 .suggest-item:last-child { border-radius: 0 0 10px 10px; }
-
-/* ---------- En vivo ---------- */
-.envivo-header {
-  position: relative;
-  overflow: hidden;
-  border-radius: 20px;
-  padding: 26px 20px 22px;
-  margin-bottom: 16px;
-  text-align: center;
-  background:
-    linear-gradient(0deg, rgba(5,7,10,.88), rgba(5,7,10,.4) 55%),
-    radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.35), transparent 55%),
-    url('hero-cancha.jpg') center/cover no-repeat, #05070a;
-  border: 1px solid var(--border);
-}
-.envivo-header .badge.live { margin-bottom: 10px; }
-.envivo-titulo {
-  font-size: 24px; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .01em; margin: 4px 0 6px; line-height: 1.15;
-}
-.envivo-sub {
-  font-size: 11.5px; color: #dfe4ee; text-transform: uppercase;
-  letter-spacing: .05em; font-weight: 600;
-}
 
 /* fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color */
 .match-vs-row {
@@ -608,12 +621,6 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
   50% { opacity: .6; box-shadow: 0 0 0 5px rgba(255,45,149,0); }
 }
 nav.tabbar .icon { position: relative; }
-#enVivoDot {
-  position: absolute; top: -2px; right: -4px;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #ff2d95;
-  animation: pulse-live 1.4s infinite;
-}
 
 .day-picker {
   display: grid;
