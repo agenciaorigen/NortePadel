@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
-<meta name="theme-color" content="#050709" />
+<meta name="theme-color" content="#0B0D0D" />
 <!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
      abre como acceso directo al navegador, no como app a pantalla completa -->
 <meta name="mobile-web-app-capable" content="yes" />
@@ -126,26 +126,26 @@
       <div class="destacados-grid" id="jugadorDelMesContenido"></div>
     </div>
 
-    <div class="card" id="ascendidosCard" style="display:none">
+    <div class="seccion" id="ascendidosCard" style="display:none">
       <h3>📈 Ascendieron este mes</h3>
       <div class="ascendidos-wrap">
         <div class="ascendidos-track" id="ascendidosContenido"></div>
       </div>
     </div>
 
-    <div class="card" id="campeonesCard" style="display:none">
+    <div class="seccion" id="campeonesCard" style="display:none">
       <h3>🏆 Campeones</h3>
       <div class="campeones-strip" id="campeonesContenido"></div>
     </div>
 
-    <div class="card">
+    <div class="seccion">
       <h2>Próximos torneos</h2>
       <div id="flyerDestacado"></div>
       <div class="flyer-grid" id="flyerMini"></div>
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </div>
 
-    <div class="card" id="noticiasCard" style="display:none">
+    <div class="seccion" id="noticiasCard" style="display:none">
       <div class="torneo-card-header">
         <h3>📰 Noticias</h3>
         <div id="noticiasInstagram"></div>
@@ -153,8 +153,8 @@
       <div id="noticiasContenido"></div>
     </div>
 
-    <div class="card" id="sponsorsInlineCard" style="display:none">
-      <h3>Con el apoyo de</h3>
+    <div class="seccion" id="sponsorsInlineCard" style="display:none">
+      <p class="sponsor-label">Presentan</p>
       <div class="sponsor-strip" id="sponsorsInline"></div>
     </div>
   </section>
@@ -244,7 +244,7 @@
         <input id="reservaBuscarAmigo" placeholder="Buscá por nombre" autocomplete="off" />
         <div id="reservaSugerencias" class="suggest-list"></div>
         <div id="reservaInvitadosSeleccionados" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
-        <button class="gradient" id="btnPedirReserva" style="margin-top:12px">Pedir reserva</button>
+        <button class="primary" id="btnPedirReserva" style="margin-top:12px">Pedir reserva</button>
         <p class="match-meta" style="margin-top:8px">Un admin va a confirmar la reserva (y el pago, si la cancha tiene costo). Te avisamos cuando quede lista.</p>
       </div>
     </div>
@@ -262,7 +262,7 @@
     <div class="torneo-context-top">
       <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
       <h2 id="dtNombre"></h2>
-      <p class="badge" id="dtEstado"></p>
+      <p id="dtEstado"></p>
     </div>
     <div class="pill-row" id="torneoSubnav"></div>
   </div>
@@ -270,6 +270,12 @@
   <!-- INICIO DEL TORNEO: resumen sin formularios embebidos — de acá se accede a
        todo lo demás (anotarme, calendario, resultados, categorías, jugadores) -->
   <section id="view-torneo-inicio" class="view">
+    <div class="torneo-hero">
+      <div class="torneo-hero-overlay">
+        <p id="dtEstadoHero"></p>
+        <h2 id="dtNombreHero"></h2>
+      </div>
+    </div>
     <div class="card">
       <p class="match-meta" id="dtInfo"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
@@ -281,7 +287,7 @@
     </div>
     <div class="card">
       <p class="match-meta" id="inscripcionEstado"></p>
-      <button class="gradient" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
+      <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
       <div class="row" style="margin-top:10px">
         <button type="button" class="secondary" id="dtBtnVerCalendario">📅 Calendario</button>
         <button type="button" class="secondary" id="dtBtnVerResultados">🏆 Resultados</button>
@@ -346,7 +352,7 @@
       <input id="buscarPareja" placeholder="Escribí el nombre de tu pareja" autocomplete="off" />
       <div id="sugerenciasPareja" class="suggest-list"></div>
       <p class="match-meta" id="parejaSeleccionadaTxt"></p>
-      <button class="gradient" id="btnInscribirme" style="margin-top:12px" disabled>Elegí tu pareja para continuar</button>
+      <button class="primary" id="btnInscribirme" style="margin-top:12px" disabled>Elegí tu pareja para continuar</button>
     </div>
     <div class="card" id="confirmarInscripcionWrap" style="display:none">
       <h3>Paso 3 · Confirmar</h3>
@@ -354,7 +360,7 @@
         <p id="confirmarInscripcionResumen"></p>
         <div id="confirmarInscripcionWhatsapp"></div>
       </div>
-      <button class="gradient" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
+      <button class="primary" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
       <button class="secondary small" id="btnCambiarPareja" style="margin-top:8px">Cambiar pareja</button>
     </div>
   </section>
@@ -488,7 +494,8 @@
     <div class="card" id="miPerfilCard" style="display:none">
       <h2>Mi perfil</h2>
       <p class="match-meta" id="miPerfilResumen"></p>
-      <button class="secondary small" id="btnEditarPerfil">Editar mis datos y horarios</button>
+      <button class="secondary" id="btnVerMiPerfilPublico" style="width:100%;margin-top:12px">📊 Ver mis estadísticas</button>
+      <button class="secondary small" id="btnEditarPerfil" style="margin-top:10px">Editar mis datos y horarios</button>
       <button class="secondary small danger" id="btnLogout" style="margin-top:10px">Cerrar sesión</button>
     </div>
   </section>
@@ -507,7 +514,7 @@
           <h2 id="admGestionNombre" style="margin:0"></h2>
           <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">✏️ Editar torneo</button>
         </div>
-        <p class="badge" id="admGestionEstado"></p>
+        <p id="admGestionEstado"></p>
         <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
         <h3 style="margin-top:16px">Dashboard</h3>
         <div class="pj-stats" id="admDashboardStats"></div>
@@ -749,7 +756,7 @@
     <div id="sidebarFlyer"></div>
   </div>
   <div class="card" id="sidebarSponsorsCard" style="display:none">
-    <h3>Sponsors</h3>
+    <p class="sponsor-label">Auspician</p>
     <div class="sponsor-strip vertical" id="sidebarSponsors"></div>
   </div>
 </aside>

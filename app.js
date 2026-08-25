@@ -670,6 +670,12 @@ async function abrirPerfilJugador(jugadorId) {
     </div>`).join("");
 }
 document.getElementById("btnVolverPerfilJugador").addEventListener("click", () => cambiarVista(vistaAntesDePerfilJugador));
+// "Ver mis estadísticas" en Mi Perfil: reutiliza el perfil público de jugador
+// (ya trae puntos/jugados/ganados/torneos reales vía RPC) en vez de duplicar
+// esa lógica acá con datos inventados.
+document.getElementById("btnVerMiPerfilPublico").addEventListener("click", () => {
+  if (miJugador) abrirPerfilJugador(miJugador.id);
+});
 
 // ============================================================
 // INICIO: próximos torneos con flyer + jugador del mes
@@ -1955,6 +1961,10 @@ async function refrescarDetalleTorneo() {
 
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").innerHTML = badgeEstadoTorneo(t);
+  // hero con foto real de cancha en la pantalla de Inicio del torneo (sección 9
+  // del rediseño): mismo dato, solo se muestra también acá en grande.
+  document.getElementById("dtNombreHero").textContent = t.nombre;
+  document.getElementById("dtEstadoHero").innerHTML = badgeEstadoTorneo(t);
   categoriasTorneoActual = (t.torneo_categorias || []).map((c) => c.categoria);
   const categorias = categoriasTorneoActual.join(", ") || "todas las categorías";
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
