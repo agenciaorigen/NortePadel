@@ -482,6 +482,17 @@ tr:first-child td { font-weight: 700; }
 .calendario-equipo { word-break: break-word; }
 .calendario-vs { display: block; text-align: center; color: var(--accent); font-weight: 800; font-size: 11px; margin: 3px 0; }
 .calendario-partido.jugado .calendario-vs { color: var(--accent); }
+/* planilla editable (modo Organizar): huecos libres para soltar un partido arrastrado,
+   partido arrastrándose y bandeja de "sin horario" arriba de la tabla */
+.calendario-vacia { min-width: 90px; border: 1px dashed var(--border); border-radius: 8px; }
+.calendario-partido[draggable] { cursor: grab; }
+.calendario-partido.arrastrando { opacity: .4; }
+.calendario-partido.pendiente { background: var(--accent-3); }
+.planilla-bandeja {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
+  border: 1px dashed var(--accent-3); border-radius: 10px; margin-bottom: 12px;
+}
+.planilla-bandeja:empty { display: none; }
 
 /* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
@@ -495,21 +506,19 @@ tr:first-child td { font-weight: 700; }
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
   background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px;
-  position: relative;
 }
-/* líneas que conectan cada partido con la próxima ronda, tipo cuadro de fútbol — solo entre
-   columnas de eliminación directa, no tiene sentido entre zonas ni cruzando a eliminación */
-.llave-columna:not(.llave-zona):not(.llave-separador):not(:last-child) .llave-partido::after {
-  content: ""; position: absolute; top: 50%; right: -16px; width: 16px; height: 2px; background: var(--border);
-}
-.llave-columna:not(.llave-zona):not(.llave-separador):not(:first-child) .llave-partido::before {
-  content: ""; position: absolute; top: 50%; left: -16px; width: 16px; height: 2px; background: var(--border);
-}
+/* nota: antes había líneas conectando cada partido con la próxima ronda (estilo cuadro de
+   fútbol) — se sacaron a pedido, la vista queda más limpia como columnas prolijas sin cruces */
+.llave-fecha { margin: 0 0 6px; padding: 0; }
 .llave-fila {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  padding: 3px 4px; border-radius: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  padding: 4px; border-radius: 6px; font-size: 12.5px; color: var(--muted);
 }
-.llave-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* apellido en negrita, nombre chico y gris debajo — un bloque por jugador, dos por pareja */
+.llave-jugadores { display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.llave-jugador { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; }
+.llave-jugador strong { display: block; font-weight: 700; color: var(--text); font-size: 12.5px; }
+.llave-jugador span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
 .llave-sets { display: flex; gap: 3px; flex-shrink: 0; }
 .llave-set {
   min-width: 18px; text-align: center; font-size: 11.5px; font-weight: 700; line-height: 1.5;
@@ -517,7 +526,8 @@ tr:first-child td { font-weight: 700; }
 }
 /* ganador resaltado en violeta/lila, no en el verde de acento general — así se distingue
    de un vistazo esta vista del resto de la app */
-.llave-fila.ganador { background: rgba(106,61,255,.16); color: #cabdff; }
+.llave-fila.ganador { background: rgba(106,61,255,.16); }
+.llave-fila.ganador .llave-jugador strong { color: #cabdff; }
 .llave-fila.ganador .llave-set { background: rgba(106,61,255,.32); color: #dcd3ff; }
 .llave-meta { margin-top: 6px; padding: 0 4px; }
 
@@ -540,6 +550,13 @@ tr:first-child td { font-weight: 700; }
   background: none; border: none; color: var(--accent); font-size: 12px;
   font-weight: 600; cursor: pointer; padding: 0; margin-left: 6px;
 }
+
+/* etiquetas de jugador (uso interno del admin) */
+.etiqueta-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-right: 5px; vertical-align: middle; flex-shrink: 0;
+}
+#etqColorNueva { width: 44px; padding: 2px; flex: 0 0 auto; }
 
 .pill.removable { display: flex; align-items: center; gap: 6px; }
 .pill.removable button {
@@ -707,6 +724,9 @@ nav.tabbar .icon { position: relative; }
 .torneo-card-poster .torneo-nombre { font-size: 16px; text-transform: uppercase; letter-spacing: .01em; }
 .torneo-card-poster .torneo-lugar,
 .torneo-card-poster .match-meta { color: #dfe4ee; }
+/* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
+   (el resto del contenido queda abajo, empujado con flex) */
+.torneo-card-flyer { min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end; }
 
 .flyer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .flyer-grid img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
@@ -765,6 +785,12 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
   padding: 16px;
 }
 .overlay-bloqueante .card { max-width: 360px; width: 100%; }
+
+/* ---------- Foto de jugador ampliada (lightbox) ---------- */
+.avatar-clickable { cursor: zoom-in; }
+.overlay-foto { flex-direction: column; gap: 14px; }
+.overlay-foto img { max-width: min(90vw, 420px); max-height: 70vh; border-radius: 16px; object-fit: contain; }
+.overlay-foto button { align-self: flex-end; margin-right: 5vw; }
 
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
 .toast {

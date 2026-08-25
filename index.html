@@ -44,6 +44,11 @@
   </div>
 </div>
 
+<div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none">
+  <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">✕ Cerrar</button>
+  <img id="fotoGrandeImg" src="" alt="Foto ampliada del jugador" />
+</div>
+
 <header class="topbar">
   <div class="logo-ring"><img src="icon-192.png" alt="Norte Padel" /></div>
   <h1>NORTE <span>PADEL</span></h1>
@@ -228,7 +233,6 @@
         <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
         <button type="button" class="secondary small organizar-only" id="btnMostrarEditarTorneo">✏️ Editar torneo</button>
       </div>
-      <img id="dtFlyer" style="display:none;width:100%;border-radius:12px;margin-top:12px;border:1px solid var(--border)" />
       <h2 id="dtNombre" style="margin-top:12px"></h2>
       <p class="badge" id="dtEstado"></p>
       <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
@@ -307,11 +311,17 @@
       <div id="confirmarInscripcionWrap" style="display:none">
         <div class="match-card">
           <p id="confirmarInscripcionResumen"></p>
+          <div id="confirmarInscripcionWhatsapp"></div>
         </div>
         <button class="gradient" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
         <button class="secondary small" id="btnCambiarPareja" style="margin-top:8px">Cambiar pareja</button>
       </div>
       <p class="match-meta" style="margin-top:8px">Vamos a usar los días y horarios que configuraste en tu perfil.</p>
+      <div id="torneoDispBloqueadaWrap" style="display:none;margin-top:14px">
+        <label>¿Tenés algún horario bloqueado puntual para ESTE torneo? (opcional, además de lo que ya cargaste en tu perfil)</label>
+        <div id="torneoDispBloqueadaForm"></div>
+        <button type="button" class="secondary small" id="btnGuardarDispTorneo" style="margin-top:8px">Guardar</button>
+      </div>
     </div>
 
     <div class="card">
@@ -356,7 +366,7 @@
   <section id="view-ranking" class="view">
     <div class="card">
       <h2>Ranking por categoría</h2>
-      <p class="match-meta" style="margin-bottom:6px;color:#ffd700">Los que están resaltados en amarillo (con foto grande) son los primeros 10 de su categoría: clasifican al Master de fin de año.</p>
+      <p class="match-meta" style="margin-bottom:6px;color:#ffd700">Los resaltados en amarillo (primeros 20 de su categoría) clasifican al Master de fin de año — los primeros 10, además, se destacan con foto grande.</p>
       <div class="pill-row" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
       <table id="tablaRanking">
@@ -448,7 +458,7 @@
         <option value="reves">Revés</option>
       </select>
 
-      <label>¿Qué días y horarios podés jugar?</label>
+      <label>¿Hay algún día/horario en el que NO podés jugar? (opcional — si no marcás nada, se asume que podés cualquier día)</label>
       <div id="disponibilidadForm"></div>
 
       <button class="primary" id="btnGuardarPerfil">Guardar perfil</button>
@@ -496,6 +506,17 @@
       <div class="row">
         <input id="catNueva" placeholder="Ej: Suma12" />
         <button class="secondary small" id="btnAgregarCategoria">Agregar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Etiquetas de jugadores</h2>
+      <p class="match-meta" style="margin-bottom:6px">Uso interno, solo para el admin: etiquetas con color (ej. "Veterano") para ayudarte a acomodar horarios y partidos. No las ven los jugadores.</p>
+      <div class="pill-row" id="listaEtiquetasAdmin"></div>
+      <div class="row">
+        <input id="etqNueva" placeholder="Ej: Veterano" />
+        <input id="etqColorNueva" type="color" value="#6a3dff" aria-label="Color de la etiqueta" />
+        <button class="secondary small" id="btnAgregarEtiqueta">Agregar</button>
       </div>
     </div>
 

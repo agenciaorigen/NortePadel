@@ -19,6 +19,7 @@ let cacheComplejos = [];
 let cacheCanchas = [];
 let cacheJugadoresAdmin = [];
 let cacheCategorias = [];
+let cacheEtiquetas = []; // etiquetas_jugador — uso interno del admin, con color
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
 let modoTorneoDetalle = "resultados"; // resultados | organizar — separa la vista pública de la gestión del torneo (solo admin)
@@ -127,17 +128,21 @@ document.getElementById("btnEditarPerfil").addEventListener("click", () => {
   renderVistaPerfil();
 });
 
-function renderDisponibilidadForm() {
-  const cont = document.getElementById("disponibilidadForm");
+// Dibuja el mismo picker de "día + horario bloqueado" tanto para el perfil
+// general (contenedorId="disponibilidadForm", claseChk="chkDia", etc.) como
+// para el bloqueo puntual de un torneo (con otro contenedor y otro prefijo
+// de clases, para no pisarse con el del perfil si los dos están en la página).
+function renderDisponibilidadForm(contenedorId = "disponibilidadForm", prefijo = "") {
+  const cont = document.getElementById(contenedorId);
   cont.innerHTML = "";
   DIAS.forEach((dia, idx) => {
     const row = document.createElement("div");
     row.className = "day-picker";
     row.innerHTML = `
-      <label><input type="checkbox" data-dia="${idx}" class="chkDia" /> ${DIAS_CORTO[idx]}</label>
-      <input type="time" class="horaDesde" data-dia="${idx}" value="19:00" />
+      <label><input type="checkbox" data-dia="${idx}" class="${prefijo}chkDia" /> ${DIAS_CORTO[idx]}</label>
+      <input type="time" class="${prefijo}horaDesde" data-dia="${idx}" />
       <span class="sep">a</span>
-      <input type="time" class="horaHasta" data-dia="${idx}" value="23:00" />
+      <input type="time" class="${prefijo}horaHasta" data-dia="${idx}" />
     `;
     cont.appendChild(row);
   });
@@ -171,7 +176,7 @@ async function precargarFormularioPerfil(j) {
   }
 
   renderDisponibilidadForm();
-  const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id);
+  const { data: disp } = await sb.from("disponibilidad").select("*").eq("jugador_id", j.id).is("torneo_id", null);
   (disp || []).forEach((d) => {
     const chk = document.querySelector(`.chkDia[data-dia="${d.dia_semana}"]`);
     const desde = document.querySelector(`.horaDesde[data-dia="${d.dia_semana}"]`);
@@ -248,13 +253,13 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
     jugadorId = data.id;
   }
 
-  await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId);
+  await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId).is("torneo_id", null);
   const disponibilidades = [];
   document.querySelectorAll(".chkDia:checked").forEach((chk) => {
     const dia = chk.dataset.dia;
     const desde = document.querySelector(`.horaDesde[data-dia="${dia}"]`).value;
     const hasta = document.querySelector(`.horaHasta[data-dia="${dia}"]`).value;
-    if (desde && hasta) disponibilidades.push({ jugador_id: jugadorId, dia_semana: Number(dia), hora_desde: desde, hora_hasta: hasta });
+    if (desde && hasta) disponibilidades.push({ jugador_id: jugadorId, torneo_id: null, dia_semana: Number(dia), hora_desde: desde, hora_hasta: hasta });
   });
   if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
 
@@ -389,13 +394,17 @@ async function cargarRanking() {
   document.getElementById("rankingVacio").style.display = "none";
   completa.forEach((j, idx) => {
     const posicion = idx + 1;
-    const clasificaMaster = posicion <= 10;
+    // clasifica al Master de fin de año: primeros 20. La foto grande (con borde
+    // dorado) queda solo para los primeros 10 — son dos cortes distintos ahora.
+    const clasificaMaster = posicion <= 20;
+    const fotoGrande = posicion <= 10;
     const tr = document.createElement("tr");
     if (clasificaMaster) tr.className = "fila-master";
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
-    const avatarClass = clasificaMaster ? "avatar-master" : "";
+    const avatarClass = fotoGrande ? "avatar-master" : "";
+    const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, clasificaMaster ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido} ${badgeMaster}</span></div></td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
@@ -426,7 +435,7 @@ async function abrirPerfilJugador(jugadorId) {
   if (!j) { toast("No se encontró el jugador"); cambiarVista(vistaAntesDePerfilJugador); return; }
   const est = (estadisticasRows || [])[0] || {};
 
-  document.getElementById("pjFoto").innerHTML = avatarHtml(j.foto_url, 96);
+  document.getElementById("pjFoto").innerHTML = avatarHtml(j.foto_url, 96, "", true);
   document.getElementById("pjNombre").textContent = `${j.nombre} ${j.apellido}`;
   document.getElementById("pjCategoria").textContent = j.categoria;
   document.getElementById("pjPuntos").textContent = j.puntos_ranking;
@@ -525,11 +534,15 @@ async function cargarInicio() {
   }
 }
 
-function avatarHtml(fotoUrl, size, extraClass) {
+// ampliable=true agrega el data-attribute que capta el listener delegado de más abajo
+// (ver "FOTO AMPLIADA") para poder tocar la foto y verla en pantalla grande
+function avatarHtml(fotoUrl, size, extraClass, ampliable) {
   const s = size || 44;
-  const cls = extraClass ? ` ${extraClass}` : "";
+  const clickable = ampliable && fotoUrl;
+  const cls = (extraClass ? ` ${extraClass}` : "") + (clickable ? " avatar-clickable" : "");
+  const dataAttr = clickable ? ` data-foto-grande="${fotoUrl}" tabindex="0" role="button" aria-label="Ver foto en grande"` : "";
   return fotoUrl
-    ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'" />`
+    ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'"${dataAttr} />`
     : `<div class="avatar avatar-placeholder${cls}" style="width:${s}px;height:${s}px">🎾</div>`;
 }
 
@@ -848,6 +861,57 @@ document.getElementById("btnTodasCategoriasEdit")?.addEventListener("click", () 
 });
 
 // ============================================================
+// ETIQUETAS DE JUGADOR (uso interno del admin, con color — mismo patrón que
+// categorías, pero NO públicas: sirven para acomodar horarios/partidos)
+// ============================================================
+async function cargarEtiquetas() {
+  if (!isAdmin) return;
+  const { data } = await sb.from("etiquetas_jugador").select("*").order("orden");
+  cacheEtiquetas = data || [];
+
+  const selectJugador = document.getElementById("jaEtiquetaFiltro"); // reservado, no usado por ahora
+  const listaAdmin = document.getElementById("listaEtiquetasAdmin");
+  if (!listaAdmin) return;
+  listaAdmin.innerHTML = cacheEtiquetas.map((et) => `
+    <span class="pill removable" style="border-color:${et.color}">
+      <span class="etiqueta-dot" style="background:${et.color}"></span> ${et.nombre}
+      <button type="button" class="btnBorrarEtiqueta" data-id="${et.id}" aria-label="Borrar etiqueta ${et.nombre}">×</button>
+    </span>
+  `).join("") || '<p class="empty">Todavía no cargaste etiquetas.</p>';
+
+  listaAdmin.querySelectorAll(".btnBorrarEtiqueta").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { error } = await sb.from("etiquetas_jugador").delete().eq("id", btn.dataset.id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Etiqueta borrada");
+      cargarEtiquetas();
+      cargarJugadoresAdmin();
+    });
+  });
+}
+
+document.getElementById("btnAgregarEtiqueta")?.addEventListener("click", async () => {
+  const input = document.getElementById("etqNueva");
+  const nombre = input.value.trim();
+  const color = document.getElementById("etqColorNueva").value;
+  if (!nombre) { toast("Poné un nombre de etiqueta"); return; }
+  const { error } = await sb.from("etiquetas_jugador").insert({ nombre, color, orden: cacheEtiquetas.length + 1 });
+  if (error) { toast("Error: " + error.message); return; }
+  input.value = "";
+  toast("Etiqueta agregada");
+  cargarEtiquetas();
+});
+
+// pill/punto de color para mostrar la etiqueta de un jugador donde le sirva al admin
+// para acomodar horarios (lista de jugadores, inscriptos y parejas de un torneo).
+// jugadorId se busca contra cacheJugadoresAdmin (ya trae etiqueta_id en su "select *").
+function etiquetaDotHtml(jugadorId) {
+  const j = cacheJugadoresAdmin.find((x) => x.id === jugadorId);
+  const et = j && cacheEtiquetas.find((e) => e.id === j.etiqueta_id);
+  return et ? `<span class="etiqueta-dot" style="background:${et.color}" title="${et.nombre}" aria-label="Etiqueta: ${et.nombre}"></span>` : "";
+}
+
+// ============================================================
 // PUNTOS POR RONDA (ranking por eliminación directa)
 // ============================================================
 const RONDAS_INPUT = {
@@ -905,6 +969,7 @@ document.getElementById("btnGuardarConfig").addEventListener("click", async () =
 async function cargarJugadoresAdmin() {
   if (!isAdmin) return;
   if (cacheCategorias.length === 0) await cargarCategorias();
+  if (cacheEtiquetas.length === 0) await cargarEtiquetas();
   const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
   cacheJugadoresAdmin = data || [];
   renderListaJugadoresAdmin();
@@ -936,6 +1001,8 @@ function renderListaJugadoresAdmin() {
     const nombresCategoria = cacheCategorias.map((c) => c.nombre);
     if (!nombresCategoria.includes(j.categoria)) nombresCategoria.push(j.categoria); // por si la categoría ya no existe
     const opcionesCategoria = nombresCategoria.map((n) => `<option value="${n}" ${n === j.categoria ? "selected" : ""}>${n}</option>`).join("");
+    const opcionesEtiqueta = `<option value="">Sin etiqueta</option>` +
+      cacheEtiquetas.map((et) => `<option value="${et.id}" ${et.id === j.etiqueta_id ? "selected" : ""}>${et.nombre}</option>`).join("");
     div.innerHTML = `
       <div class="row">
         <input type="text" class="jaNombre" value="${j.nombre}" placeholder="Nombre" />
@@ -944,6 +1011,10 @@ function renderListaJugadoresAdmin() {
       <div class="row" style="margin-top:8px">
         <select class="jaCategoria">${opcionesCategoria}</select>
         <input type="number" class="jaPuntos" value="${j.puntos_ranking}" placeholder="Puntos" style="max-width:100px" />
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label for="jaEtiqueta-${j.id}" class="match-meta" style="margin:0">Etiqueta:</label>
+        <select id="jaEtiqueta-${j.id}" class="jaEtiqueta">${opcionesEtiqueta}</select>
       </div>
       <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
       <div class="row" style="margin-top:8px;gap:8px">
@@ -956,9 +1027,10 @@ function renderListaJugadoresAdmin() {
       const apellido = div.querySelector(".jaApellido").value.trim();
       const categoria = div.querySelector(".jaCategoria").value;
       const puntos_ranking = Number(div.querySelector(".jaPuntos").value);
+      const etiqueta_id = div.querySelector(".jaEtiqueta").value || null;
       if (!nombre || !apellido) { toast("Nombre y apellido no pueden quedar vacíos"); return; }
       if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
-      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking }).eq("id", j.id);
+      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking, etiqueta_id }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
@@ -1059,7 +1131,9 @@ async function cargarTorneos() {
   }
   data.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "match-card torneo-card-poster";
+    // con flyer propio, la tarjeta se agranda para que se vea como un póster de
+    // verdad (no solo de fondo detrás del texto, como con la imagen genérica)
+    div.className = "match-card torneo-card-poster" + (t.flyer_url ? " torneo-card-flyer" : "");
     div.style.cursor = "pointer";
     if (t.flyer_url) {
       div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.92), rgba(5,7,10,.55) 65%), radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%), url('${t.flyer_url}')`;
@@ -1173,6 +1247,10 @@ function cambiarModoTorneoDetalle(modo) {
   modoTorneoDetalle = modo;
   document.body.classList.toggle("modo-organizar", modo === "organizar");
   document.querySelectorAll("#torneoModoPills .pill").forEach((b) => b.classList.toggle("active", b.dataset.modo === modo));
+  // en Organizar la vista "Calendario" pasa a ser la planilla editable de cancha ×
+  // horario (se puede arrastrar partidos ahí) — se relabela para que quede claro
+  const pillCalendario = document.querySelector('#partidosVistaPills .pill[data-vista="calendario"]');
+  if (pillCalendario) pillCalendario.textContent = modo === "organizar" ? "Planilla" : "Calendario";
   // el botón de abrir/cerrar inscripción y el panel de carga de resultado/cancha/horario
   // de cada partido dependen del modo actual — se refresca todo el detalle del torneo
   if (torneoActualId) refrescarDetalleTorneo();
@@ -1229,7 +1307,9 @@ async function renderInscribirme() {
   const estado = document.getElementById("inscripcionEstado");
   const btn = document.getElementById("btnInscribirme");
   const buscarWrap = document.getElementById("buscarParejaWrap");
+  const dispTorneoWrap = document.getElementById("torneoDispBloqueadaWrap");
   document.getElementById("confirmarInscripcionWrap").style.display = "none";
+  dispTorneoWrap.style.display = "none";
 
   if (!currentUser) {
     estado.textContent = "Iniciá sesión para poder inscribirte.";
@@ -1262,6 +1342,7 @@ async function renderInscribirme() {
     estado.textContent = "✅ Ya estás inscripto en este torneo.";
     buscarWrap.style.display = "none";
     btn.style.display = "none";
+    await cargarYMostrarDispTorneo();
   } else if (torneoActualData && torneoActualData.estado !== "inscripcion") {
     estado.textContent = "🔒 La inscripción para este torneo está cerrada.";
     buscarWrap.style.display = "none";
@@ -1275,6 +1356,38 @@ async function renderInscribirme() {
   }
 }
 
+// Muestra y precarga el picker de horarios bloqueados puntuales para ESTE
+// torneo (además de los generales del perfil, que ya se combinan solos al
+// armar los partidos — ver jugadoresDisponibilidad).
+async function cargarYMostrarDispTorneo() {
+  document.getElementById("torneoDispBloqueadaWrap").style.display = "block";
+  renderDisponibilidadForm("torneoDispBloqueadaForm", "t");
+  const { data: disp } = await sb.from("disponibilidad").select("*")
+    .eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
+  (disp || []).forEach((d) => {
+    const chk = document.querySelector(`.tchkDia[data-dia="${d.dia_semana}"]`);
+    const desde = document.querySelector(`.thoraDesde[data-dia="${d.dia_semana}"]`);
+    const hasta = document.querySelector(`.thoraHasta[data-dia="${d.dia_semana}"]`);
+    if (chk) chk.checked = true;
+    if (desde) desde.value = String(d.hora_desde).slice(0, 5);
+    if (hasta) hasta.value = String(d.hora_hasta).slice(0, 5);
+  });
+}
+
+document.getElementById("btnGuardarDispTorneo").addEventListener("click", async () => {
+  if (!miJugador || !torneoActualId) return;
+  await sb.from("disponibilidad").delete().eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
+  const disponibilidades = [];
+  document.querySelectorAll(".tchkDia:checked").forEach((chk) => {
+    const dia = chk.dataset.dia;
+    const desde = document.querySelector(`.thoraDesde[data-dia="${dia}"]`).value;
+    const hasta = document.querySelector(`.thoraHasta[data-dia="${dia}"]`).value;
+    if (desde && hasta) disponibilidades.push({ jugador_id: miJugador.id, torneo_id: torneoActualId, dia_semana: Number(dia), hora_desde: desde, hora_hasta: hasta });
+  });
+  if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
+  toast("¡Guardado! 🎾");
+});
+
 // paso 2: confirmación antes de anotar de verdad (acá se va a sumar el pago más adelante)
 function mostrarConfirmarInscripcion() {
   const categoria = document.getElementById("anotarmeCategoria").value;
@@ -1284,6 +1397,13 @@ function mostrarConfirmarInscripcion() {
   const costoTxt = t?.costo ? ` · Costo: $${t.costo}` : "";
   document.getElementById("confirmarInscripcionResumen").textContent =
     `¿Anotamos a vos y a ${parejaSeleccionada.nombre} ${parejaSeleccionada.apellido} en "${t?.nombre || "este torneo"}", categoría ${categoria}?${costoTxt} Un admin va a confirmar la inscripción cuando verifique el pago.`;
+  const contWsp = document.getElementById("confirmarInscripcionWhatsapp");
+  if (t?.costo && Number(t.costo) > 0 && configApp.whatsapp_numero) {
+    contWsp.innerHTML = botonWhatsappPagoHtml("btnPagarWhatsappConfirmar", "margin-top:8px");
+    wirearBotonWhatsappPago("btnPagarWhatsappConfirmar", t);
+  } else {
+    contWsp.innerHTML = "";
+  }
   document.getElementById("buscarParejaWrap").style.display = "none";
   document.getElementById("btnInscribirme").style.display = "none";
   document.getElementById("confirmarInscripcionWrap").style.display = "block";
@@ -1489,6 +1609,26 @@ async function cargarReservasPendientesAdmin() {
   });
 }
 
+// ---------- WhatsApp para coordinar el pago de una inscripción ----------
+// ícono nativo (SVG inline, sin depender de ninguna librería ni imagen externa)
+const ICONO_WHATSAPP_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-3px;margin-right:5px"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.77.46 3.45 1.35 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.83 14.02c-.24.68-1.4 1.32-1.94 1.4-.5.08-1.09.11-1.76-.11-.4-.13-.92-.3-1.59-.58-2.79-1.2-4.62-4.01-4.76-4.2-.14-.19-1.14-1.51-1.14-2.88 0-1.37.72-2.04.97-2.32.25-.28.55-.35.73-.35.18 0 .37 0 .53.01.17.01.4-.06.62.48.24.58.81 2.01.88 2.16.07.15.11.32.02.51-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.72 1.19 1.55 1.93 1.06.95 1.96 1.24 2.24 1.38.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.18-.27.36-.23.61-.14.24.09 1.55.73 1.82.86.27.14.45.2.51.32.07.12.07.68-.17 1.36z"/></svg>`;
+
+function botonWhatsappPagoHtml(id, estiloExtra = "") {
+  return `<button type="button" class="secondary small" id="${id}" style="${estiloExtra}">${ICONO_WHATSAPP_SVG}Coordinar pago por WhatsApp</button>`;
+}
+
+// engancha el click de un botón ya insertado en el DOM (por id) para abrir WhatsApp
+// con un mensaje precargado — mismo mensaje sin importar desde qué botón se abrió
+function wirearBotonWhatsappPago(id, t) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const quien = miJugador ? `Soy ${miJugador.nombre} ${miJugador.apellido} y ` : "";
+    const mensaje = `Hola! ${quien}quiero coordinar el pago de mi inscripción a "${t.nombre}" ($${t.costo}).`;
+    window.open(`https://wa.me/${configApp.whatsapp_numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
+  });
+}
+
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
   const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", torneoActualId).single();
@@ -1526,23 +1666,15 @@ async function refrescarDetalleTorneo() {
   if (t.costo && Number(t.costo) > 0) {
     contCosto.style.display = "block";
     contCosto.innerHTML = `<span class="badge solid">💰 Costo: $${t.costo}</span>` +
-      (configApp.whatsapp_numero ? `<button type="button" class="secondary small" id="btnPagarWhatsapp" style="margin-left:8px">💬 Coordinar pago por WhatsApp</button>` : "");
-    const btnWsp = document.getElementById("btnPagarWhatsapp");
-    if (btnWsp) {
-      btnWsp.addEventListener("click", () => {
-        const quien = miJugador ? `Soy ${miJugador.nombre} ${miJugador.apellido} y ` : "";
-        const mensaje = `Hola! ${quien}quiero coordinar el pago de mi inscripción a "${t.nombre}" ($${t.costo}).`;
-        window.open(`https://wa.me/${configApp.whatsapp_numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
-      });
-    }
+      (configApp.whatsapp_numero ? botonWhatsappPagoHtml("btnPagarWhatsapp", "margin-left:8px") : "");
+    wirearBotonWhatsappPago("btnPagarWhatsapp", t);
   } else {
     contCosto.style.display = "none";
     contCosto.innerHTML = "";
   }
 
-  const flyerImg = document.getElementById("dtFlyer");
-  if (t.flyer_url) { flyerImg.src = t.flyer_url; flyerImg.style.display = "block"; }
-  else flyerImg.style.display = "none";
+  // el flyer ya se ve grande en la tarjeta de "Torneos" (torneo-card-poster) — repetirlo
+  // acá adentro solo alargaba la página sin agregar nada nuevo, así que no se muestra más.
 
   await renderInscribirme();
   await cargarSponsorsTorneo();
@@ -1572,8 +1704,11 @@ async function refrescarDetalleTorneo() {
     const estadoBadge = p.estado === "confirmada"
       ? `<span class="badge solid">Confirmada</span>`
       : `<span class="badge orange">Pendiente de confirmar</span>`;
+    // los puntitos de color son solo para el admin en modo Organizar — ayudan a
+    // identificar de un vistazo perfiles como "Veterano" al acomodar horarios
+    const etiquetas = isAdmin && modoTorneoDetalle === "organizar" ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
     return `<div class="pareja-row">
-      <span>🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
+      <span>${etiquetas}🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${isAdmin && modoTorneoDetalle === "organizar" && p.estado !== "confirmada" ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${isAdmin && modoTorneoDetalle === "organizar" ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
@@ -1591,7 +1726,7 @@ async function refrescarDetalleTorneo() {
   contSinPareja.innerHTML = sinPareja.length === 0 ? "" : `
     <p class="match-meta" style="margin:12px 0 6px">Todavía sin pareja:</p>
     ${sinPareja.map((i) =>
-      `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${i.estado && i.estado !== "confirmada" ? " · pendiente" : ""}${isAdmin && modoTorneoDetalle === "organizar" ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
+      `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${isAdmin && modoTorneoDetalle === "organizar" ? etiquetaDotHtml(i.jugador_id) : ""}${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${i.estado && i.estado !== "confirmada" ? " · pendiente" : ""}${isAdmin && modoTorneoDetalle === "organizar" ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`
     ).join("")}`;
   contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
     btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
@@ -1787,8 +1922,16 @@ function ventanaDelTorneo(torneo) {
     : null;
 }
 
-async function jugadoresDisponibilidad(jugadorIds) {
-  const { data: dispRows } = await sb.from("disponibilidad").select("*").in("jugador_id", jugadorIds);
+// Trae los horarios BLOQUEADOS de cada jugador para un torneo: los generales
+// de su perfil (torneo_id null, aplican siempre) más los puntuales que haya
+// cargado para ESTE torneo puntualmente — combinados, ya que ambos restan
+// disponibilidad por igual a la hora de buscar un horario común.
+async function jugadoresDisponibilidad(jugadorIds, torneoId) {
+  const { data: dispRows } = await sb
+    .from("disponibilidad")
+    .select("*")
+    .in("jugador_id", jugadorIds)
+    .or(`torneo_id.is.null,torneo_id.eq.${torneoId}`);
   const disponibilidadPorJugador = {};
   (dispRows || []).forEach((d) => {
     if (!disponibilidadPorJugador[d.jugador_id]) disponibilidadPorJugador[d.jugador_id] = [];
@@ -1818,7 +1961,7 @@ async function armarPartidosParaGrupo(entrada, categoria, ronda, torneo, canchas
   const todasLasParejas = entrada.grupos ? entrada.grupos.flat() : entrada.parejas;
   if (todasLasParejas.length < 2) return { generados: 0, sinHorario: 0 };
   const jugadorIds = [...new Set(todasLasParejas.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
-  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds);
+  const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds, torneo.id);
 
   const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
     parejas: entrada.parejas,
@@ -2009,51 +2152,139 @@ function renderPartidos(partidos, canchasTorneo) {
 }
 
 // vista "tipo calendario": una tabla con las canchas del torneo como columnas
-// y cada horario distinto en el que hay algún partido como fila.
+// y los horarios como filas. En modo Organizar (admin) es además la PLANILLA
+// editable que pidió el club para acomodar los partidos: se agregan también
+// los huecos libres del cuadro (no solo los horarios ya ocupados) y cada
+// partido se puede arrastrar a otra celda — cambia cancha y horario juntos,
+// con drag-and-drop nativo del navegador (sin librerías externas).
 function renderPartidosCalendario(partidos, canchasTorneo) {
   const cont = document.getElementById("dtPartidos");
   const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean);
   const conHorario = partidos.filter((p) => p.horario);
   const sinHorario = partidos.filter((p) => !p.horario);
+  const editable = isAdmin && modoTorneoDetalle === "organizar";
 
-  if (canchas.length === 0 || conHorario.length === 0) {
+  if (canchas.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay canchas asignadas a este torneo.</p>';
+    return;
+  }
+  if (!editable && conHorario.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos con cancha y horario asignados.</p>';
     return;
   }
 
-  const horarios = [...new Set(conHorario.map((p) => p.horario))].sort();
-  const celda = (horario, canchaId) => conHorario.find((p) => p.horario === horario && p.cancha_id === canchaId);
+  // una fila por MOMENTO real (no por texto de horario): así un hueco generado que cae
+  // justo en un horario ya ocupado por otra cancha no duplica la fila en la tabla
+  const filaPorMinuto = new Map(); // timestamp -> horario ISO a mostrar en esa fila
+  conHorario.forEach((p) => filaPorMinuto.set(new Date(p.horario).getTime(), p.horario));
+  if (editable && torneoActualData) {
+    const duracion = torneoActualData.duracion_minutos || 90;
+    const baseDia = ventanaDelTorneo(torneoActualData) || FRANJA_DEFAULT_DIA;
+    fechasDelTorneo(torneoActualData).forEach((fecha) => {
+      for (let m = baseDia.desde; m + duracion <= baseDia.hasta; m += duracion) {
+        const d = new Date(fecha);
+        d.setHours(0, m, 0, 0);
+        if (!filaPorMinuto.has(d.getTime())) filaPorMinuto.set(d.getTime(), d.toISOString());
+      }
+    });
+  }
+  const horarios = [...filaPorMinuto.entries()].sort((a, b) => a[0] - b[0]).map(([, iso]) => iso);
 
-  let html = '<div style="overflow-x:auto"><table class="tabla-calendario"><thead><tr><th>Horario</th>' +
+  if (horarios.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos ni horarios definidos para este torneo.</p>';
+    return;
+  }
+
+  const celda = (horario, canchaId) => conHorario.find((p) => p.horario === horario && p.cancha_id === canchaId);
+  const tarjetaHtml = (p, extraClase = "") => `
+    <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" ${editable ? `draggable="true" data-partido="${p.id}"` : ""}>
+      <div class="calendario-equipo">${p.pareja1_nombre}</div>
+      <div class="calendario-vs">V</div>
+      <div class="calendario-equipo">${p.pareja2_nombre}</div>
+      ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
+      ${!partidosCategoriaFiltro && p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
+    </div>`;
+
+  let html = "";
+  if (editable && sinHorario.length > 0) {
+    html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario a un hueco libre de la planilla:</p>
+      <div class="planilla-bandeja" id="planillaBandeja">${sinHorario.map((p) => tarjetaHtml(p, "pendiente")).join("")}</div>`;
+  }
+
+  html += '<div style="overflow-x:auto"><table class="tabla-calendario"><thead><tr><th>Horario</th>' +
     canchas.map((c) => `<th>${c.nombre}</th>`).join("") + "</tr></thead><tbody>";
   horarios.forEach((h) => {
     const fecha = new Date(h).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
     html += `<tr><td class="calendario-hora">${fecha}</td>`;
     canchas.forEach((c) => {
       const p = celda(h, c.id);
-      html += "<td>" + (p
-        ? `<div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""}">
-             <div class="calendario-equipo">${p.pareja1_nombre}</div>
-             <div class="calendario-vs">V</div>
-             <div class="calendario-equipo">${p.pareja2_nombre}</div>
-             ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
-             ${!partidosCategoriaFiltro && p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
-           </div>`
-        : "") + "</td>";
+      html += p
+        ? `<td>${tarjetaHtml(p)}</td>`
+        : `<td ${editable ? `class="calendario-vacia" data-horario="${h}" data-cancha="${c.id}"` : ""}></td>`;
     });
     html += "</tr>";
   });
   html += "</tbody></table></div>";
 
-  if (sinHorario.length > 0) {
+  if (!editable && sinHorario.length > 0) {
     html += `<p class="match-meta" style="margin-top:10px">Sin horario asignado (${sinHorario.length}): ` +
       sinHorario.map((p) => `${p.pareja1_nombre} vs ${p.pareja2_nombre}`).join(" · ") + "</p>";
   }
   cont.innerHTML = html;
+
+  if (editable) wirePlanillaDragAndDrop();
+}
+
+// Drag & drop nativo del navegador (sin librerías): tomar un partido y soltarlo en
+// otra celda le cambia cancha y horario juntos en un solo update — reutiliza el mismo
+// chequeo de choques (hayConflictoCancha) que ya usan los botones de la vista Lista.
+// Soltarlo en la bandeja de arriba lo vuelve a dejar "sin horario".
+function wirePlanillaDragAndDrop() {
+  const cont = document.getElementById("dtPartidos");
+  let arrastrando = null;
+
+  cont.querySelectorAll(".calendario-partido[draggable]").forEach((el) => {
+    el.addEventListener("dragstart", () => { arrastrando = el.dataset.partido; el.classList.add("arrastrando"); });
+    el.addEventListener("dragend", () => { el.classList.remove("arrastrando"); arrastrando = null; });
+  });
+
+  const zonas = [...cont.querySelectorAll("td.calendario-vacia")];
+  const bandeja = document.getElementById("planillaBandeja");
+  if (bandeja) zonas.push(bandeja);
+
+  zonas.forEach((zona) => {
+    zona.addEventListener("dragover", (e) => e.preventDefault());
+    zona.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      const partidoId = arrastrando;
+      if (!partidoId) return;
+      const nuevoHorario = zona.dataset.horario || null; // sin dataset.horario = soltado en la bandeja
+      const nuevaCancha = zona.dataset.cancha || null;
+      const duracion = torneoActualData?.duracion_minutos || 90;
+
+      if (nuevoHorario && nuevaCancha && hayConflictoCancha(ultimosPartidos, partidoId, nuevaCancha, nuevoHorario, duracion)) {
+        toast("Ese horario ya está ocupado en esa cancha");
+        return;
+      }
+      const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq("id", partidoId);
+      if (error) { toast("Error: " + error.message); return; }
+      toast(nuevoHorario ? "Partido reubicado ✅" : "Partido movido a \"sin horario\"");
+      avisarActualizacionEnVivo();
+      refrescarDetalleTorneo();
+    });
+  });
 }
 
 // tarjeta compacta de un partido para la vista Llave: nombres + resultado set por
 // set en línea, fecha/hora y cancha — el ganador se resalta en violeta/lila.
+// bloque de un jugador dentro de la tarjeta: apellido en negrita arriba, nombre chico
+// y gris debajo (en vez de "Nombre Apellido" todo junto en una sola línea) — si no
+// vinieron nombre/apellido separados (jugador borrado, etc.) cae a un "?" como antes
+function jugadorBlockHtml(nombre, apellido) {
+  if (!nombre && !apellido) return `<div class="llave-jugador"><strong>?</strong></div>`;
+  return `<div class="llave-jugador"><strong>${apellido || ""}</strong><span>${nombre || ""}</span></div>`;
+}
+
 function llavePartidoCardHtml(p) {
   const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
   const sets = p.sets || [];
@@ -2061,17 +2292,19 @@ function llavePartidoCardHtml(p) {
   const horario = p.horario
     ? new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "horario a definir";
+  const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " " : ""}${p.cancha_nombre}` : "a definir";
   return `
     <div class="llave-partido">
+      <div class="match-meta llave-meta llave-fecha">🕒 ${horario}</div>
       <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
-        <span class="llave-nombre">${p.pareja1_nombre}</span>
+        <div class="llave-jugadores">${jugadorBlockHtml(p.j1a_nombre, p.j1a_apellido)}${jugadorBlockHtml(p.j1b_nombre, p.j1b_apellido)}</div>
         <span class="llave-sets">${setsHtml(1)}</span>
       </div>
       <div class="llave-fila ${ganador === 2 ? "ganador" : ""}">
-        <span class="llave-nombre">${p.pareja2_nombre}</span>
+        <div class="llave-jugadores">${jugadorBlockHtml(p.j2a_nombre, p.j2a_apellido)}${jugadorBlockHtml(p.j2b_nombre, p.j2b_apellido)}</div>
         <span class="llave-sets">${setsHtml(2)}</span>
       </div>
-      <div class="match-meta llave-meta">🕒 ${horario} · 📍 Local: ${p.cancha_nombre || "a definir"}</div>
+      <div class="match-meta llave-meta">📍 Local: ${local}</div>
     </div>`;
 }
 
@@ -2443,6 +2676,35 @@ document.getElementById("btnNotif").addEventListener("click", abrirNotificacione
 document.getElementById("btnCerrarNotif").addEventListener("click", () => { document.getElementById("notifOverlay").style.display = "none"; });
 document.getElementById("notifOverlay").addEventListener("click", (e) => {
   if (e.target.id === "notifOverlay") document.getElementById("notifOverlay").style.display = "none";
+});
+
+// ---------- Foto ampliada (lightbox): tocar la foto de un jugador para verla grande ----------
+// listener delegado sobre document — cubre cualquier avatarHtml(..., true) presente o
+// futuro en la página, sin tener que reengancharlo cada vez que se re-renderiza algo
+function abrirFotoGrande(fotoUrl) {
+  document.getElementById("fotoGrandeImg").src = fotoUrl;
+  document.getElementById("fotoGrandeOverlay").style.display = "flex";
+}
+function cerrarFotoGrande() {
+  document.getElementById("fotoGrandeOverlay").style.display = "none";
+  document.getElementById("fotoGrandeImg").src = "";
+}
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-foto-grande]");
+  if (el) abrirFotoGrande(el.dataset.fotoGrande);
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-foto-grande]")) {
+    e.preventDefault();
+    abrirFotoGrande(e.target.dataset.fotoGrande);
+  }
+});
+document.getElementById("btnCerrarFotoGrande").addEventListener("click", cerrarFotoGrande);
+document.getElementById("fotoGrandeOverlay").addEventListener("click", (e) => {
+  if (e.target.id === "fotoGrandeOverlay") cerrarFotoGrande();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("fotoGrandeOverlay").style.display !== "none") cerrarFotoGrande();
 });
 
 let canalNotificaciones = null;

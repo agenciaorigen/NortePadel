@@ -1,0 +1,31 @@
+-- ============================================================
+-- MIGRACIÓN PUNTUAL — correr UNA SOLA VEZ, a mano, solo si esta instalación
+-- ya tenía jugadores con "disponibilidad" cargada ANTES de esta actualización.
+--
+-- NO es parte de schema.sql a propósito: schema.sql tiene que ser siempre
+-- seguro de volver a correr sin tocar datos reales, y esto sí los toca.
+--
+-- Por qué hace falta: hasta ahora, cada fila de la tabla "disponibilidad"
+-- representaba un horario en el que el jugador SÍ podía jugar. Desde esta
+-- versión es al revés: cada fila representa un horario en el que NO puede
+-- (bloqueado), y quien no cargó nada se asume libre todo el día. Si dejamos
+-- las filas viejas tal cual, se leerían al revés: alguien que antes decía
+-- "puedo jugar sábado de 19 a 23" ahora se leería como "estoy bloqueado
+-- sábado de 19 a 23" — justo lo contrario de lo que esa persona quiso decir.
+--
+-- No hay forma de "invertir" esos datos automáticamente y que el resultado
+-- tenga sentido (invertir "disponible 19-23" a ciegas daría "bloqueado todo
+-- el día excepto 19-23", que tampoco es necesariamente cierto). Lo más
+-- seguro es arrancar de cero: se borran las filas viejas (con eso, todos
+-- quedan "disponibles todo el día" por defecto, que es una base neutra y
+-- segura) y cada jugador vuelve a cargar sus horarios bloqueados reales
+-- desde "Mi perfil" cuando le convenga — no es obligatorio antes de que el
+-- club siga usando el armado automático, solo hace que sea menos preciso
+-- hasta que la gente los vuelva a cargar.
+--
+-- Cuándo correrlo: una sola vez, después de correr schema.sql con esta
+-- versión (que ya agrega la columna torneo_id a "disponibilidad") y antes
+-- de que alguien use "Armar fase de grupos automáticamente" de nuevo.
+-- ============================================================
+
+delete from disponibilidad;
