@@ -82,13 +82,19 @@ const FRANJA_DEFAULT_DIA = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("
 //    modo "fase de grupos": cada grupo juega TODOS contra todos (nadie queda
 //    eliminado en esta etapa). Si no viene, se usa `parejas` en modo
 //    eliminación directa: cada pareja contra la siguiente de la lista.
-function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [] }) {
+//  bloqueosPorCancha: { cancha_id: [{desde:Date, hasta:Date}] } — bloqueos de
+//    cancha cargados por el admin (mantenimiento, lluvia, otro evento). Es un
+//    concepto DISTINTO de la disponibilidad de un jugador: acá la cancha
+//    entera queda inutilizable para todos, no solo para un jugador puntual.
+//    Se suma directo a la ocupación de cancha antes de buscar horario, sin
+//    tocar el resto del algoritmo.
+function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [], bloqueosPorCancha = {} }) {
   const partidosGenerados = [];
   const sinHorario = [];
   const ocupacionCancha = {}; // cancha_id -> [{desde:Date, hasta:Date}]
   const ocupacionJugador = {}; // jugador_id -> [{desde:Date, hasta:Date}]
 
-  canchas.forEach((c) => (ocupacionCancha[c.id] = []));
+  canchas.forEach((c) => (ocupacionCancha[c.id] = [...(bloqueosPorCancha[c.id] || [])]));
   partidosYaProgramados.forEach((p) => {
     if (!p.horario || !p.cancha_id || !ocupacionCancha[p.cancha_id]) return;
     const desde = new Date(p.horario);
@@ -184,14 +190,18 @@ function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fe
 
 // Reasigna un partido ya cargado a otra cancha (o complejo) por clima u
 // otro motivo, evitando pisar otro partido que ya esté en esa cancha y
-// horario.
-function hayConflictoCancha(partidosDelTorneo, partidoId, canchaId, horarioISO, duracionMinutos = 90) {
+// horario. `bloqueosDeCancha` (opcional) es la lista de bloqueos ([{desde,
+// hasta}], objetos Date) de ESA cancha puntual — si viene, también cuenta
+// como conflicto reasignar un partido a un horario bloqueado.
+function hayConflictoCancha(partidosDelTorneo, partidoId, canchaId, horarioISO, duracionMinutos = 90, bloqueosDeCancha = []) {
   const desde = new Date(horarioISO);
   const hasta = new Date(desde.getTime() + duracionMinutos * 60000);
-  return partidosDelTorneo.some((p) => {
+  const chocaConPartido = partidosDelTorneo.some((p) => {
     if (p.id === partidoId || p.cancha_id !== canchaId || !p.horario) return false;
     const pDesde = new Date(p.horario);
     const pHasta = new Date(pDesde.getTime() + duracionMinutos * 60000);
     return desde < pHasta && hasta > pDesde;
   });
+  if (chocaConPartido) return true;
+  return bloqueosDeCancha.some((b) => desde < b.hasta && hasta > b.desde);
 }

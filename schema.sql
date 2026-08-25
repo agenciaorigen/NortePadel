@@ -216,6 +216,24 @@ create table if not exists torneo_canchas (
   unique (torneo_id, cancha_id)
 );
 
+-- ---------- BLOQUEOS DE CANCHA (funcionalidad nueva) ----------
+-- Un bloqueo de cancha es distinto de la disponibilidad de un jugador:
+-- la disponibilidad es una preferencia de horario de UN jugador (no impide
+-- que otros jueguen ahí); un bloqueo de cancha hace que ESA cancha quede
+-- literalmente inutilizable para TODOS en esa ventana (lluvia, mantenimiento,
+-- otro evento del club, etc.) — nunca se combinan ni se guardan en la misma
+-- tabla, para no confundir ambos conceptos.
+create table if not exists canchas_bloqueos (
+  id uuid primary key default gen_random_uuid(),
+  cancha_id uuid not null references canchas(id) on delete cascade,
+  desde timestamptz not null,
+  hasta timestamptz not null,
+  motivo text,
+  created_at timestamptz not null default now(),
+  check (hasta > desde)
+);
+create index if not exists idx_canchas_bloqueos_cancha on canchas_bloqueos(cancha_id, desde, hasta);
+
 -- Categorías que compiten en cada torneo (un torneo puede abarcar varias, ej: de 2da a 8va)
 create table if not exists torneo_categorias (
   id uuid primary key default gen_random_uuid(),
@@ -860,6 +878,7 @@ $$;
 -- ============================================================
 alter table complejos enable row level security;
 alter table canchas enable row level security;
+alter table canchas_bloqueos enable row level security;
 alter table categorias enable row level security;
 alter table etiquetas_jugador enable row level security;
 alter table puntos_ronda enable row level security;
@@ -893,6 +912,13 @@ drop policy if exists "canchas_select" on canchas;
 create policy "canchas_select" on canchas for select using (true);
 drop policy if exists "canchas_write" on canchas;
 create policy "canchas_write" on canchas for all using (is_admin()) with check (is_admin());
+
+-- canchas_bloqueos: lectura pública (para que el calendario público muestre
+-- la cancha como bloqueada), escritura solo admin — mismo patrón que canchas
+drop policy if exists "canchas_bloqueos_select" on canchas_bloqueos;
+create policy "canchas_bloqueos_select" on canchas_bloqueos for select using (true);
+drop policy if exists "canchas_bloqueos_write" on canchas_bloqueos;
+create policy "canchas_bloqueos_write" on canchas_bloqueos for all using (is_admin()) with check (is_admin());
 
 -- reservas: cada uno ve las suyas (las que organizó o a las que lo invitaron) y el
 -- admin las ve todas. El alta real de una reserva pasa por reservar_cancha() (más

@@ -1,7 +1,7 @@
 :root {
   --bg: #050709;
   --bg-elev: #0a0d12;
-  --card: #10141c;
+  --card: #0c0f16;
   --accent: #b4ff39;       /* verde pelota de pádel */
   --accent-ink: #0c1400;   /* texto sobre el verde */
   --accent-2: #ff2d95;     /* magenta */
@@ -9,10 +9,16 @@
   --accent-teal: #0f9e96;  /* filas de partidos tipo "order of play" */
   --text: #f5f7fb;
   --muted: #8b93a7;
-  --border: #232838;
+  --border: #262c3d;
   --danger: #ff4d6d;
   --ok: #22c55e;
   --gradient: linear-gradient(135deg, var(--accent-2), var(--accent-3));
+  /* estética tipo revista deportiva: paneles de bordes finos y esquinas más
+     rectas (en vez de muy redondeadas), tipografía grande y bien bold en los
+     títulos — mismos colores e iconos de siempre, solo cambia el "corte". */
+  --radius-sm: 6px;
+  --radius: 3px;
+  --radius-lg: 3px;
 }
 
 * { box-sizing: border-box; }
@@ -43,6 +49,11 @@ body::after {
 }
 
 h1, h2, h3, button { font-family: "Poppins", "Inter", -apple-system, sans-serif; }
+/* headlines grandes tipo tapa de revista deportiva: negro/900, bien apretado */
+.titular {
+  font-weight: 900; letter-spacing: -.02em; line-height: .96;
+  text-transform: uppercase;
+}
 
 header.topbar {
   display: flex;
@@ -64,11 +75,12 @@ header.topbar .logo-ring {
 }
 header.topbar img { width: 100%; height: 100%; border-radius: 50%; display: block; background: #05070a; }
 header.topbar h1 {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 800;
   margin: 0;
   flex: 1;
-  letter-spacing: .01em;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
 }
 header.topbar h1 span { color: var(--accent); }
 header.topbar button {
@@ -79,7 +91,7 @@ header.topbar button {
   border: 1px solid rgba(180,255,57,.3);
   color: var(--accent);
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -91,22 +103,45 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
 .view { display: none; }
 .view.active { display: block; }
 
+/* Inicio: en vez de tarjetas flotando con aire alrededor, los bloques se tocan
+   entre sí y comparten un borde fino (estilo grilla de revista) dentro de un
+   único marco general — la banda "Brasil" (.energia-banda) queda afuera de
+   este tratamiento a propósito, es un póster angosto centrado, no una franja
+   de ancho completo. */
+#view-inicio.active {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+#view-inicio.active > *:not(.energia-banda) {
+  margin: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+#view-inicio.active > *:last-child:not(.energia-banda) { border-bottom: none; }
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   padding: 18px;
   margin-bottom: 14px;
 }
 
-h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--text); letter-spacing: .01em; }
-h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+h2 { font-size: 17px; font-weight: 800; margin: 0 0 12px; color: var(--text); letter-spacing: -.01em; text-transform: uppercase; }
+h3 { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
 
 label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
 input, select, textarea {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: #0a0e16;
   color: var(--text);
@@ -121,15 +156,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); bo
 button.primary {
   background: var(--accent);
   color: var(--accent-ink);
-  font-weight: 700;
+  font-weight: 800;
   border: none;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   margin-top: 14px;
   width: 100%;
   cursor: pointer;
-  letter-spacing: .01em;
+  letter-spacing: .02em;
+  text-transform: uppercase;
 }
 button.primary:active { transform: scale(.98); }
 button.secondary {
@@ -137,19 +173,21 @@ button.secondary {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 9px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
 }
-button.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+button.small { padding: 6px 10px; font-size: 12px; border-radius: 7px; }
 button.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
 button.gradient {
   background: var(--gradient);
   color: #fff;
-  font-weight: 700;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .02em;
   border: none;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   width: 100%;
   cursor: pointer;
@@ -159,7 +197,7 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 tr:first-child td { font-weight: 700; }
 
 .pos-1 { color: #ffd700; }
@@ -179,6 +217,13 @@ tr:first-child td { font-weight: 700; }
 .badge.orange { background: rgba(255,45,149,.14); color: #ff6fb8; border: 1px solid rgba(255,45,149,.3); }
 .badge.danger { background: rgba(255,77,109,.14); color: var(--danger); border: 1px solid rgba(255,77,109,.3); }
 .badge.solid { background: var(--accent); color: var(--accent-ink); border: none; font-weight: 700; }
+
+/* ranking público: menos "tabla" y más lista de leaderboard — las líneas entre
+   filas quedan casi invisibles, el peso visual lo pone el propio contenido */
+#tablaRanking th { border-bottom: 2px solid var(--border); }
+#tablaRanking td { padding: 11px 6px; border-bottom: 1px solid rgba(255,255,255,.05); }
+#tablaRanking tr:last-child td { border-bottom: none; }
+.tabla-posiciones td { border-bottom: 1px solid rgba(255,255,255,.05); }
 
 .fila-master td { background: rgba(255,215,0,.05); }
 .fila-master td:first-child { border-left: 2px solid #ffd700; }
@@ -208,10 +253,27 @@ tr:first-child td { font-weight: 700; }
 .avatar-grande { width: 88px; height: 88px; border: 2px solid var(--accent); font-size: 30px; margin-bottom: 8px; }
 .avatar-master { border: 3px solid #ffd700; box-shadow: 0 0 0 2px rgba(255,215,0,.25); }
 
+/* lupa superpuesta sobre fotos ampliables (ver avatarHtml en app.js) — puramente
+   decorativa (pointer-events:none), el click/foco siguen siendo los de la imagen */
+.avatar-wrap { position: relative; display: inline-block; flex-shrink: 0; }
+.avatar-wrap .avatar { display: block; }
+.avatar-zoom-icon {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  border: 2px solid var(--card);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
 .pj-header .avatar { border: 2px solid var(--accent); font-size: 34px; }
-.pj-header h2 { margin: 0 0 6px; }
+/* nombre bien grande y bold, como una tapa de revista deportiva */
+.pj-header h2 {
+  margin: 0 0 6px; font-size: 25px; font-weight: 900; letter-spacing: -.02em;
+  line-height: 1.02; text-transform: uppercase;
+}
 /* medallero: 🥇 campeón / 🥈 subcampeón, al lado de la categoría en el header del perfil */
 .pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pj-medalla {
@@ -220,13 +282,33 @@ tr:first-child td { font-weight: 700; }
 }
 .pj-medalla-oro { background: rgba(255,196,0,.14); color: #ffcf4d; border-color: rgba(255,196,0,.35); }
 .pj-medalla-plata { background: rgba(200,208,224,.12); color: #d7dceb; border-color: rgba(200,208,224,.3); }
+/* insignias circulares para las estadísticas del jugador, como los aros de
+   stats del ejemplo — mismos colores de acento de siempre, en rotación */
 .pj-stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); gap: 10px;
   margin-top: 18px; text-align: center;
 }
-.pj-stats > div { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 4px; }
-.pj-stats strong { display: block; font-size: 18px; }
-.pj-stats span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+/* aro tipo "anillo de progreso": un tramo del borde resaltado en el color de
+   acento y el resto apagado, en vez de un borde parejo — el color en sí sigue
+   siendo uno de los 4 acentos de siempre, solo cambia cómo se dibuja el aro */
+.pj-stats > div {
+  aspect-ratio: 1; max-width: 92px; margin: 0 auto; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 50%; padding: 6px; border: 3px solid transparent;
+  background:
+    linear-gradient(var(--bg-elev), var(--bg-elev)) padding-box,
+    conic-gradient(var(--stat-color, var(--accent)) 0deg 120deg, var(--border) 120deg 360deg) border-box;
+}
+.pj-stats strong { display: block; font-size: clamp(11px, 3.4vw, 16px); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+.pj-stats span { display: block; font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; margin-top: 2px; overflow-wrap: anywhere; }
+.pj-stats > div:nth-child(4n+1) { --stat-color: var(--accent); }
+.pj-stats > div:nth-child(4n+1) strong { color: var(--accent); }
+.pj-stats > div:nth-child(4n+2) { --stat-color: var(--accent-2); }
+.pj-stats > div:nth-child(4n+2) strong { color: var(--accent-2); }
+.pj-stats > div:nth-child(4n+3) { --stat-color: var(--accent-3); }
+.pj-stats > div:nth-child(4n+3) strong { color: var(--accent-3); }
+.pj-stats > div:nth-child(4n+4) { --stat-color: var(--accent-teal); }
+.pj-stats > div:nth-child(4n+4) strong { color: var(--accent-teal); }
 .pj-torneo-item {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 0; border-bottom: 1px solid var(--border);
@@ -237,7 +319,7 @@ tr:first-child td { font-weight: 700; }
 .hero-club {
   position: relative;
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   padding: 28px 20px 26px;
   margin-bottom: 16px;
   background:
@@ -257,11 +339,12 @@ tr:first-child td { font-weight: 700; }
 }
 .hero-club-titulo {
   position: relative;
-  font-size: 32px;
-  line-height: 1.05;
-  font-weight: 800;
+  font-size: 34px;
+  line-height: .98;
+  font-weight: 900;
   margin: 0 0 10px;
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
   max-width: 80%;
 }
 .hero-club-titulo span { color: var(--accent); }
@@ -281,7 +364,7 @@ tr:first-child td { font-weight: 700; }
   background: rgba(10,13,18,.85);
   backdrop-filter: blur(6px);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 8px 12px;
   display: flex; flex-direction: column; align-items: flex-end;
   text-align: right;
@@ -297,7 +380,7 @@ tr:first-child td { font-weight: 700; }
   overflow: hidden;
   background: var(--accent);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   margin-bottom: 16px;
   padding: 8px 0;
   cursor: pointer;
@@ -323,7 +406,7 @@ tr:first-child td { font-weight: 700; }
 .ascendidos-set { display: flex; gap: 18px; padding-right: 18px; }
 .ascendido-item { flex-shrink: 0; width: 88px; text-align: center; cursor: pointer; }
 .ascendido-item strong { display: block; font-size: 11.5px; font-weight: 700; margin-top: 6px; line-height: 1.25; }
-.ascendido-item span { display: block; font-size: 10.5px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+.ascendido-item span { display: block; font-size: 10px; color: var(--accent); font-weight: 700; margin-top: 2px; text-transform: uppercase; letter-spacing: .02em; }
 
 /* ---------- Banda de energía (foto real del club) ---------- */
 .energia-banda {
@@ -332,7 +415,7 @@ tr:first-child td { font-weight: 700; }
   max-width: 340px;
   aspect-ratio: 315 / 413;
   margin: 0 auto 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: url('brasil-tour.jpg') center/cover no-repeat;
   display: flex; align-items: flex-end; justify-content: center;
@@ -347,15 +430,15 @@ tr:first-child td { font-weight: 700; }
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
-  font-size: 22px; font-weight: 800; margin: 0 0 8px;
-  text-transform: uppercase; letter-spacing: .01em;
+  font-size: 23px; font-weight: 900; margin: 0 0 8px;
+  text-transform: uppercase; letter-spacing: -.01em; line-height: 1.02;
 }
 .energia-texto p { font-size: 13px; color: #dfe4ee; margin: 0; }
 
 /* ---------- Banda de "Jugadores del mes" (deja ver el fondo general de la app) ---------- */
 .destacados-band {
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   padding: 16px 14px 18px;
   margin-bottom: 16px;
@@ -364,12 +447,17 @@ tr:first-child td { font-weight: 700; }
     linear-gradient(0deg, rgba(5,7,10,.75), rgba(5,7,10,.55)),
     url('pelotas.jpg') center/cover no-repeat, #05070a;
 }
+/* etiqueta de sección en bloque sólido de acento, a todo el ancho de la banda
+   (como los encabezados de sección de la referencia sobre fondo plano) —
+   mismo color de acento de siempre, ahora como fondo en vez de solo texto */
 .destacados-overline {
   position: relative; z-index: 1;
   display: flex; align-items: center; justify-content: space-between;
   font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--accent);
-  margin-bottom: 12px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  margin: -16px -14px 14px;
+  padding: 8px 14px;
 }
 .destacados-grid {
   position: relative; z-index: 1;
@@ -378,7 +466,7 @@ tr:first-child td { font-weight: 700; }
 
 .destacado-card {
   position: relative;
-  border-radius: 14px;
+  border-radius: var(--radius);
   overflow: hidden;
   min-height: 190px;
   display: flex; flex-direction: column; justify-content: space-between;
@@ -410,20 +498,20 @@ tr:first-child td { font-weight: 700; }
   font-size: 10.5px; font-weight: 700;
 }
 .destacado-stat { position: relative; z-index: 1; }
-.destacado-stat strong { display: block; font-size: 26px; font-weight: 800; line-height: 1; }
+.destacado-stat strong { display: block; font-size: 27px; font-weight: 900; line-height: 1; letter-spacing: -.01em; }
 .destacado-stat span { font-size: 10.5px; color: #dfe4ee; text-transform: uppercase; letter-spacing: .04em; }
 .destacado-info { position: relative; z-index: 1; }
 .destacado-info strong {
-  display: block; font-size: 17px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: .01em;
+  display: block; font-size: 18px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: -.01em; line-height: 1.05;
 }
-.destacado-info span { font-size: 11px; color: #dfe4ee; }
+.destacado-info span { font-size: 10.5px; color: #dfe4ee; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
 
 /* ---------- Flyer destacado (próximo torneo) ---------- */
 .flyer-destacado {
   position: relative;
   min-height: 220px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 12px;
   cursor: pointer;
@@ -440,15 +528,15 @@ tr:first-child td { font-weight: 700; }
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
-  display: block; font-size: 24px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: .01em; line-height: 1.15;
+  display: block; font-size: 25px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: -.01em; line-height: 1.05;
 }
 .flyer-destacado-info span { font-size: 12px; color: #dfe4ee; }
 
 .campeones-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
 .campeon-card {
   flex-shrink: 0; width: 140px; text-align: center;
-  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 10px;
+  background: #0e182c; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px;
 }
 .campeon-avatares { display: flex; justify-content: center; margin-bottom: 6px; }
 .campeon-avatares .avatar { width: 48px; height: 48px; margin-left: -12px; }
@@ -466,33 +554,68 @@ tr:first-child td { font-weight: 700; }
 }
 .categorias-genero-grupo .check-grid { margin: 0 0 4px; }
 
-/* ---------- Vista calendario (canchas × horarios) ---------- */
-.tabla-calendario { font-size: 12px; white-space: nowrap; }
-.tabla-calendario th, .tabla-calendario td { padding: 6px; vertical-align: top; }
-.tabla-calendario th {
-  background: rgba(5,7,10,.7); color: var(--text); font-size: 11px;
-  text-transform: uppercase; letter-spacing: .04em; border-radius: 6px;
-}
-.calendario-hora { color: var(--muted); font-weight: 600; white-space: nowrap; }
+/* ---------- Vista calendario (SLOT = fecha + hora + cancha) ----------
+   Desktop: CSS Grid que se reacomoda al ancho disponible (auto-fit/minmax)
+   en vez de una tabla de ancho fijo con scroll horizontal — con 2 canchas o
+   con 8, nunca corta contenido. Mobile: agenda vertical (.calendario-agenda),
+   ver más abajo — el scroll horizontal no es la solución principal en
+   ningún tamaño de pantalla. */
+.calendario-hora { color: var(--muted); font-weight: 700; white-space: nowrap; text-transform: uppercase; letter-spacing: .02em; }
 .calendario-partido {
-  background: var(--accent-teal); color: #fff; border-radius: 8px;
-  padding: 8px 10px; line-height: 1.35; width: 150px; white-space: normal; font-weight: 600;
+  background: var(--accent-teal); color: #fff; border-radius: var(--radius-sm);
+  padding: 8px 10px; line-height: 1.35; width: 100%; height: 100%; white-space: normal; font-weight: 600;
 }
 .calendario-partido.jugado { background: #0e182c; border: 1px solid rgba(180,255,57,.4); color: var(--text); font-weight: 400; }
 .calendario-equipo { word-break: break-word; }
 .calendario-vs { display: block; text-align: center; color: var(--accent); font-weight: 800; font-size: 11px; margin: 3px 0; }
 .calendario-partido.jugado .calendario-vs { color: var(--accent); }
-/* planilla editable (modo Organizar): huecos libres para soltar un partido arrastrado,
-   partido arrastrándose y bandeja de "sin horario" arriba de la tabla */
-.calendario-vacia { min-width: 90px; border: 1px dashed var(--border); border-radius: 8px; }
+/* planilla editable (Administración): huecos libres para soltar un partido arrastrado,
+   partido arrastrándose y bandeja de "sin horario" arriba de la grilla */
+.calendario-vacia { min-height: 54px; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
 .calendario-partido[draggable] { cursor: grab; }
 .calendario-partido.arrastrando { opacity: .4; }
 .calendario-partido.pendiente { background: var(--accent-3); }
 .planilla-bandeja {
   display: flex; flex-wrap: wrap; gap: 8px; padding: 10px;
-  border: 1px dashed var(--accent-3); border-radius: 10px; margin-bottom: 12px;
+  border: 1px dashed var(--accent-3); border-radius: var(--radius-sm); margin-bottom: 12px;
 }
 .planilla-bandeja:empty { display: none; }
+
+/* cancha bloqueada: nunca lleva data-horario/data-cancha, así que ya queda
+   afuera como drop-target sin tocar nada de la lógica de drag&drop */
+.calendario-bloqueada {
+  min-height: 54px; border-radius: var(--radius-sm); background: rgba(255,77,109,.08);
+  border: 1px dashed rgba(255,77,109,.4); color: var(--danger); font-size: 10.5px;
+  font-weight: 600; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 4px; line-height: 1.25;
+}
+
+.calendario-grid-scroll { overflow-x: auto; }
+.calendario-grid {
+  display: grid;
+  grid-template-columns: 78px repeat(var(--calendario-cols, 1), minmax(120px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+.calendario-grid-cabecera {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text); background: rgba(5,7,10,.7); border-radius: var(--radius-sm);
+  padding: 8px 4px; text-align: center; display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- Calendario en mobile: agenda vertical fecha → hora → cancha ---------- */
+.calendario-agenda-fecha {
+  font-weight: 800; text-transform: uppercase; letter-spacing: .03em; font-size: 12px;
+  color: var(--accent); margin: 16px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.calendario-agenda-fecha:first-child { margin-top: 0; }
+.calendario-agenda-hora {
+  display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
+  font-weight: 700; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .02em;
+}
+.calendario-agenda-item { margin-bottom: 6px; }
+.calendario-agenda-item .calendario-partido,
+.calendario-agenda-item .calendario-bloqueada { min-height: 0; }
 
 /* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
@@ -505,7 +628,7 @@ tr:first-child td { font-weight: 700; }
 /* separa visualmente el bloque de zonas (grupos) del bloque de eliminación directa */
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
-  background: #0e182c; border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px;
+  background: #0e182c; border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 11px;
 }
 /* nota: antes había líneas conectando cada partido con la próxima ronda (estilo cuadro de
    fútbol) — se sacaron a pedido, la vista queda más limpia como columnas prolijas sin cruces */
@@ -532,7 +655,7 @@ tr:first-child td { font-weight: 700; }
 .llave-meta { margin-top: 6px; padding: 0 4px; }
 
 .tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 4px 6px; border-bottom: 1px solid var(--border); }
 .tabla-posiciones td { padding: 6px; border-bottom: 1px solid var(--border); }
 .tabla-posiciones tr:last-child td { border-bottom: none; }
 .tabla-posiciones tr:first-child td { color: var(--accent); font-weight: 700; }
@@ -564,6 +687,18 @@ tr:first-child td { font-weight: 700; }
   font-size: 14px; line-height: 1; padding: 0;
 }
 
+/* ---------- Disponibilidad: colapsada por defecto (🟢 completa), solo
+   despliega la lista de restricciones si el jugador toca 🔴 ---------- */
+.disp-toggle .pill[data-disp="restringida"].active {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+}
+.disp-restricciones-wrap { margin-top: 10px; }
+.disp-lista-restricciones { margin-bottom: 8px; }
+.disp-nueva-restriccion {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px; margin: 8px 0;
+}
+
 /* ---------- Parejas anotadas en un torneo ---------- */
 .pareja-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -579,17 +714,15 @@ tr:first-child td { font-weight: 700; }
 .admin-only { display: none; }
 body.is-admin .admin-only { display: block; }
 
-/* ---------- Torneo: Resultados (vista pública, default para todos) vs Organizar
-   (gestión del torneo — solo admin, y solo entrando explícitamente a este modo) ---------- */
-.organizar-only { display: none; }
-body.modo-organizar .organizar-only { display: block; }
-/* en modo Organizar el toggle se pinta violeta/lila (mismo acento que usa la vista Llave)
-   para que se note de un vistazo que se está en la parte de gestión, no en los resultados */
-#torneoModoPills .pill[data-modo="organizar"].active {
-  background: var(--accent-3); color: #fff; border-color: var(--accent-3);
-}
-
 header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Barra de contexto de un torneo (persiste arriba de las 8
+   pantallas públicas/jugador de ese torneo: Inicio, Categorías, Jugadores,
+   Calendario, Resultados, Inscripción, Mi inscripción, Mi disponibilidad) ---------- */
+#torneoContextBar { margin-bottom: 14px; }
+.torneo-context-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.torneo-context-top h2 { margin: 0; flex: 1; min-width: 140px; }
+#torneoSubnav.pill-row { margin-top: 10px; }
 
 /* ---------- Buscador de pareja ---------- */
 .suggest-list { position: relative; }
@@ -607,15 +740,15 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 }
 .suggest-item:first-child { border-top: 1px solid var(--border); border-radius: 0 0 0 0; margin-top: -1px; }
 .suggest-item:hover { background: #111827; }
-.suggest-item:last-child { border-radius: 0 0 10px 10px; }
+.suggest-item:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 
 /* fila de partido tipo "order of play": equipo · V · equipo, sobre fondo de color */
 .match-vs-row {
   display: flex; align-items: center; gap: 10px;
   background: var(--accent-teal); color: #fff;
-  border-radius: 10px; padding: 12px 14px; margin: 10px 0;
+  border-radius: var(--radius); padding: 12px 14px; margin: 10px 0;
 }
-.match-vs-team { flex: 1; font-weight: 700; font-size: 12.5px; line-height: 1.35; }
+.match-vs-team { flex: 1; font-weight: 800; font-size: 12.5px; line-height: 1.35; text-transform: uppercase; letter-spacing: -.005em; }
 .match-vs-team.derecha { text-align: right; }
 .match-vs-divider { font-weight: 800; color: var(--accent); font-size: 13px; flex-shrink: 0; }
 /* cuando el partido ya tiene resultado, la barra cambia de color y resalta al ganador */
@@ -659,15 +792,20 @@ nav.tabbar .icon { position: relative; }
 
 .match-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 12px;
   margin-bottom: 10px;
   background: #0e182c;
 }
 .match-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .match-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+/* variante corta tipo "etiqueta" (categorías/fecha en tarjeta de torneo, captions
+   de flyer) — NO se usa en .match-meta que sean oraciones largas/instructivas,
+   ahí mayúscula sostenida perjudica la lectura */
+.match-meta.meta-caption { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
 /* partido con resultado cargado: se distingue con un filo de color, no solo texto */
 .match-card-jugado { border-color: var(--accent-teal); }
+.match-card.clickeable { cursor: pointer; }
 .sets-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .set-chip {
   font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
@@ -681,7 +819,7 @@ nav.tabbar .icon { position: relative; }
 .match-admin-panel {
   background: rgba(5,7,10,.6);
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 10px;
   margin-top: 10px;
 }
@@ -694,7 +832,7 @@ nav.tabbar .icon { position: relative; }
 /* tarjeta "Partidos" (Lista / Calendario / Llave) con fondo tipo póster */
 .card.partidos-poster {
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, rgba(5,7,10,.85), rgba(5,7,10,.94) 45%),
     radial-gradient(120% 90% at 15% -10%, rgba(15,158,150,.3), transparent 55%),
@@ -703,11 +841,12 @@ nav.tabbar .icon { position: relative; }
 .partidos-poster > h3 { text-transform: uppercase; letter-spacing: .03em; }
 
 .torneo-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.torneo-nombre { font-weight: 700; font-size: 15.5px; }
+.torneo-nombre { font-weight: 800; font-size: 15.5px; letter-spacing: -.005em; }
 .torneo-lugar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-top: 8px; font-size: 13px; color: var(--text);
 }
+.torneo-lugar span { text-transform: uppercase; letter-spacing: .02em; font-weight: 700; font-size: 12px; }
 .torneo-maps-link { color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: none; }
 .torneo-maps-link:hover { text-decoration: underline; }
 
@@ -721,7 +860,7 @@ nav.tabbar .icon { position: relative; }
     radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%),
     url('pelotas.jpg') center/cover no-repeat, #05070a;
 }
-.torneo-card-poster .torneo-nombre { font-size: 16px; text-transform: uppercase; letter-spacing: .01em; }
+.torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; }
 .torneo-card-poster .torneo-lugar,
 .torneo-card-poster .match-meta { color: #dfe4ee; }
 /* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
@@ -729,12 +868,12 @@ nav.tabbar .icon { position: relative; }
 .torneo-card-flyer { min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end; }
 
 .flyer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.flyer-grid img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+.flyer-grid img { width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); }
 
 /* ---------- Noticias ---------- */
 .noticia-card { border-bottom: 1px solid var(--border); padding: 12px 0; }
 .noticia-card:last-child { border-bottom: none; }
-.noticia-card img { width: 100%; border-radius: 10px; margin-bottom: 8px; display: block; }
+.noticia-card img { width: 100%; border-radius: var(--radius-sm); margin-bottom: 8px; display: block; }
 .noticia-card strong { display: block; font-size: 14px; margin-bottom: 4px; }
 .noticia-card p { font-size: 13px; color: var(--muted); margin: 0 0 6px; line-height: 1.4; }
 
@@ -751,8 +890,10 @@ nav.tabbar button {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 10.5px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
   padding: 10px 2px 8px;
   display: flex;
   flex-direction: column;
@@ -760,7 +901,7 @@ nav.tabbar button {
   gap: 3px;
   cursor: pointer;
 }
-nav.tabbar button.active { color: var(--accent); font-weight: 600; }
+nav.tabbar button.active { color: var(--accent); font-weight: 800; }
 nav.tabbar .icon { display: block; }
 nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
 
@@ -776,7 +917,20 @@ nav.tabbar button.tab-cta .icon {
   box-shadow: 0 2px 8px rgba(0,0,0,.35);
 }
 nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); }
-nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600; }
+nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 800; }
+
+/* En mobile la barra inferior queda con lo esencial (Inicio/Calendario/Resultados/
+   Perfil + "Más"), como una app nativa; Torneos/Ranking/Administración pasan a vivir
+   en el menú de "Más" para no amontonar la barra. En PC hay lugar de sobra: se
+   muestran todos los accesos juntos y "Más" no hace falta. */
+nav.tabbar button.tab-desktop-only { display: none; }
+nav.tabbar button.tab-mobile-only { display: flex; }
+/* Administración: además de desktop-only, solo se muestra si sos admin — antes esto
+   se resolvía con un style.display inline en JS, que por especificidad le ganaba a
+   los media queries de arriba/abajo y lo mostraba en la tabbar de mobile igual si
+   eras admin. Con esta regla (más específica por ID) alcanza con el body.is-admin
+   que ya se togglea en manejarCambioSesion, sin tocar el estilo desde JS. */
+#btnAdminPanel { display: none; }
 
 .overlay-bloqueante {
   position: fixed; inset: 0; z-index: 200;
@@ -789,7 +943,7 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
 /* ---------- Foto de jugador ampliada (lightbox) ---------- */
 .avatar-clickable { cursor: zoom-in; }
 .overlay-foto { flex-direction: column; gap: 14px; }
-.overlay-foto img { max-width: min(90vw, 420px); max-height: 70vh; border-radius: 16px; object-fit: contain; }
+.overlay-foto img { max-width: min(90vw, 420px); max-height: 70vh; border-radius: var(--radius-lg); object-fit: contain; }
 .overlay-foto button { align-self: flex-end; margin-right: 5vw; }
 
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
@@ -797,7 +951,7 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
   position: fixed;
   bottom: 78px; left: 50%; transform: translateX(-50%);
   background: #0f2f2e; border: 1px solid var(--accent);
-  color: var(--text); padding: 10px 16px; border-radius: 10px;
+  color: var(--text); padding: 10px 16px; border-radius: var(--radius-sm);
   font-size: 13px; z-index: 50; max-width: 90%; text-align: center;
 }
 .sets-input { display: flex; gap: 6px; }
@@ -810,7 +964,7 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
   flex-shrink: 0;
   display: block;
   background: #fff;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 8px 14px;
   border: 1px solid var(--border);
   color: inherit;
@@ -845,6 +999,9 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
   }
   nav.tabbar button { flex: none; padding: 12px 4px; }
   nav.tabbar .icon svg { width: 21px; height: 21px; }
+  nav.tabbar button.tab-desktop-only { display: flex; }
+  nav.tabbar button.tab-mobile-only { display: none; }
+  body.is-admin #btnAdminPanel { display: flex; }
 
   .app-body {
     max-width: 1440px;
@@ -891,7 +1048,7 @@ nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 600
   #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 240px; }
 
   /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
-  #listaJugadores, #listaComplejos, #listaTorneos, #dtPartidos {
+  #listaJugadores, #listaComplejos, #listaTorneos, #admPartidosLista {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
