@@ -513,7 +513,11 @@
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <h2 id="admGestionNombre" style="margin:0"></h2>
-          <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">✏️ Editar torneo</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">✏️ Editar torneo</button>
+            <button type="button" class="secondary small" id="btnAuspiciantesTorneo">📢 Auspiciantes</button>
+            <button type="button" class="secondary small danger" id="btnBorrarTorneo">🗑️ Borrar torneo</button>
+          </div>
         </div>
         <button type="button" class="link-btn" id="admBtnVolverConfigGeneral" style="display:none;margin-top:4px">← Volver a Administración general</button>
         <p id="admGestionEstado"></p>
@@ -726,22 +730,27 @@
       <input id="jdmMotivo" placeholder="Ej: campeón del último torneo" />
       <button class="secondary small" id="btnDestacarJugador" style="margin-top:10px">Destacar en Inicio</button>
     </div>
-
-    <div class="card">
-      <h2>Auspiciantes / Publicidad</h2>
-      <p class="match-meta" style="margin-bottom:6px">Un auspiciante "General" aparece en Inicio, la columna lateral y en todos los torneos. Si elegís un torneo puntual, el logo aparece solo ahí.</p>
-      <label>Nombre del auspiciante</label>
-      <input id="spNombre" placeholder="Ej: Wilson Padel" />
-      <label>Torneo</label>
-      <select id="spTorneo"><option value="">General (todos los torneos)</option></select>
-      <label>Link (opcional, a donde va si tocan el logo)</label>
-      <input id="spLink" placeholder="https://..." />
-      <label>Logo</label>
-      <input id="spArchivo" type="file" accept="image/*" />
-      <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
-      <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
     </div>
 
+    <div id="auspiciantesWrap" style="display:none">
+      <div class="card">
+        <button type="button" class="link-btn" id="btnCerrarAuspiciantesTorneo" style="display:none;margin-bottom:8px">← Volver a este torneo</button>
+        <h2>Auspiciantes / Publicidad</h2>
+        <p class="match-meta" style="margin-bottom:6px">Un auspiciante "General" aparece en Inicio, la columna lateral y en todos los torneos. Si elegís un torneo puntual, el logo aparece solo ahí.</p>
+        <label>Nombre del auspiciante</label>
+        <input id="spNombre" placeholder="Ej: Wilson Padel" />
+        <label>Torneo</label>
+        <select id="spTorneo"><option value="">General (todos los torneos)</option></select>
+        <label>Link (opcional, a donde va si tocan el logo)</label>
+        <input id="spLink" placeholder="https://..." />
+        <label>Logo</label>
+        <input id="spArchivo" type="file" accept="image/*" />
+        <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
+        <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div id="admConfigGeneralWrap2">
     <div class="card">
       <h2>Noticias</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>

@@ -565,7 +565,11 @@ tr:first-child td { font-weight: 700; }
 .calendario-vacia { min-height: 56px; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
 .calendario-partido[draggable] { cursor: grab; }
 .calendario-partido.arrastrando { opacity: .4; }
-.calendario-partido.pendiente { background: var(--accent-3); }
+/* la tarjeta base fija width/height:100% pensando en una celda de grid — acá
+   adentro es un flex-wrap, así que sin este override cada tarjeta ocupaba
+   todo el ancho de la bandeja y se apilaban como bloques sólidos en vez de
+   agruparse como chips (el bug de "la planilla se ve muy mal" reportado) */
+.calendario-partido.pendiente { background: var(--accent-3); width: 200px; height: auto; flex: 0 0 auto; }
 .planilla-bandeja {
   display: flex; flex-wrap: wrap; gap: 8px; padding: 12px;
   border: 1px dashed var(--accent-3); border-radius: var(--radius-sm); margin-bottom: 14px;

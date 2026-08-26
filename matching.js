@@ -75,9 +75,12 @@ const FRANJA_DEFAULT_DIA = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("
 //    para el torneo (ej: 16:00 a 22:00). Si viene, se usa como base del día
 //    en vez de FRANJA_DEFAULT_DIA, para no proponer horarios fuera del
 //    horario en que el club/torneo funciona.
-//  partidosYaProgramados: [{cancha_id, horario}] partidos que ya están
-//    ocupando cancha y horario (de otras categorías del mismo torneo, por
-//    ejemplo) para no proponerles la misma cancha a la misma hora.
+//  partidosYaProgramados: [{cancha_id, horario, jugadores_ids}] partidos que
+//    ya están ocupando cancha y horario (de esta misma categoría en una
+//    ronda anterior, o de otra categoría del mismo torneo) para no proponer
+//    ni la misma cancha ni el mismo jugador a la misma hora. `jugadores_ids`
+//    es opcional (si no viene, ese partido solo bloquea la cancha, nunca al
+//    jugador — mantiene compatibilidad con llamadas viejas).
 //  grupos: [[pareja,...], ...] — si viene, se ignora `parejas` y se arma en
 //    modo "fase de grupos": cada grupo juega TODOS contra todos (nadie queda
 //    eliminado en esta etapa). Si no viene, se usa `parejas` en modo
@@ -122,10 +125,18 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
 
   canchas.forEach((c) => (ocupacionCancha[c.id] = [...(bloqueosPorCancha[c.id] || [])]));
   partidosYaProgramados.forEach((p) => {
-    if (!p.horario || !p.cancha_id || !ocupacionCancha[p.cancha_id]) return;
+    if (!p.horario) return;
     const desde = new Date(p.horario);
     const hasta = new Date(desde.getTime() + duracionMinutos * 60000);
-    ocupacionCancha[p.cancha_id].push({ desde, hasta });
+    if (p.cancha_id && ocupacionCancha[p.cancha_id]) ocupacionCancha[p.cancha_id].push({ desde, hasta });
+    // clave del bug reportado: si no se registra acá que estos jugadores ya
+    // están jugando en este horario, una ronda o categoría posterior puede
+    // proponerles OTRO partido a la misma hora (la misma pareja terminaba con
+    // dos partidos simultáneos en distinta cancha).
+    (p.jugadores_ids || []).forEach((jid) => {
+      if (!ocupacionJugador[jid]) ocupacionJugador[jid] = [];
+      ocupacionJugador[jid].push({ desde, hasta });
+    });
   });
 
   function libre(lista, desde, hasta) {
@@ -207,7 +218,8 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
       pareja2_id: pareja2.id,
       cancha_id: slot.cancha.id,
       horario: slot.horario.toISOString(),
-      grupo
+      grupo,
+      jugadores_ids: jugadoresIds
     });
   });
 
@@ -216,17 +228,25 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
 
 // Reasigna un partido ya cargado a otra cancha (o complejo) por clima u
 // otro motivo, evitando pisar otro partido que ya esté en esa cancha y
-// horario. `bloqueosDeCancha` (opcional) es la lista de bloqueos ([{desde,
-// hasta}], objetos Date) de ESA cancha puntual — si viene, también cuenta
-// como conflicto reasignar un partido a un horario bloqueado.
+// horario, O que ponga a la MISMA pareja a jugar otro partido a la misma
+// hora (aunque sea en otra cancha) — este segundo chequeo es el que faltaba
+// y permitía, al reasignar a mano en la planilla, dejar a una pareja con dos
+// partidos simultáneos. `bloqueosDeCancha` (opcional) es la lista de
+// bloqueos ([{desde, hasta}], objetos Date) de ESA cancha puntual — si
+// viene, también cuenta como conflicto reasignar un partido a un horario
+// bloqueado.
 function hayConflictoCancha(partidosDelTorneo, partidoId, canchaId, horarioISO, duracionMinutos = 90, bloqueosDeCancha = []) {
   const desde = new Date(horarioISO);
   const hasta = new Date(desde.getTime() + duracionMinutos * 60000);
+  const partidoActual = partidosDelTorneo.find((p) => p.id === partidoId);
+  const parejasActual = partidoActual ? [partidoActual.pareja1_id, partidoActual.pareja2_id].filter(Boolean) : [];
   const chocaConPartido = partidosDelTorneo.some((p) => {
-    if (p.id === partidoId || p.cancha_id !== canchaId || !p.horario) return false;
+    if (p.id === partidoId || !p.horario) return false;
     const pDesde = new Date(p.horario);
     const pHasta = new Date(pDesde.getTime() + duracionMinutos * 60000);
-    return desde < pHasta && hasta > pDesde;
+    if (!(desde < pHasta && hasta > pDesde)) return false;
+    if (p.cancha_id === canchaId) return true;
+    return parejasActual.includes(p.pareja1_id) || parejasActual.includes(p.pareja2_id);
   });
   if (chocaConPartido) return true;
   return bloqueosDeCancha.some((b) => desde < b.hasta && hasta > b.desde);

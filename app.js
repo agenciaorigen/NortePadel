@@ -102,12 +102,25 @@ function cambiarVista(nombre, ruta) {
   // ese segundo llamado deshacía el modo enfocado apenas se activaba.
   if (nombre === "admin" && !adminFocoTorneoActivo) {
     document.getElementById("admSelectorTorneoCard").style.display = "block";
-    document.getElementById("admConfigGeneralWrap").style.display = "block";
+    mostrarConfigGeneral(true);
     document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
   } else if (nombre !== "admin") {
     adminFocoTorneoActivo = false;
   }
   if (!syncingDesdeHash) navegarA(ruta || (nombre === "inicio" ? "/" : "/" + nombre));
+}
+
+// Prende/apaga TODA la configuración general del club de una sola vez —
+// admConfigGeneralWrap (cfg general, complejos, categorías...) y
+// admConfigGeneralWrap2 (noticias, jugadores registrados) son dos wraps
+// separados por HTML solo porque "Auspiciantes" (auspiciantesWrap) quedó
+// en el medio de los dos para poder mostrarse solo, sin el resto, desde el
+// atajo de "Administrar este torneo" — ver btnAuspiciantesTorneo más abajo.
+function mostrarConfigGeneral(visible) {
+  document.getElementById("admConfigGeneralWrap").style.display = visible ? "block" : "none";
+  document.getElementById("admConfigGeneralWrap2").style.display = visible ? "block" : "none";
+  document.getElementById("auspiciantesWrap").style.display = visible ? "block" : "none";
+  document.getElementById("btnCerrarAuspiciantesTorneo").style.display = "none";
 }
 
 function navegarA(ruta) {
@@ -1646,9 +1659,22 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
 // (refrescarDetalleTorneo) sea cual sea la pantalla pedida — es más simple
 // y más seguro que hacer 8 loaders parciales distintos, y el costo es
 // insignificante (las 8 pantallas ya están en el DOM, solo una queda visible).
+//
+// Cada pestaña del subnav (Inicio/Categorías/Jugadores/Calendario/Resultados)
+// cambia el hash, y eso dispara despacharRuta -> abrirTorneo de nuevo (ver
+// cambiarVista/despacharRuta) — cada click real vuelve a pedir todos los
+// datos del torneo por Supabase. Si el jugador toca dos pestañas rápido
+// (por ejemplo Categorías y enseguida Jugadores), la primera consulta puede
+// tardar más y resolver DESPUÉS de la segunda, pisando la pantalla nueva con
+// la vieja ("a veces vuelve a Categorías"). Un token por llamada evita que
+// una respuesta vieja gane: si ya arrancó una navegación más nueva mientras
+// esta esperaba, esta no toca la pantalla al terminar.
+let tokenNavegacionTorneo = 0;
 async function abrirTorneo(id, pantalla) {
+  const miToken = ++tokenNavegacionTorneo;
   torneoActualId = id;
   await refrescarDetalleTorneo();
+  if (miToken !== tokenNavegacionTorneo) return; // ya hay una navegación más nueva en curso
   mostrarPantallaTorneo(pantalla);
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
@@ -2434,6 +2460,31 @@ async function cargarGestionTorneo(id) {
   renderPartidosAdmin(partidos || [], tc || [], parejas || []);
 }
 
+// Borra un torneo completo (inscripciones, parejas, partidos, canchas
+// asignadas, bloqueos y auspiciantes de ese torneo se van con él por el "on
+// delete cascade" ya definido en el schema — no hay que borrar nada aparte a
+// mano). Pide escribir el nombre exacto del torneo como segunda confirmación
+// porque es irreversible y se lleva puestos resultados ya jugados.
+document.getElementById("btnBorrarTorneo").addEventListener("click", async () => {
+  if (!torneoGestionId || !torneoGestionData) return;
+  const nombre = torneoGestionData.nombre;
+  const escrito = prompt(`Esto borra "${nombre}" para siempre: inscripciones, parejas, partidos y resultados ya jugados. No se puede deshacer.\n\nEscribí el nombre del torneo para confirmar:`);
+  if (escrito === null) return;
+  if (escrito.trim() !== nombre.trim()) { toast("No coincide el nombre — no se borró nada."); return; }
+
+  const { error } = await sb.from("torneos").delete().eq("id", torneoGestionId);
+  if (error) { toast("Error al borrar: " + error.message); return; }
+
+  toast(`"${nombre}" borrado`);
+  torneoGestionId = null;
+  torneoGestionData = null;
+  document.getElementById("admGestionTorneoWrap").style.display = "none";
+  document.getElementById("admSelectTorneoGestion").value = "";
+  document.getElementById("admSelectorTorneoCard").style.display = "block";
+  await cargarTorneos();
+  avisarActualizacionEnVivo();
+});
+
 // ---------- editar torneo (nombre, sede, categorías, fechas, costo, flyer) ----------
 document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", async () => {
   if (!torneoGestionData) return;
@@ -2964,7 +3015,7 @@ document.getElementById("btnGenerarCalendario").addEventListener("click", async 
   if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
   if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
 
-  const { data: partidosExistentes } = await sb.from("partidos").select("categoria, cancha_id, horario").eq("torneo_id", torneoGestionId);
+  const { data: partidosExistentes } = await sb.from("partidos").select("categoria, cancha_id, horario, pareja1_id, pareja2_id").eq("torneo_id", torneoGestionId);
   // las categorías más altas (mayor "orden" en la tabla categorias, ej: 1ra
   // por encima de 8va) se procesan primero para que tengan prioridad de
   // horario y cancha, tal como pidió el club — el resto simplemente se reparte
@@ -2975,7 +3026,23 @@ document.getElementById("btnGenerarCalendario").addEventListener("click", async 
     .sort((a, b) => (ordenCategoria[b] || 0) - (ordenCategoria[a] || 0));
   if (categoriasSinHorario.length === 0) { toast("No hay ningún fixture pendiente de calendario — generá el fixture primero"); return; }
 
-  const ocupacionAcumulada = (partidosExistentes || []).filter((p) => p.horario);
+  // resuelve pareja_id -> [jugador1_id, jugador2_id] de TODO el torneo (no solo
+  // la categoría que se está por procesar) para poder marcar ocupados a los
+  // jugadores de los partidos que ya tienen horario — sin esto, una pareja podía
+  // terminar con dos partidos a la misma hora (bug reportado: un jugador ya
+  // ocupado por un partido de otra categoría, u otra ronda ya calendarizada,
+  // podía volver a proponerse libre).
+  const yaProgramados = (partidosExistentes || []).filter((p) => p.horario);
+  const parejaIdsOcupadas = [...new Set(yaProgramados.flatMap((p) => [p.pareja1_id, p.pareja2_id]).filter(Boolean))];
+  const { data: parejasOcupadasDb } = parejaIdsOcupadas.length
+    ? await sb.from("parejas").select("id, jugador1_id, jugador2_id").in("id", parejaIdsOcupadas)
+    : { data: [] };
+  const parejaOcupadaPorId = Object.fromEntries((parejasOcupadasDb || []).map((p) => [p.id, p]));
+  const ocupacionAcumulada = yaProgramados.map((p) => {
+    const j1 = parejaOcupadaPorId[p.pareja1_id], j2 = parejaOcupadaPorId[p.pareja2_id];
+    const jugadores_ids = [j1?.jugador1_id, j1?.jugador2_id, j2?.jugador1_id, j2?.jugador2_id].filter(Boolean);
+    return { cancha_id: p.cancha_id, horario: p.horario, jugadores_ids };
+  });
   let totalGenerados = 0, totalSinHorario = 0;
   for (const categoria of categoriasSinHorario) {
     const { generados, sinHorario } = await generarCalendarioParaCategoria(torneoGestionId, categoria, torneo, canchas, ocupacionAcumulada);
@@ -3234,7 +3301,7 @@ function wirePlanillaDragAndDrop(containerId) {
       const bloqueosDeCancha = nuevaCancha ? (bloqueosPorCanchaMapa()[nuevaCancha] || []) : [];
 
       if (nuevoHorario && nuevaCancha && hayConflictoCancha(ultimosPartidosGestion, partidoId, nuevaCancha, nuevoHorario, duracion, bloqueosDeCancha)) {
-        toast("Ese horario ya está ocupado (o bloqueado) en esa cancha");
+        toast("Ese horario ya está ocupado (cancha bloqueada, o alguna de las parejas ya tiene otro partido a esa hora)");
         return;
       }
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq("id", partidoId);
@@ -3456,15 +3523,32 @@ document.getElementById("btnAdministrarEsteTorneo").addEventListener("click", as
   // aparte, en Administración general) para que "Administrar este torneo" no se
   // sienta como "me manda a la configuración general".
   document.getElementById("admSelectorTorneoCard").style.display = "none";
-  document.getElementById("admConfigGeneralWrap").style.display = "none";
+  mostrarConfigGeneral(false);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
   document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", () => {
   adminFocoTorneoActivo = false;
   document.getElementById("admSelectorTorneoCard").style.display = "block";
-  document.getElementById("admConfigGeneralWrap").style.display = "block";
+  mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
+});
+
+// Atajo pedido por el club: desde "Administrar este torneo" poder cargar/ver
+// auspiciantes de ESE torneo sin tener que ir a la Configuración general
+// (que ahí queda oculta a propósito). Muestra solo la card de Auspiciantes
+// —no el resto de la config general— con el torneo ya preseleccionado.
+document.getElementById("btnAuspiciantesTorneo").addEventListener("click", () => {
+  document.getElementById("auspiciantesWrap").style.display = "block";
+  document.getElementById("btnCerrarAuspiciantesTorneo").style.display = "inline-block";
+  const spTorneo = document.getElementById("spTorneo");
+  if (torneoGestionId) spTorneo.value = torneoGestionId;
+  document.getElementById("auspiciantesWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("btnCerrarAuspiciantesTorneo").addEventListener("click", () => {
+  document.getElementById("auspiciantesWrap").style.display = "none";
+  document.getElementById("btnCerrarAuspiciantesTorneo").style.display = "none";
+  document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 function renderResultadosPublico() {
@@ -3698,7 +3782,7 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       const bloqueosDeCancha = bloqueosPorCanchaMapa()[nuevaCancha] || [];
       const duracion = torneoGestionData?.duracion_minutos || 90;
       if (partido?.horario && hayConflictoCancha(ultimosPartidosGestion, partidoId, nuevaCancha, partido.horario, duracion, bloqueosDeCancha)) {
-        toast("Esa cancha ya tiene otro partido (o está bloqueada) a esa hora — elegí otra cancha o cambiá primero el horario");
+        toast("Esa cancha ya tiene otro partido a esa hora (o está bloqueada, o alguna pareja ya juega a esa hora) — elegí otra cancha o cambiá primero el horario");
         return;
       }
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha }).eq("id", partidoId);
@@ -3723,7 +3807,7 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       const bloqueosDeCancha = canchaId ? (bloqueosPorCanchaMapa()[canchaId] || []) : [];
       const duracion = torneoGestionData?.duracion_minutos || 90;
       if (canchaId && hayConflictoCancha(ultimosPartidosGestion, partidoId, canchaId, nuevoHorarioISO, duracion, bloqueosDeCancha)) {
-        toast("Esa cancha ya tiene otro partido (o está bloqueada) a esa hora — elegí otro horario");
+        toast("Esa cancha ya tiene otro partido a esa hora (o está bloqueada, o alguna pareja ya juega a esa hora) — elegí otro horario");
         return;
       }
       const cambios = { horario: nuevoHorarioISO };
