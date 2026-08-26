@@ -200,7 +200,7 @@
         <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
         <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
       </select>
-      <div class="row">
+      <div class="row" id="tGrupoConfigRow">
         <div><label>Parejas por grupo</label><input id="tTamanoGrupo" type="number" value="3" min="2" /></div>
         <div><label>Cuántas avanzan por grupo</label><input id="tAvanzanPorGrupo" type="number" value="2" min="1" /></div>
       </div>
@@ -524,6 +524,9 @@
         <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
         <h3 style="margin-top:16px">Dashboard</h3>
         <div class="pj-stats" id="admDashboardStats"></div>
+        <h3 style="margin-top:16px">Diagnóstico</h3>
+        <p class="match-meta" style="margin-bottom:6px">Chequeo rápido para saber si el torneo quedó bien armado antes de avisarle a la gente.</p>
+        <div id="admDiagnostico"></div>
       </div>
 
       <div class="card" id="editarTorneoCard" style="display:none">
@@ -557,7 +560,7 @@
           <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
           <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
         </select>
-        <div class="row">
+        <div class="row" id="teGrupoConfigRow">
           <div><label>Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
           <div><label>Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
         </div>

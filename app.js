@@ -1593,6 +1593,19 @@ document.getElementById("btnCancelarCrearTorneo").addEventListener("click", () =
   document.getElementById("crearTorneoCard").style.display = "none";
 });
 
+// "Parejas por grupo" / "Cuántas avanzan por grupo" solo se usan cuando el
+// formato es "grupos" (armarGruposDeParejas) — en "eliminación directa" y
+// "cuadro de zonas" esos dos campos no significan nada, así que se ocultan
+// en vez de dejarlos siempre a la vista confundiendo al admin.
+function toggleGrupoConfigRow(selectId, rowId) {
+  const select = document.getElementById(selectId);
+  const row = document.getElementById(rowId);
+  if (select && row) row.style.display = select.value === "grupos" ? "flex" : "none";
+}
+document.getElementById("tFaseGruposFormato").addEventListener("change", () => toggleGrupoConfigRow("tFaseGruposFormato", "tGrupoConfigRow"));
+document.getElementById("teFaseGruposFormato").addEventListener("change", () => toggleGrupoConfigRow("teFaseGruposFormato", "teGrupoConfigRow"));
+toggleGrupoConfigRow("tFaseGruposFormato", "tGrupoConfigRow");
+
 document.getElementById("btnCrearTorneo").addEventListener("click", async () => {
   if (!isAdmin) { toast("Solo un administrador puede crear torneos"); return; }
   const nombre = document.getElementById("tNombre").value.trim();
@@ -2184,8 +2197,12 @@ async function refrescarDetalleTorneo() {
   const categorias = categoriasTorneoActual.join(", ") || "todas las categorías";
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
 
+  // una vez que el torneo ya arrancó (o terminó) coordinar el pago de la
+  // inscripción ya no tiene sentido — se deja de mostrar costo y el botón de
+  // WhatsApp para no confundir a alguien que entra a ver resultados
+  const torneoYaEmpezo = t.estado === "en_curso" || t.estado === "finalizado";
   const contCosto = document.getElementById("dtCosto");
-  if (t.costo && Number(t.costo) > 0) {
+  if (t.costo && Number(t.costo) > 0 && !torneoYaEmpezo) {
     contCosto.style.display = "block";
     contCosto.innerHTML = `<span class="badge solid">💰 Costo: $${t.costo}</span>` +
       (configApp.whatsapp_numero ? botonWhatsappPagoHtml("btnPagarWhatsapp", "margin-left:8px") : "");
@@ -2210,6 +2227,16 @@ async function refrescarDetalleTorneo() {
     sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId })
   ]);
   ultimosPartidos = partidos || [];
+  // el flag de arriba se basa en torneo_categorias.estado_fase, que puede quedar
+  // desactualizado si un horario se asignó a mano partido por partido (o
+  // arrastrando en la planilla) en vez de con "Generar calendario" — bug real
+  // detectado: quedaban partidos con horario pero la pestaña de Calendario
+  // seguía oculta para todo el mundo salvo el admin. Se refuerza mirando los
+  // partidos reales: si ya hay alguno con horario o jugado, el calendario
+  // existe para el público aunque ese flag no se haya actualizado.
+  if (!hayCalendarioTorneoActual) {
+    hayCalendarioTorneoActual = ultimosPartidos.some((p) => p.horario || p.estado === "jugado");
+  }
 
   // Calendario/Resultados (pestañas de torneoSubnav) solo aparecen una vez que
   // alguna categoría tiene calendario confirmado — mientras se está anotando
@@ -2455,9 +2482,37 @@ async function cargarGestionTorneo(id) {
     [(tc || []).length, "Canchas"],
     [`${pctCalendario}%`, "Calendario armado"]
   ]);
+  renderDiagnosticoTorneo(insc || [], parejas || [], partidos || []);
 
   await cargarBloqueosCancha();
   renderPartidosAdmin(partidos || [], tc || [], parejas || []);
+}
+
+// Chequeo rápido de salud del torneo, pedido por el club para poder confirmar
+// "¿quedó bien armado?" sin tener que revisar categoría por categoría a mano.
+// Cada fila es una situación real que puede pasar sin que rompa nada (una
+// pareja sin partido, alguien anotado sin pareja, un partido sin horario) pero
+// que el club quiere poder ver de un vistazo antes de avisarle a la gente.
+function renderDiagnosticoTorneo(insc, parejas, partidos) {
+  const cont = document.getElementById("admDiagnostico");
+  if (!cont) return;
+  const parejasActivas = parejas.filter((p) => p.estado !== "rechazada");
+  const enPartido = new Set(partidos.flatMap((p) => [p.pareja1_id, p.pareja2_id]));
+  const parejasSinPartido = parejasActivas.filter((p) => !enPartido.has(p.id));
+  const enPareja = new Set(parejasActivas.flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+  const inscSinPareja = insc.filter((i) => i.estado !== "cancelada" && i.estado !== "rechazada" && !enPareja.has(i.jugador_id));
+  const parejasPendientes = parejasActivas.filter((p) => p.estado === "pendiente");
+  const partidosSinHorario = partidos.filter((p) => !p.horario && p.estado !== "jugado");
+
+  const filas = [];
+  if (parejasSinPartido.length) filas.push(`⚠️ ${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${p.jugador1_nombre} / ${p.jugador2_nombre} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
+  if (inscSinPareja.length) filas.push(`⚠️ ${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${i.nombre} ${i.apellido}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
+  if (parejasPendientes.length) filas.push(`⚠️ ${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${p.jugador1_nombre} / ${p.jugador2_nombre}`).join(", ")}.`);
+  if (partidosSinHorario.length) filas.push(`⚠️ ${partidosSinHorario.length} partido${partidosSinHorario.length === 1 ? "" : "s"} todavía sin cancha/horario — usá "Generar calendario" o asignalo a mano.`);
+
+  cont.innerHTML = filas.length === 0
+    ? '<p class="match-meta">✅ Todo en orden: todas las parejas tienen partido, nadie quedó sin pareja y no hay partidos sueltos sin horario.</p>'
+    : filas.map((f) => `<p class="match-meta" style="margin-bottom:6px">${f}</p>`).join("");
 }
 
 // Borra un torneo completo (inscripciones, parejas, partidos, canchas
@@ -2504,6 +2559,7 @@ document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", a
   document.getElementById("teFaseGruposFormato").value = t.fase_grupos_formato || "grupos";
   document.getElementById("teTamanoGrupo").value = t.tamano_grupo || 3;
   document.getElementById("teAvanzanPorGrupo").value = t.avanzan_por_grupo || 2;
+  toggleGrupoConfigRow("teFaseGruposFormato", "teGrupoConfigRow");
   document.getElementById("teFlyerArchivo").value = "";
   const categoriasActuales = new Set((t.torneo_categorias || []).map((c) => c.categoria));
   document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
@@ -2867,10 +2923,17 @@ async function generarSiguienteRondaCuadro(categoria, torneoId) {
 // Los cruces que sigan sin hueco quedan como partidos reales con horario en
 // null (reasignables a mano después), nunca se pierden.
 async function generarCalendarioParaCategoria(torneoId, categoria, torneo, canchas, ocupacionAcumulada) {
-  const { data: sinHorarioDb } = await sb.from("partidos").select("*").eq("torneo_id", torneoId).eq("categoria", categoria).is("horario", null);
-  if (!sinHorarioDb || sinHorarioDb.length === 0) return { generados: 0, sinHorario: 0 };
+  // los "bye" del cuadro de zonas (pareja impar) ya nacen "jugados" con
+  // pareja2_id null y nunca necesitan horario — se descartan acá para no
+  // mandarlos a asignarHorarios, y sobre todo para que ese null nunca llegue
+  // a la lista de ids de abajo (ver el filter(Boolean) — un null ahí rompía
+  // el .in() contra Supabase real y hacía que NINGUNA pareja se resolviera,
+  // dejando la categoría entera sin calendario sin avisar del motivo).
+  const { data: partidosDb } = await sb.from("partidos").select("*").eq("torneo_id", torneoId).eq("categoria", categoria).is("horario", null);
+  const sinHorarioDb = (partidosDb || []).filter((p) => p.pareja1_id && p.pareja2_id);
+  if (sinHorarioDb.length === 0) return { generados: 0, sinHorario: 0 };
 
-  const parejaIds = [...new Set(sinHorarioDb.flatMap((p) => [p.pareja1_id, p.pareja2_id]))];
+  const parejaIds = [...new Set(sinHorarioDb.flatMap((p) => [p.pareja1_id, p.pareja2_id]).filter(Boolean))];
   const { data: parejasDb } = await sb.from("parejas").select("*").in("id", parejaIds);
   const parejaPorId = Object.fromEntries((parejasDb || []).map((p) => [p.id, p]));
   const cruces = sinHorarioDb
@@ -3304,8 +3367,16 @@ function wirePlanillaDragAndDrop(containerId) {
         toast("Ese horario ya está ocupado (cancha bloqueada, o alguna de las parejas ya tiene otro partido a esa hora)");
         return;
       }
+      const partido = ultimosPartidosGestion.find((x) => x.id === partidoId);
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
+      // mismo motivo que en btnCambiarHorario: si este partido no tenía horario
+      // y ahora se le asignó arrastrándolo, esta categoría ya tiene calendario
+      // para mostrarle al público, aunque no se haya usado "Generar calendario".
+      if (nuevoHorario && !partido?.horario && partido?.categoria) {
+        await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
+        await actualizarEstadoTorneoPorFases(torneoGestionId);
+      }
       toast(nuevoHorario ? "Partido reubicado ✅" : "Partido movido a \"sin horario\"");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
@@ -3359,11 +3430,23 @@ function renderPartidosLlave(containerId, partidos) {
     partidos: grupales.filter((p) => p.grupo === g)
   }));
 
+  // cuadro de zonas del club (fase_grupos_formato "cuadro_zonas"): cada zona
+  // es un solo partido con slot_cuadro "Z1"/"Z2"/... y ronda "Zona" (no usa
+  // `grupo`, que es del formato "Grupos" de todos-contra-todos) — se arma una
+  // columna por número de zona igual que arriba, para que también se vea
+  // organizado en la Llave y no todo junto bajo un único cartel "Zona".
+  const zonasCuadro = partidos.filter((p) => p.ronda === "Zona" && p.slot_cuadro);
+  const numsZonaCuadro = [...new Set(zonasCuadro.map((p) => Number(p.slot_cuadro.slice(1))))].sort((a, b) => a - b);
+  const columnasZonaCuadro = numsZonaCuadro.map((n) => ({
+    titulo: `Zona ${n}`, zona: true,
+    partidos: zonasCuadro.filter((p) => Number(p.slot_cuadro.slice(1)) === n)
+  }));
+
   // las columnas de eliminación se arman con los nombres de ronda que realmente existen,
   // en el orden en que se generaron (no una lista fija) — así sirve tanto para el cuadro
   // clásico de 16/8/4/2 como para un torneo chico que arranca directo en semifinal, o con
   // nombres genéricos ("Ronda de 6") si el cuadro es irregular
-  const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null);
+  const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
   const nombresOrdenados = [...new Set(
     [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
   )];
@@ -3372,7 +3455,7 @@ function renderPartidosLlave(containerId, partidos) {
     partidos: eliminacion.filter((p) => p.ronda === r)
   }));
 
-  const columnas = [...columnasZona, ...columnasRonda];
+  const columnas = [...columnasZona, ...columnasZonaCuadro, ...columnasRonda];
 
   if (columnas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
@@ -3814,6 +3897,15 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       if (!partido?.cancha_id && canchaId) cambios.cancha_id = canchaId;
       const { error } = await sb.from("partidos").update(cambios).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
+      // si este partido no tenía horario todavía, es la primera vez que esta
+      // categoría tiene algo calendarizado — marcarla acá también (no solo en
+      // "Generar calendario") es lo que hace que Calendario/Resultados se le
+      // muestren al público: antes, asignar el horario a mano dejaba el dato
+      // bien cargado pero la categoría seguía marcada "sin calendario".
+      if (!partido?.horario && partido?.categoria) {
+        await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
+        await actualizarEstadoTorneoPorFases(torneoGestionId);
+      }
       toast("Horario cambiado");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
