@@ -88,7 +88,33 @@ const FRANJA_DEFAULT_DIA = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("
 //    entera queda inutilizable para todos, no solo para un jugador puntual.
 //    Se suma directo a la ocupación de cancha antes de buscar horario, sin
 //    tocar el resto del algoritmo.
-function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [], bloqueosPorCancha = {} }) {
+//
+// Fixture (armarCruces) y Calendario (asignarHorarios) son dos pasos separados
+// a propósito: armar el fixture no debería obligar a resolver un horario en el
+// mismo acto, y un cruce que hoy no encuentra hueco (sinHorario) tiene que
+// poder quedar como partido real, reasignable después, en vez de perderse.
+
+// Arma la lista de cruces (pares de parejas) según el modo: {grupos: [[...]]}
+// para fase de grupos (todos contra todos dentro de cada grupo, nadie queda
+// eliminado en esta etapa) o {parejas: [...]} para eliminación directa (cada
+// pareja contra la siguiente de la lista). No toca horarios ni canchas.
+function armarCruces({ parejas, grupos }) {
+  const cruces = [];
+  if (grupos) {
+    grupos.forEach((grupo, idx) => {
+      for (let a = 0; a < grupo.length; a++) {
+        for (let b = a + 1; b < grupo.length; b++) cruces.push({ pareja1: grupo[a], pareja2: grupo[b], grupo: idx + 1 });
+      }
+    });
+  } else {
+    for (let i = 0; i < parejas.length - 1; i += 2) cruces.push({ pareja1: parejas[i], pareja2: parejas[i + 1], grupo: null });
+  }
+  return cruces;
+}
+
+// Busca horario y cancha para cruces ya armados (nuevos o ya existentes como
+// partidos con horario en null). `cruces`: [{pareja1, pareja2, grupo}].
+function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, canchas, duracionMinutos = 90, ventana = null, partidosYaProgramados = [], bloqueosPorCancha = {} }) {
   const partidosGenerados = [];
   const sinHorario = [];
   const ocupacionCancha = {}; // cancha_id -> [{desde:Date, hasta:Date}]
@@ -149,24 +175,12 @@ function armarPartidosAutomatico({ parejas, grupos, disponibilidadPorJugador, fe
     return null;
   }
 
-  // arma la lista de cruces (pares de parejas) según el modo
-  const cruces = [];
-  if (grupos) {
-    grupos.forEach((grupo, idx) => {
-      for (let a = 0; a < grupo.length; a++) {
-        for (let b = a + 1; b < grupo.length; b++) cruces.push({ pareja1: grupo[a], pareja2: grupo[b], grupo: idx + 1 });
-      }
-    });
-  } else {
-    for (let i = 0; i < parejas.length - 1; i += 2) cruces.push({ pareja1: parejas[i], pareja2: parejas[i + 1], grupo: null });
-  }
-
   cruces.forEach(({ pareja1, pareja2, grupo }) => {
     const jugadoresIds = [pareja1.jugador1_id, pareja1.jugador2_id, pareja2.jugador1_id, pareja2.jugador2_id];
 
     const slot = buscarSlot(jugadoresIds);
     if (!slot) {
-      sinHorario.push({ pareja1, pareja2 });
+      sinHorario.push({ pareja1, pareja2, grupo });
       return;
     }
 

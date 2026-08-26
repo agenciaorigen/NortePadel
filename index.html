@@ -49,18 +49,18 @@
   <img id="fotoGrandeImg" src="" alt="Foto ampliada del jugador" />
 </div>
 
-<!-- "Más": en mobile la tabbar solo trae Inicio/Calendario/Resultados/Perfil —
-     Torneos, Ranking y Administración (si sos admin) viven acá, un toque más
-     adentro, para no amontonar la barra de abajo. En PC no hace falta: esos
-     accesos ya están siempre visibles en la barra lateral. -->
+<!-- "Más": en mobile la tabbar solo trae Inicio/Torneos/Más (Perfil vive en el
+     ícono de arriba, no acá) — Ranking y Administración (si sos admin) viven
+     un toque más adentro, para no amontonar la barra de abajo. Torneos ya es
+     una tab siempre visible, así que no se repite acá. En PC no hace falta
+     este menú: esos accesos ya están siempre visibles en la barra lateral. -->
 <div id="masOverlay" class="overlay-bloqueante" style="display:none">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">Más</h2>
       <button type="button" class="secondary small" id="btnCerrarMas">Cerrar</button>
     </div>
-    <button type="button" class="secondary" id="masBtnTorneos" style="margin-top:14px;width:100%">🏆 Torneos</button>
-    <button type="button" class="secondary" id="masBtnRanking" style="margin-top:8px;width:100%">📊 Ranking</button>
+    <button type="button" class="secondary" id="masBtnRanking" style="margin-top:14px;width:100%">📊 Ranking</button>
     <button type="button" class="secondary admin-only" id="masBtnAdmin" style="margin-top:8px;width:100%">⚙️ Administración</button>
   </div>
 </div>
@@ -278,6 +278,7 @@
         <h2 id="dtNombreHero"></h2>
       </div>
     </div>
+    <button type="button" class="secondary admin-only" id="btnAdministrarEsteTorneo" style="width:100%;margin-bottom:12px">⚙️ Administrar este torneo</button>
     <div class="card">
       <p class="match-meta" id="dtInfo"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
@@ -290,12 +291,14 @@
     <div class="card">
       <p class="match-meta" id="inscripcionEstado"></p>
       <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
-      <div class="row" style="margin-top:10px">
-        <button type="button" class="secondary" id="dtBtnVerCalendario">📅 Calendario</button>
-        <button type="button" class="secondary" id="dtBtnVerResultados">🏆 Resultados</button>
+      <!-- Calendario/Resultados recién tienen sentido con el fixture armado — mientras
+           se está anotando gente esta fila queda oculta (ver refrescarDetalleTorneo) -->
+      <div class="row" style="margin-top:10px" id="dtAccesoPartidosRow">
+        <button type="button" class="secondary" id="dtBtnVerCalendario"><svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg> Calendario</button>
+        <button type="button" class="secondary" id="dtBtnVerResultados"><svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a3 3 0 0 0 3 4"/><path d="M16 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3"/><path d="M9 20h6"/><path d="M10 16h4l.5 4h-5l.5-4Z"/></svg> Resultados</button>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="dtProximosPartidosCard">
       <h3>Próximos partidos</h3>
       <div id="dtProximosPartidos"></div>
     </div>
@@ -524,6 +527,7 @@
 
       <div class="card" id="editarTorneoCard" style="display:none">
         <h2>Editar torneo</h2>
+        <p class="match-meta" id="teAvisoBloqueo" style="display:none">🔒 Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
         <label>Nombre</label>
         <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
         <label>Complejo sede</label>
@@ -609,7 +613,8 @@
 
       <div class="card partidos-poster">
         <h2>Partidos</h2>
-        <button class="primary" id="btnArmarPartidos">Armar fase de grupos automáticamente</button>
+        <button class="primary" id="btnArmarPartidos">1. Generar fixture (cruces, sin horario)</button>
+        <button class="secondary" id="btnGenerarCalendario" style="margin-top:8px">2. Generar calendario (asignar cancha y horario)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
         <label style="margin-top:12px">Categoría</label>
         <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
@@ -775,18 +780,12 @@
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5-6-3.5Z" fill="currentColor" stroke="none"/></svg></span>
     Jugar
   </button>
-  <!-- Calendario/Resultados llevan siempre al torneo destacado (en curso o
-       el próximo) — así un jugador nunca tiene que entender cómo está
-       organizada la app para saber "cuándo juego": toca Calendario y listo. -->
-  <button id="tabCalendario" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg></span>
-    Calendario
-  </button>
-  <button id="tabResultados" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
-    Resultados
-  </button>
-  <button data-view="torneos" class="tab tab-desktop-only">
+  <!-- Calendario/Resultados ya no son atajos globales: no llevaban a una pantalla
+       real, sino que abrían el torneo destacado por detrás — un atajo "disfrazado"
+       que duplicaba abrirTorneo(). Ahora se accede desde Torneos -> el torneo en
+       cuestión, donde además están bien gateados (solo aparecen si esa categoría
+       ya tiene calendario armado). -->
+  <button data-view="torneos" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>
     Torneos
   </button>
@@ -794,10 +793,8 @@
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
     Ranking
   </button>
-  <button data-view="perfil" class="tab">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.3"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg></span>
-    Perfil
-  </button>
+  <!-- Perfil ya no se repite acá: el ícono de arriba (#btnPerfil) es el único
+       acceso, así no hay dos caminos al mismo lugar. -->
   <button id="btnAdminPanel" data-view="admin" class="tab tab-desktop-only" title="Panel de administrador" aria-label="Administración">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.6a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.1.68.3.94.56"/></svg></span>
     Config

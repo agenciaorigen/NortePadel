@@ -241,6 +241,16 @@ create table if not exists torneo_categorias (
   categoria text not null,
   unique (torneo_id, categoria)
 );
+-- fase en la que está ESTA categoría dentro del torneo (cada categoría avanza a su
+-- propio ritmo — una puede seguir en fase de grupos mientras otra ya tiene calendario):
+--   sin_fixture         -> todavía no se armaron los cruces
+--   fixture_generado    -> ya están los cruces (partidos con cancha_id/horario en null)
+--   calendario_confirmado -> ya se les asignó cancha y horario
+--   finalizada          -> ya se jugó su fase final
+-- Es la fuente de verdad para mostrar Calendario/Resultados al público (ver
+-- renderTorneoSubnav en app.js) en vez del parche anterior de "hay partidos sí/no",
+-- que se rompía apenas existía un fixture todavía sin horario.
+alter table torneo_categorias add column if not exists estado_fase text not null default 'sin_fixture';
 
 -- ---------- PAREJAS ----------
 create table if not exists parejas (
@@ -260,9 +270,13 @@ create table if not exists inscripciones (
   unique (torneo_id, jugador_id)
 );
 -- categoría en la que juega ESE torneo puntual (un torneo puede abarcar varias, ej "de 2da a 8va")
--- y si el admin ya confirmó el pago/la categoría, o todavía está pendiente de revisión
+-- y si el admin ya confirmó el pago/la categoría, o todavía está pendiente de revisión.
+-- estado: pendiente, confirmada, rechazada (con motivo), cancelada (el jugador se
+-- dio de baja él mismo). rechazada/cancelada NO se borran físicamente — quedan
+-- como historial y para que el cupo se libere sin perder el registro de que existió.
 alter table inscripciones add column if not exists categoria text;
 alter table inscripciones add column if not exists estado text not null default 'pendiente';
+alter table inscripciones add column if not exists motivo_rechazo text;
 
 -- ---------- PARTIDOS ----------
 create table if not exists partidos (
@@ -422,10 +436,50 @@ declare
   perdedor parejas%rowtype;
   pts_ganador int := 0;
   pts_perdedor int := 0;
+  es_correccion boolean;
+  old_ganador parejas%rowtype;
+  old_perdedor_id uuid;
+  old_perdedor parejas%rowtype;
+  old_pts_ganador int := 0;
+  old_pts_perdedor int := 0;
 begin
   -- solo actuar cuando el partido pasa a "jugado" y tiene ganador
   if new.estado = 'jugado' and new.ganador_pareja_id is not null
      and (old.estado is distinct from 'jugado' or old.ganador_pareja_id is distinct from new.ganador_pareja_id) then
+
+    -- si el partido YA estaba jugado con otro ganador, es una corrección de
+    -- un resultado que ya había sumado puntos: hay que revertir exactamente
+    -- lo que se le dio al ganador/perdedor viejo ANTES de sumar el nuevo,
+    -- para no dejar el ranking inflado con cada corrección (bug detectado:
+    -- antes de este fix, una corrección solo sumaba y nunca restaba).
+    es_correccion := old.estado = 'jugado' and old.ganador_pareja_id is not null
+                      and old.ganador_pareja_id is distinct from new.ganador_pareja_id;
+
+    if es_correccion then
+      select * into old_ganador from parejas where id = old.ganador_pareja_id;
+      old_perdedor_id := case when old.pareja1_id = old.ganador_pareja_id then old.pareja2_id else old.pareja1_id end;
+      select * into old_perdedor from parejas where id = old_perdedor_id;
+
+      if old.ronda = 'Final' then
+        select puntos into old_pts_ganador from puntos_ronda where ronda = 'Campeón';
+        select puntos into old_pts_perdedor from puntos_ronda where ronda = 'Sub';
+      elsif old.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+        select puntos into old_pts_perdedor from puntos_ronda where ronda = old.ronda;
+      end if;
+
+      update jugadores set
+        puntos_ranking = puntos_ranking - coalesce(old_pts_ganador, 0),
+        partidos_jugados = partidos_jugados - 1,
+        partidos_ganados = partidos_ganados - 1
+      where id in (old_ganador.jugador1_id, old_ganador.jugador2_id);
+
+      if old_perdedor.id is not null then
+        update jugadores set
+          puntos_ranking = puntos_ranking - coalesce(old_pts_perdedor, 0),
+          partidos_jugados = partidos_jugados - 1
+        where id in (old_perdedor.jugador1_id, old_perdedor.jugador2_id);
+      end if;
+    end if;
 
     select * into ganador from parejas where id = new.ganador_pareja_id;
 
@@ -550,11 +604,11 @@ $$;
 drop function if exists parejas_publicas(uuid);
 create or replace function parejas_publicas(p_torneo_id uuid) returns table (
   id uuid, jugador1_id uuid, jugador2_id uuid, jugador1_nombre text, jugador2_nombre text,
-  categoria text, estado text
+  categoria text, estado text, motivo_rechazo text
 ) language sql stable security definer set search_path = public as $$
   select p.id, p.jugador1_id, p.jugador2_id,
     j1.nombre || ' ' || j1.apellido, j2.nombre || ' ' || j2.apellido,
-    i1.categoria, coalesce(i1.estado, 'pendiente')
+    i1.categoria, coalesce(i1.estado, 'pendiente'), i1.motivo_rechazo
   from parejas p
   join jugadores j1 on j1.id = p.jugador1_id
   join jugadores j2 on j2.id = p.jugador2_id
@@ -625,13 +679,22 @@ begin
     raise exception 'Elegí en qué categoría van a jugar este torneo';
   end if;
 
+  -- si ya existe una inscripción de este jugador a este torneo pero está
+  -- 'cancelada' (se había dado de baja antes) o 'rechazada' (el admin la
+  -- rechazó), se reactiva con la categoría nueva en vez de quedar pisada para
+  -- siempre por el "do nothing": ninguna de las dos se borra físicamente (ver
+  -- policy inscripciones_jugador_cancela y la columna motivo_rechazo), así que
+  -- reinscribirse tiene que poder revivirlas. Si la fila existente está
+  -- pendiente/confirmada de antes, se deja intacta como hasta ahora.
   insert into inscripciones (torneo_id, jugador_id, categoria)
   values (p_torneo_id, v_mi_id, p_categoria)
-  on conflict (torneo_id, jugador_id) do nothing;
+  on conflict (torneo_id, jugador_id) do update set categoria = excluded.categoria, estado = 'pendiente', motivo_rechazo = null
+  where inscripciones.estado in ('cancelada', 'rechazada');
 
   insert into inscripciones (torneo_id, jugador_id, categoria)
   values (p_torneo_id, p_pareja_jugador_id, p_categoria)
-  on conflict (torneo_id, jugador_id) do nothing;
+  on conflict (torneo_id, jugador_id) do update set categoria = excluded.categoria, estado = 'pendiente', motivo_rechazo = null
+  where inscripciones.estado in ('cancelada', 'rechazada');
 
   -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
   if not exists (
@@ -1023,7 +1086,7 @@ create policy "partidos_admin" on partidos for all using (is_admin()) with check
 drop policy if exists "historial_categoria_admin" on historial_categoria;
 create policy "historial_categoria_admin" on historial_categoria for all using (is_admin()) with check (is_admin());
 
--- inscripciones: cada jugador ve/crea/borra la suya, admin todas
+-- inscripciones: cada jugador ve/crea la suya, admin todas
 drop policy if exists "inscripciones_select" on inscripciones;
 create policy "inscripciones_select" on inscripciones for select using (
   is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
@@ -1032,13 +1095,21 @@ drop policy if exists "inscripciones_insert" on inscripciones;
 create policy "inscripciones_insert" on inscripciones for insert with check (
   is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
 );
+-- el borrado físico queda reservado al admin (dar de baja a un jugador del roster,
+-- o al borrar una pareja completa); el jugador cancela su propia inscripción
+-- actualizando el estado (ver inscripciones_jugador_cancela más abajo), nunca
+-- borrando la fila, para no perder el historial.
 drop policy if exists "inscripciones_delete" on inscripciones;
-create policy "inscripciones_delete" on inscripciones for delete using (
-  is_admin() or exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid())
-);
--- solo el admin confirma una inscripción (pago + categoría verificados)
+create policy "inscripciones_delete" on inscripciones for delete using (is_admin());
+-- el admin confirma/rechaza una inscripción (pago + categoría verificados)
 drop policy if exists "inscripciones_update" on inscripciones;
 create policy "inscripciones_update" on inscripciones for update using (is_admin()) with check (is_admin());
+-- el propio jugador puede cancelar su inscripción (estado -> 'cancelada'), mismo
+-- patrón ya usado en reservas_organizador_cancela
+drop policy if exists "inscripciones_jugador_cancela" on inscripciones;
+create policy "inscripciones_jugador_cancela" on inscripciones for update
+  using (exists (select 1 from jugadores j where j.id = inscripciones.jugador_id and j.auth_user_id = auth.uid()))
+  with check (estado = 'cancelada');
 
 -- flyers (legacy), sponsors, jugador_del_mes: lectura pública, escritura admin
 drop policy if exists "flyers_select" on flyers;

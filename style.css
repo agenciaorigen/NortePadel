@@ -1010,10 +1010,11 @@ nav.tabbar button.tab-cta .icon {
 nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); color: #fff; }
 nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 700; }
 
-/* En mobile la barra inferior queda con lo esencial (Inicio/Calendario/Resultados/
-   Perfil + "Más"), como una app nativa; Torneos/Ranking/Administración pasan a vivir
-   en el menú de "Más" para no amontonar la barra. En PC hay lugar de sobra: se
-   muestran todos los accesos juntos y "Más" no hace falta. */
+/* En mobile la barra inferior queda con lo esencial (Inicio/Torneos + "Más"),
+   como una app nativa; Perfil vive en el ícono de arriba (no se repite acá) y
+   Ranking/Administración pasan a vivir en el menú de "Más" para no amontonar
+   la barra. En PC hay lugar de sobra: se muestran todos los accesos juntos y
+   "Más" no hace falta. */
 nav.tabbar button.tab-desktop-only { display: none; }
 nav.tabbar button.tab-mobile-only { display: flex; }
 /* Administración: además de desktop-only, solo se muestra si sos admin — se resuelve

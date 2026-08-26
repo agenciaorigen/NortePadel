@@ -24,6 +24,11 @@ let cacheEtiquetas = []; // etiquetas_jugador — uso interno del admin, con col
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
 let ultimosPartidos = [];
+// true si alguna categoría del torneo abierto ya tiene calendario (cancha+horario
+// asignados) o terminó — fuente de verdad para mostrar Calendario/Resultados
+// (ver renderTorneoSubnav), en vez de "hay partidos" que también es cierto para
+// un fixture recién armado y todavía sin horario.
+let hayCalendarioTorneoActual = false;
 let ultimasCanchasTorneo = [];
 let partidosCategoriaFiltro = ""; // "" = todas las categorías del torneo
 let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instagram_url)
@@ -131,7 +136,7 @@ window.addEventListener("hashchange", despacharRuta);
 // antes de saber si el usuario es admin o no.
 
 document.querySelectorAll(".tab").forEach((btn) => {
-  if (!btn.dataset.view) return; // Calendario/Resultados/Más navegan a algo dinámico, tienen su propio listener (más abajo)
+  if (!btn.dataset.view) return; // "Más" navega a algo dinámico, tiene su propio listener (más abajo)
   btn.addEventListener("click", () => cambiarVista(btn.dataset.view));
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
@@ -141,26 +146,13 @@ document.getElementById("marqueeBanda").addEventListener("click", () => {
   else cambiarVista("torneos");
 });
 
-// Calendario/Resultados de la tabbar llevan siempre al torneo destacado (en
-// curso o el próximo) — un jugador nunca necesita entender cómo está armada
-// la app para saber "cuándo juego": toca Calendario y listo.
-document.getElementById("tabCalendario").addEventListener("click", () => {
-  if (torneoDestacadoId) abrirTorneo(torneoDestacadoId, "calendario");
-  else { toast("Todavía no hay un torneo activo"); cambiarVista("torneos"); }
-});
-document.getElementById("tabResultados").addEventListener("click", () => {
-  if (torneoDestacadoId) abrirTorneo(torneoDestacadoId, "resultados");
-  else { toast("Todavía no hay un torneo activo"); cambiarVista("torneos"); }
-});
-
-// "Más": en mobile la tabbar solo trae 4 accesos + esto — Torneos/Ranking/
+// "Más": en mobile la tabbar solo trae Inicio/Torneos + esto — Ranking/
 // Administración viven acá, un toque más adentro (ver style.css .tab-mobile-only)
 document.getElementById("tabMas").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "flex"; });
 document.getElementById("btnCerrarMas").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; });
 document.getElementById("masOverlay").addEventListener("click", (e) => {
   if (e.target.id === "masOverlay") document.getElementById("masOverlay").style.display = "none";
 });
-document.getElementById("masBtnTorneos").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; cambiarVista("torneos"); });
 document.getElementById("masBtnRanking").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; cambiarVista("ranking"); });
 document.getElementById("masBtnAdmin").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; cambiarVista("admin"); });
 
@@ -1142,33 +1134,43 @@ function etiquetaDotHtml(jugadorId) {
 // ============================================================
 function parejaRowHtml(p, editable) {
   const catBadge = p.categoria ? `<span class="badge">${p.categoria}</span>` : "";
-  const estadoBadge = p.estado === "confirmada"
-    ? `<span class="badge solid">Confirmada</span>`
+  const estadoBadge = p.estado === "confirmada" ? `<span class="badge solid">Confirmada</span>`
+    : p.estado === "rechazada" ? `<span class="badge danger" title="${p.motivo_rechazo || ""}">Rechazada</span>`
     : `<span class="badge orange">Pendiente de confirmar</span>`;
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
+  const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
   return `<div class="pareja-row">
     <span>${etiquetas}🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
     <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-      ${editable && p.estado !== "confirmada" ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
+      ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
+      ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
       ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
     </span>
   </div>`;
 }
 function sinParejaChipHtml(i, editable) {
-  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${i.estado && i.estado !== "confirmada" ? " · pendiente" : ""}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`;
+  const sufijoEstado = i.estado && i.estado !== "confirmada" ? ` · ${i.estado === "pendiente" ? "pendiente" : i.estado}` : "";
+  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`;
 }
 function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable) {
-  const enPareja = new Set((parejas || []).flatMap((p) => [p.jugador1_id, p.jugador2_id]));
-  const sinPareja = (insc || []).filter((i) => !enPareja.has(i.jugador_id));
+  // al público no se le muestran parejas rechazadas ni inscripciones
+  // canceladas/rechazadas — son historial para el admin, no algo vigente
+  const inscBase = editable ? (insc || []) : (insc || []).filter((i) => i.estado !== "cancelada" && i.estado !== "rechazada");
+  const parejasBase = editable ? (parejas || []) : (parejas || []).filter((p) => p.estado !== "rechazada");
+  const enPareja = new Set(parejasBase.flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+  const sinPareja = inscBase.filter((i) => !enPareja.has(i.jugador_id));
 
   const contParejas = document.getElementById(contParejasId);
-  contParejas.innerHTML = (parejas || []).map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
+  contParejas.innerHTML = parejasBase.map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
   if (editable) {
     contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => await borrarPareja(btn.dataset.id, btn.dataset.nombre, btn.dataset.j1, btn.dataset.j2));
     });
     contParejas.querySelectorAll(".btnConfirmarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => await confirmarPareja(btn.dataset.j1, btn.dataset.j2));
+    });
+    contParejas.querySelectorAll(".btnRechazarPareja").forEach((btn) => {
+      btn.addEventListener("click", async () => await rechazarPareja(btn.dataset.j1, btn.dataset.j2));
     });
   }
 
@@ -1542,12 +1544,18 @@ function mostrarPantallaTorneo(pantalla) {
 
 // mini-nav del torneo (Inicio/Categorías/Jugadores/Calendario/Resultados) —
 // un solo lugar que arma los pills, así nunca queda desalineado con
-// PANTALLAS_TORNEO ni con la pantalla realmente activa.
+// PANTALLAS_TORNEO ni con la pantalla realmente activa. Mientras se está
+// anotando gente (todavía no hay partidos armados) Calendario y Resultados
+// ni siquiera aparecen como pestaña — recién se muestran una vez que se
+// cerró la inscripción y el fixture está armado, tal cual se pidió desde el
+// arranque: en etapa de inscripción, solo la información del torneo.
 function renderTorneoSubnav(claveActiva) {
   const cont = document.getElementById("torneoSubnav");
-  cont.innerHTML = Object.entries(PANTALLAS_TORNEO).map(([key, info]) =>
-    `<button type="button" class="pill ${key === claveActiva ? "active" : ""}" data-pantalla="${key}">${info.label}</button>`
-  ).join("");
+  cont.innerHTML = Object.entries(PANTALLAS_TORNEO)
+    .filter(([key]) => hayCalendarioTorneoActual || (key !== "calendario" && key !== "resultados"))
+    .map(([key, info]) =>
+      `<button type="button" class="pill ${key === claveActiva ? "active" : ""}" data-pantalla="${key}">${info.label}</button>`
+    ).join("");
   cont.querySelectorAll(".pill").forEach((btn) => {
     btn.addEventListener("click", () => mostrarPantallaTorneo(btn.dataset.pantalla));
   });
@@ -1620,13 +1628,22 @@ async function actualizarAccesoInscripcion() {
     btn.onclick = () => cambiarVista("perfil");
     return;
   }
-  const { data } = await sb.from("inscripciones").select("id").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle();
-  yaInscriptoEnTorneoActual = !!data;
-  if (data) {
+  // cancelada/rechazada no cuentan como "ya inscripto" — la fila sigue existiendo
+  // como historial (ver schema.sql), pero para la UI es como si no se hubiera
+  // anotado: puede volver a hacerlo (inscribirse_con_pareja la reactiva).
+  const { data } = await sb.from("inscripciones").select("id, estado, motivo_rechazo").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle();
+  const inscActiva = data && data.estado !== "cancelada" && data.estado !== "rechazada";
+  yaInscriptoEnTorneoActual = !!inscActiva;
+  if (inscActiva) {
     estado.textContent = "✅ Ya estás inscripto en este torneo.";
     btn.textContent = "Ver mi inscripción";
     btn.style.display = "block";
     btn.onclick = () => mostrarPantallaTorneo("mi-inscripcion");
+  } else if (data && data.estado === "rechazada") {
+    estado.textContent = `❌ Tu inscripción fue rechazada${data.motivo_rechazo ? ": " + data.motivo_rechazo : ""}. Podés volver a anotarte.`;
+    btn.textContent = "Anotarme de nuevo";
+    btn.style.display = "block";
+    btn.onclick = () => mostrarPantallaTorneo("inscripcion");
   } else if (torneoActualData && torneoActualData.estado !== "inscripcion") {
     estado.textContent = "🔒 La inscripción para este torneo está cerrada.";
     btn.style.display = "none";
@@ -1678,9 +1695,11 @@ async function cargarMiInscripcion() {
     sb.from("inscripciones").select("*").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle(),
     sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId })
   ]);
-  if (!insc) {
-    contEstado.innerHTML = "";
-    contResumen.textContent = "Todavía no estás inscripto en este torneo.";
+  if (!insc || insc.estado === "cancelada" || insc.estado === "rechazada") {
+    contEstado.innerHTML = insc?.estado === "rechazada" ? '<span class="badge danger">Rechazada</span>' : "";
+    contResumen.textContent = insc?.estado === "rechazada"
+      ? `Tu inscripción fue rechazada${insc.motivo_rechazo ? ": " + insc.motivo_rechazo : ""}.`
+      : "Todavía no estás inscripto en este torneo.";
     return;
   }
   contEstado.innerHTML = insc.estado === "confirmada"
@@ -1706,7 +1725,10 @@ document.getElementById("miInscBtnCancelar").addEventListener("click", async () 
     return;
   }
   if (!confirm("¿Seguro que querés cancelar tu inscripción a este torneo?")) return;
-  const { error } = await sb.from("inscripciones").delete().eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id);
+  // no se borra la fila: queda como historial (estado 'cancelada'), permitido por
+  // RLS solo hacia ese valor (ver inscripciones_jugador_cancela en schema.sql).
+  // Si más adelante se vuelve a anotar, inscribirse_con_pareja la reactiva.
+  const { error } = await sb.from("inscripciones").update({ estado: "cancelada" }).eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id);
   if (error) { toast("Error: " + error.message); return; }
   toast("Cancelaste tu inscripción.");
   avisarActualizacionEnVivo();
@@ -1982,9 +2004,10 @@ function wirearBotonWhatsappPago(id, t) {
 // más acá: eso es refrescarGestionTorneo/cargarGestionTorneo, en Administración.
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
-  const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", torneoActualId).single();
+  const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria, estado_fase)").eq("id", torneoActualId).single();
   if (!t) return;
   torneoActualData = t;
+  hayCalendarioTorneoActual = (t.torneo_categorias || []).some((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada");
 
   document.getElementById("dtNombre").textContent = t.nombre;
   document.getElementById("dtEstado").innerHTML = badgeEstadoTorneo(t);
@@ -2022,6 +2045,14 @@ async function refrescarDetalleTorneo() {
     sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId })
   ]);
   ultimosPartidos = partidos || [];
+
+  // Calendario/Resultados (pestaña y accesos directos) solo aparecen una vez que
+  // alguna categoría tiene calendario confirmado — mientras se está anotando
+  // gente, o mientras solo existe el fixture (cruces sin horario todavía), Inicio
+  // muestra solo información, sin mezclar partidos que el público todavía no
+  // puede ubicar en el tiempo (ver también renderTorneoSubnav).
+  document.getElementById("dtAccesoPartidosRow").style.display = hayCalendarioTorneoActual ? "flex" : "none";
+  document.getElementById("dtProximosPartidosCard").style.display = hayCalendarioTorneoActual ? "block" : "none";
 
   renderParejasEn("dtParejas", "dtSinPareja", insc || [], parejas || [], false);
   cargarCategoriasTorneo(parejas || []);
@@ -2099,7 +2130,7 @@ function renderStatsInicioTorneo(parejas, canchasTorneo, partidos) {
 let cacheBloqueosCancha = [];
 
 // cancha_id -> [{desde:Date, hasta:Date, motivo}], el formato que esperan
-// calcularSlots, armarPartidosAutomatico y hayConflictoCancha.
+// calcularSlots, asignarHorarios y hayConflictoCancha.
 function bloqueosPorCanchaMapa() {
   const mapa = {};
   cacheBloqueosCancha.forEach((b) => {
@@ -2193,7 +2224,7 @@ document.getElementById("admSelectTorneoGestion").addEventListener("change", asy
 // vive solo acá.
 async function cargarGestionTorneo(id) {
   torneoGestionId = id;
-  const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").eq("id", id).single();
+  const { data: t } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria, estado_fase)").eq("id", id).single();
   if (!t) return;
   torneoGestionData = t;
   document.getElementById("admSelectTorneoGestion").value = id;
@@ -2275,6 +2306,16 @@ document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", a
   document.getElementById("teFlyerArchivo").value = "";
   const categoriasActuales = new Set((t.torneo_categorias || []).map((c) => c.categoria));
   document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
+
+  // una vez que alguna categoría ya tiene calendario armado, tocar fecha/horario/
+  // formato/categorías puede desincronizar los partidos ya programados con lo
+  // que el torneo dice — se bloquean esos campos (nombre/sede/costo siguen libres).
+  const hayCalendarioArmado = (t.torneo_categorias || []).some((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada");
+  document.getElementById("teAvisoBloqueo").style.display = hayCalendarioArmado ? "block" : "none";
+  ["teFechaInicio", "teFechaFin", "teDuracion", "teHoraDesde", "teHoraHasta", "teFaseGruposFormato", "teTamanoGrupo", "teAvanzanPorGrupo"]
+    .forEach((id) => { document.getElementById(id).disabled = hayCalendarioArmado; });
+  document.querySelectorAll(".chkDiaTorneoEdit, .chkTorneoCategoriaEdit").forEach((chk) => { chk.disabled = hayCalendarioArmado; });
+
   const card = document.getElementById("editarTorneoCard");
   card.style.display = "block";
   card.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2389,16 +2430,38 @@ async function confirmarPareja(jugador1Id, jugador2Id) {
 // desinscriptos (no "sin pareja" sueltos) — para volver a anotarse tienen que
 // hacerlo de nuevo, siempre de a dos.
 async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
-  const { data: jugado } = await sb.from("partidos").select("id")
+  const { data: partidosPareja } = await sb.from("partidos").select("id, estado")
     .eq("torneo_id", torneoGestionId)
-    .or(`pareja1_id.eq.${parejaId},pareja2_id.eq.${parejaId}`)
-    .eq("estado", "jugado").maybeSingle();
-  if (jugado) { toast(`${nombrePareja} ya jugó partidos en este torneo — sacale el resultado a mano primero`); return; }
+    .or(`pareja1_id.eq.${parejaId},pareja2_id.eq.${parejaId}`);
+  if ((partidosPareja || []).some((p) => p.estado === "jugado")) {
+    toast(`${nombrePareja} ya jugó partidos en este torneo — sacale el resultado a mano primero`);
+    return;
+  }
+  // borrar la pareja borra también en cascada sus partidos programados sin
+  // jugar (fixture y/o calendario) — es destructivo y no se puede deshacer,
+  // así que se avisa antes en vez de hacerlo silencioso.
+  const programados = (partidosPareja || []).length;
+  if (programados > 0 && !confirm(`${nombrePareja} tiene ${programados} partido(s) programado(s) sin jugar. Al sacarla del torneo esos partidos también se borran. ¿Confirmás?`)) return;
   const { error } = await sb.from("parejas").delete().eq("id", parejaId); // borra también sus partidos pendientes (en cascada)
   if (error) { toast("Error: " + error.message); return; }
   await sb.from("inscripciones").delete().eq("torneo_id", torneoGestionId).eq("jugador_id", jugador1Id);
   await sb.from("inscripciones").delete().eq("torneo_id", torneoGestionId).eq("jugador_id", jugador2Id);
   toast(`Se sacó del torneo a la pareja ${nombrePareja}`);
+  avisarActualizacionEnVivo();
+  refrescarTrasAccionGestion();
+}
+
+// ---------- admin rechaza una inscripción pendiente (con motivo) ----------
+// A diferencia de "Confirmar", rechazar no borra nada: la fila queda con
+// estado 'rechazada' + motivo, para que el jugador entienda qué pasó (y para
+// no perder el historial, mismo criterio que "cancelada" — ver schema.sql).
+async function rechazarPareja(jugador1Id, jugador2Id) {
+  const motivo = prompt("¿Por qué se rechaza esta inscripción? (se le va a mostrar al jugador)");
+  if (motivo === null) return; // canceló el prompt
+  const { error: e1 } = await sb.from("inscripciones").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador1Id);
+  const { error: e2 } = await sb.from("inscripciones").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador2Id);
+  if (e1 || e2) { toast("Error: " + (e1 || e2).message); return; }
+  toast("Inscripción rechazada");
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
 }
@@ -2469,19 +2532,48 @@ function armarGruposDeParejas(parejasCategoria, tamanoGrupo) {
   return gruposArr;
 }
 
-// Arma (e inserta) los partidos de UNA categoría, encadenando la ocupación
-// de cancha/horario ya usada por otras categorías del mismo torneo para no
-// proponerles la misma cancha a la misma hora. `entrada` es {parejas: [...]}
-// para modo eliminación directa, o {grupos: [[...], ...]} para fase de grupos.
-async function armarPartidosParaGrupo(entrada, categoria, ronda, torneo, canchas, ocupacionAcumulada) {
-  const todasLasParejas = entrada.grupos ? entrada.grupos.flat() : entrada.parejas;
-  if (todasLasParejas.length < 2) return { generados: 0, sinHorario: 0 };
-  const jugadorIds = [...new Set(todasLasParejas.flatMap((p) => [p.jugador1_id, p.jugador2_id]))];
+// Arma (e inserta) el FIXTURE de UNA categoría: quién juega contra quién,
+// SIN asignarle todavía cancha ni horario — eso es un paso aparte
+// (generarCalendarioParaCategoria), para no perder cruces que no encuentren
+// hueco en el mismo acto en que se decide quién juega contra quién. `entrada`
+// es {parejas: [...]} para modo eliminación directa, o {grupos: [[...], ...]}
+// para fase de grupos.
+async function generarFixtureParaGrupo(entrada, categoria, ronda, torneo) {
+  const cruces = armarCruces({ parejas: entrada.parejas, grupos: entrada.grupos });
+  if (cruces.length === 0) return { generados: 0 };
+  const filas = cruces.map((c) => ({
+    torneo_id: torneo.id, ronda, categoria, grupo: c.grupo,
+    pareja1_id: c.pareja1.id, pareja2_id: c.pareja2.id, estado: "programado"
+  }));
+  const { error } = await sb.from("partidos").insert(filas);
+  if (error) { toast(`Error armando ${categoria}: ` + error.message); return { generados: 0 }; }
+  await sb.from("torneo_categorias").update({ estado_fase: "fixture_generado" }).eq("torneo_id", torneo.id).eq("categoria", categoria);
+  return { generados: filas.length };
+}
+
+// Busca cancha y horario para los partidos de una categoría que YA tienen
+// fixture pero todavía no calendario (horario en null) y actualiza esas
+// mismas filas (no inserta partidos nuevos). Encadena `ocupacionAcumulada`
+// para no proponerle la misma cancha/horario a otra categoría del torneo.
+// Los cruces que sigan sin hueco quedan como partidos reales con horario en
+// null (reasignables a mano después), nunca se pierden.
+async function generarCalendarioParaCategoria(torneoId, categoria, torneo, canchas, ocupacionAcumulada) {
+  const { data: sinHorarioDb } = await sb.from("partidos").select("*").eq("torneo_id", torneoId).eq("categoria", categoria).is("horario", null);
+  if (!sinHorarioDb || sinHorarioDb.length === 0) return { generados: 0, sinHorario: 0 };
+
+  const parejaIds = [...new Set(sinHorarioDb.flatMap((p) => [p.pareja1_id, p.pareja2_id]))];
+  const { data: parejasDb } = await sb.from("parejas").select("*").in("id", parejaIds);
+  const parejaPorId = Object.fromEntries((parejasDb || []).map((p) => [p.id, p]));
+  const cruces = sinHorarioDb
+    .map((p) => ({ id: p.id, pareja1: parejaPorId[p.pareja1_id], pareja2: parejaPorId[p.pareja2_id], grupo: p.grupo }))
+    .filter((c) => c.pareja1 && c.pareja2);
+  if (cruces.length === 0) return { generados: 0, sinHorario: 0 };
+
+  const jugadorIds = [...new Set(cruces.flatMap((c) => [c.pareja1.jugador1_id, c.pareja1.jugador2_id, c.pareja2.jugador1_id, c.pareja2.jugador2_id]))];
   const disponibilidadPorJugador = await jugadoresDisponibilidad(jugadorIds, torneo.id);
 
-  const { partidosGenerados, sinHorario } = armarPartidosAutomatico({
-    parejas: entrada.parejas,
-    grupos: entrada.grupos,
+  const { partidosGenerados, sinHorario } = asignarHorarios({
+    cruces,
     disponibilidadPorJugador,
     fechasDisponibles: fechasDelTorneo(torneo),
     canchas,
@@ -2491,11 +2583,15 @@ async function armarPartidosParaGrupo(entrada, categoria, ronda, torneo, canchas
     bloqueosPorCancha: bloqueosPorCanchaMapa() // respeta los bloqueos de cancha cargados en Administración
   });
 
+  const idPorParejas = new Map(cruces.map((c) => [`${c.pareja1.id}-${c.pareja2.id}`, c.id]));
+  for (const p of partidosGenerados) {
+    const partidoId = idPorParejas.get(`${p.pareja1_id}-${p.pareja2_id}`);
+    if (!partidoId) continue;
+    await sb.from("partidos").update({ cancha_id: p.cancha_id, horario: p.horario }).eq("id", partidoId);
+  }
   if (partidosGenerados.length > 0) {
-    const filas = partidosGenerados.map((p) => ({ torneo_id: torneo.id, ronda, categoria, ...p, estado: "programado" }));
-    const { error } = await sb.from("partidos").insert(filas);
-    if (error) { toast(`Error armando ${categoria}: ` + error.message); return { generados: 0, sinHorario: 0 }; }
     ocupacionAcumulada.push(...partidosGenerados);
+    await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoId).eq("categoria", categoria);
   }
   return { generados: partidosGenerados.length, sinHorario: sinHorario.length };
 }
@@ -2523,6 +2619,26 @@ function calcularTablaGrupo(partidosGrupo) {
   );
 }
 
+// Escribe torneo.estado='en_curso' la primera vez que alguna categoría llega
+// a tener calendario, y 'finalizado' cuando TODAS las categorías del torneo
+// llegan a 'finalizada'. Reemplaza a calcularTorneoDestacado() (que decide por
+// fecha) como fuente de verdad de "¿está en curso?" para cualquier lugar que
+// necesite saberlo de verdad en vez de estimarlo.
+async function actualizarEstadoTorneoPorFases(torneoId) {
+  const { data: cats } = await sb.from("torneo_categorias").select("estado_fase").eq("torneo_id", torneoId);
+  if (!cats || cats.length === 0) return;
+  const { data: t } = await sb.from("torneos").select("estado").eq("id", torneoId).single();
+  if (!t || t.estado === "cancelado" || t.estado === "finalizado") return;
+  if (cats.every((c) => c.estado_fase === "finalizada")) {
+    await sb.from("torneos").update({ estado: "finalizado" }).eq("id", torneoId);
+  } else if (
+    (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada") &&
+    cats.some((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada")
+  ) {
+    await sb.from("torneos").update({ estado: "en_curso" }).eq("id", torneoId);
+  }
+}
+
 // Agrupa un array de {..., categoria} por su campo categoria (las sin
 // categoría asignada todavía quedan juntas bajo "Sin categoría", para no
 // perderlas de vista en vez de mezclarlas con otro grupo).
@@ -2540,40 +2656,65 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   // parejas_publicas ya trae la categoría de cada pareja (la del torneo puntual
   // en el que se anotó) — un torneo puede tener varias categorías corriendo en
   // paralelo (ej: Damas y Caballeros, varias divisiones) y cada una arma su
-  // propia fase de grupos por separado, nunca cruzadas entre sí.
+  // propia fase de grupos por separado, nunca cruzadas entre sí. Este botón
+  // solo arma QUIÉN juega contra quién — el horario y la cancha se asignan
+  // aparte con "Generar calendario", una vez armado el fixture.
   if (!torneoGestionId) { toast("Elegí primero un torneo en gestión"); return; }
   const { data: parejasDb } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoGestionId });
   if (!parejasDb || parejasDb.length < 2) { toast("Armá primero al menos 2 parejas"); return; }
 
   // evita duplicar partidos si se apreta el botón más de una vez: solo arma
   // fase de grupos para las parejas que todavía no tienen ningún partido
-  const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id, cancha_id, horario").eq("torneo_id", torneoGestionId);
+  const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id").eq("torneo_id", torneoGestionId);
   const yaJuegan = new Set((partidosExistentes || []).flatMap((p) => [p.pareja1_id, p.pareja2_id]));
   const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id));
   if (parejasSinPartido.length < 2) { toast("Todas las parejas ya tienen un partido de fase de grupos asignado"); return; }
 
   const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoGestionId).single();
-  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoGestionId);
-  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
-  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
-  if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
-
-  const ocupacionAcumulada = [...(partidosExistentes || [])];
   const grupos = agruparPorCategoria(parejasSinPartido);
   const formatoGrupos = torneo.fase_grupos_formato === "grupos";
-  let totalGenerados = 0, totalSinHorario = 0;
+  let totalGenerados = 0;
   for (const categoria of Object.keys(grupos)) {
     const parejasCategoria = grupos[categoria];
     if (parejasCategoria.length < 2) continue; // una sola pareja suelta en esa categoría: no hay con quién cruzarla todavía
     const entrada = formatoGrupos
       ? { grupos: armarGruposDeParejas(parejasCategoria, torneo.tamano_grupo || 3) }
       : { parejas: parejasCategoria };
-    const { generados, sinHorario } = await armarPartidosParaGrupo(entrada, categoria, "Fase de grupos", torneo, canchas, ocupacionAcumulada);
+    const { generados } = await generarFixtureParaGrupo(entrada, categoria, "Fase de grupos", torneo);
+    totalGenerados += generados;
+  }
+
+  toast(`Se armó el fixture: ${totalGenerados} partidos (todavía sin cancha ni horario). Ahora usá "Generar calendario".`);
+  avisarActualizacionEnVivo();
+  refrescarTrasAccionGestion();
+});
+
+document.getElementById("btnGenerarCalendario").addEventListener("click", async () => {
+  // Toma los partidos que ya tienen fixture (pareja1/pareja2 definidos) pero
+  // todavía no cancha/horario, y les busca un hueco — separado de "Armar
+  // fixture" para que armar quién juega contra quién nunca pierda cruces por
+  // no encontrarles horario en el mismo acto.
+  if (!torneoGestionId) { toast("Elegí primero un torneo en gestión"); return; }
+  const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoGestionId).single();
+  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoGestionId);
+  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
+  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
+  if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
+
+  const { data: partidosExistentes } = await sb.from("partidos").select("categoria, cancha_id, horario").eq("torneo_id", torneoGestionId);
+  const categoriasSinHorario = [...new Set((partidosExistentes || []).filter((p) => !p.horario).map((p) => p.categoria))];
+  if (categoriasSinHorario.length === 0) { toast("No hay ningún fixture pendiente de calendario — generá el fixture primero"); return; }
+
+  const ocupacionAcumulada = (partidosExistentes || []).filter((p) => p.horario);
+  let totalGenerados = 0, totalSinHorario = 0;
+  for (const categoria of categoriasSinHorario) {
+    const { generados, sinHorario } = await generarCalendarioParaCategoria(torneoGestionId, categoria, torneo, canchas, ocupacionAcumulada);
     totalGenerados += generados;
     totalSinHorario += sinHorario;
   }
 
-  toast(`Se programaron ${totalGenerados} partidos` + (totalSinHorario ? `, ${totalSinHorario} quedaron sin horario común` : ""));
+  await actualizarEstadoTorneoPorFases(torneoGestionId);
+  toast(`Se asignó horario a ${totalGenerados} partidos` + (totalSinHorario ? `, ${totalSinHorario} quedaron sin horario común` : ""));
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
 });
@@ -2591,11 +2732,6 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
   if (!partidos || partidos.length === 0) { toast("Todavía no armaste ningún partido"); return; }
 
   const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoGestionId).single();
-  const { data: tc } = await sb.from("torneo_canchas").select("canchas(*)").eq("torneo_id", torneoGestionId);
-  const canchas = (tc || []).map((c) => c.canchas).filter(Boolean);
-  if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
-
-  const ocupacionAcumulada = partidos.map((p) => ({ cancha_id: p.cancha_id, horario: p.horario }));
   const grupos = agruparPorCategoria(partidos);
   const mensajes = [];
   let totalGenerados = 0;
@@ -2630,15 +2766,22 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
     } else {
       ganadoresIds = [...new Set(partidosFaseActual.map((p) => p.ganador_pareja_id).filter(Boolean))];
     }
-    if (ganadoresIds.length < 2) { if (ganadoresIds.length === 1) mensajes.push(`${categoria}: ya tiene a su campeón, no hay más fases para armar`); continue; }
+    if (ganadoresIds.length < 2) {
+      if (ganadoresIds.length === 1) {
+        mensajes.push(`${categoria}: ya tiene a su campeón, no hay más fases para armar`);
+        await sb.from("torneo_categorias").update({ estado_fase: "finalizada" }).eq("torneo_id", torneoGestionId).eq("categoria", categoria);
+      }
+      continue;
+    }
     if (ganadoresIds.length % 2 !== 0) { mensajes.push(`${categoria}: quedaron ${ganadoresIds.length} clasificados (número impar) — resolvé eso a mano`); continue; }
 
     const { data: parejasGanadoras } = await sb.from("parejas").select("*").in("id", ganadoresIds);
     const siguienteFase = nombreFasePorCantidadEquipos(ganadoresIds.length);
-    const { generados } = await armarPartidosParaGrupo({ parejas: parejasGanadoras }, categoria, siguienteFase, torneo, canchas, ocupacionAcumulada);
-    if (generados > 0) { totalGenerados += generados; mensajes.push(`${categoria}: se armó "${siguienteFase}" (${generados})`); }
+    const { generados } = await generarFixtureParaGrupo({ parejas: parejasGanadoras }, categoria, siguienteFase, torneo);
+    if (generados > 0) { totalGenerados += generados; mensajes.push(`${categoria}: se armó el fixture de "${siguienteFase}" (${generados}) — generá el calendario para asignarle horario`); }
   }
 
+  await actualizarEstadoTorneoPorFases(torneoGestionId);
   toast(mensajes.length ? mensajes.join(" · ") : "Ninguna categoría está lista para avanzar todavía");
   if (totalGenerados > 0) avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
@@ -3006,6 +3149,17 @@ document.getElementById("calFiltroCategoria").addEventListener("change", renderC
 document.getElementById("calFiltroFecha").addEventListener("change", renderCalendarioPublico);
 document.getElementById("dtBtnVerCalendario").addEventListener("click", () => mostrarPantallaTorneo("calendario"));
 document.getElementById("dtBtnVerResultados").addEventListener("click", () => mostrarPantallaTorneo("resultados"));
+
+// Entra a Administración ya con ESTE torneo en gestión (reemplaza el selector
+// suelto #admSelectTorneoGestion como único punto de entrada: ahora también se
+// llega desde dentro del propio torneo, que es donde tiene sentido "administrar
+// esto" — ver Fase 4 de la reorganización club/torneo).
+document.getElementById("btnAdministrarEsteTorneo").addEventListener("click", async () => {
+  if (!torneoActualId) return;
+  cambiarVista("admin", "/admin");
+  await cargarGestionTorneo(torneoActualId);
+  document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 function renderResultadosPublico() {
   const sel = document.getElementById("resFiltroCategoria");
