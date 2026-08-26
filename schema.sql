@@ -219,9 +219,19 @@ alter table torneos add column if not exists duracion_minutos int not null defau
 alter table torneos add column if not exists dias_semana int[]; -- días de semana permitidos (0=domingo..6=sábado); null = todos los días del rango
 alter table torneos add column if not exists hora_desde time; -- horario del día desde el que se puede programar (opcional)
 alter table torneos add column if not exists hora_hasta time; -- horario del día hasta el que se puede programar (opcional)
+-- horario propio por día de la semana, para torneos que juegan en franjas distintas
+-- cada día (ej: viernes de noche, sábado y domingo desde la mañana). Formato
+-- {"5": {"desde":"18:00","hasta":"23:00"}, ...}, clave = mismo número que dias_semana.
+-- Un día sin entrada acá usa hora_desde/hora_hasta (el horario "por defecto"). Null =
+-- todos los días usan el horario por defecto, como siempre.
+alter table torneos add column if not exists horarios_por_dia jsonb;
 -- formato de la fase de grupos: 'grupos' = todos contra todos en grupos chicos,
 -- nadie queda eliminado en esta etapa (cada pareja juega tamano_grupo-1 partidos);
--- 'eliminacion' = 1 solo partido, el que pierde queda afuera directo.
+-- 'eliminacion' = 1 solo partido, el que pierde queda afuera directo;
+-- 'cuadro_zonas' = el formato propio del club (ver PLANTILLAS_CUADRO en
+-- matching.js): zonas de 2 parejas armadas por ranking, con una "segunda
+-- chance" cruzada para el que pierde su primer partido antes de pasar a
+-- eliminación directa.
 alter table torneos add column if not exists fase_grupos_formato text not null default 'grupos';
 alter table torneos add column if not exists tamano_grupo int not null default 3; -- parejas por grupo (solo aplica si fase_grupos_formato='grupos')
 alter table torneos add column if not exists avanzan_por_grupo int not null default 2; -- cuántas parejas de cada grupo pasan a la siguiente fase
@@ -238,6 +248,12 @@ create table if not exists torneo_canchas (
   cancha_id uuid not null references canchas(id) on delete cascade,
   unique (torneo_id, cancha_id)
 );
+-- días de semana en que ESTA cancha está disponible para ESTE torneo (mismo
+-- formato que torneos.dias_semana: 0=domingo..6=sábado). Null o vacío = todos
+-- los días del torneo, como siempre — solo hace falta cargarlo cuando el club
+-- tiene distinta cantidad de canchas según el día (ej: jueves y viernes menos
+-- canchas que sábado y domingo).
+alter table torneo_canchas add column if not exists dias_semana int[];
 
 -- ---------- BLOQUEOS DE CANCHA (funcionalidad nueva) ----------
 -- Un bloqueo de cancha es distinto de la disponibilidad de un jugador:
@@ -319,6 +335,14 @@ create table if not exists partidos (
 );
 alter table partidos add column if not exists categoria text;
 alter table partidos add column if not exists grupo int; -- número de grupo dentro de la fase de grupos (null = no es de fase de grupos, o es de eliminación directa)
+-- Posición de un partido dentro de la plantilla de cuadro del club (ver
+-- PLANTILLAS_CUADRO en matching.js), ej: "Z3" (partido de la zona 3), "O2"
+-- (octavos, partido 2), "C1", "S1", "F1". Solo se usa cuando el torneo tiene
+-- fase_grupos_formato='cuadro_zonas' — permite que al cargar el resultado de
+-- un partido, el motor sepa exactamente a qué cruce de la siguiente ronda
+-- alimenta (ganador y, si corresponde, perdedor), en vez de tener que
+-- adivinarlo por orden de creación.
+alter table partidos add column if not exists slot_cuadro text;
 
 -- ---------- FLYERS ----------
 create table if not exists flyers (

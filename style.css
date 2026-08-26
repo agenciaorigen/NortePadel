@@ -497,14 +497,17 @@ tr:first-child td { font-weight: 700; }
 /* ---------- Flyer destacado (próximo torneo) ---------- */
 .flyer-destacado {
   position: relative;
-  min-height: 220px;
+  aspect-ratio: 4 / 5; /* ver comentario de .torneo-card-flyer: la mayoría de los
+    afiches son verticales, esta forma evita recortarlos sin dejar franjas vacías */
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 12px;
   cursor: pointer;
   box-shadow: var(--shadow);
-  background-size: cover;
-  background-position: center top;
+  background-color: #05070a;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
   display: flex; align-items: flex-end;
   padding: 18px;
 }
@@ -951,8 +954,18 @@ nav.tabbar .icon { position: relative; }
 .torneo-card-poster .torneo-lugar,
 .torneo-card-poster .match-meta { color: #d8dbdb; }
 /* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
-   (el resto del contenido queda abajo, empujado con flex) */
-.torneo-card-flyer { min-height: 260px; display: flex; flex-direction: column; justify-content: flex-end; }
+   (el resto del contenido queda abajo, empujado con flex). El flyer casi siempre es
+   un afiche vertical (fecha/sede suelen ir arriba y abajo del todo) — con "cover" en
+   una tarjeta ancha y baja se recortaba justo esa parte; "contain" muestra el afiche
+   completo, con el degradé de fondo como marco en vez de tapar los bordes. */
+.torneo-card-flyer {
+  aspect-ratio: 4 / 5; /* la mayoría de los afiches son verticales — un marco parecido
+    a esa forma evita recortar el afiche sin dejar franjas vacías enormes a los costados */
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: 0 0, 0 0, center;
+  background-size: cover, cover, contain;
+}
 
 .flyer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .flyer-grid img { width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); }

@@ -135,7 +135,19 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
   function buscarSlot(jugadoresIds) {
     for (const fecha of fechasDisponibles) {
       const diaSemana = fecha.getDay();
-      const baseDia = ventana || FRANJA_DEFAULT_DIA;
+      // `ventana` puede ser una sola franja {desde,hasta} para todo el torneo (como
+      // siempre) o un mapa {diaSemana: {desde,hasta}} cuando el torneo tiene horarios
+      // distintos según el día (ver ventanaDelTorneo en app.js) — se distingue por si
+      // tiene o no la clave "desde" directamente.
+      const esMapaPorDia = ventana && typeof ventana === "object" && ventana.desde === undefined;
+      const baseDia = (esMapaPorDia ? ventana[diaSemana] : ventana) || FRANJA_DEFAULT_DIA;
+
+      // canchas de HOY: una cancha con dias_semana cargado (ver torneo_canchas)
+      // solo está disponible esos días (ej: el club tiene menos canchas libres
+      // jueves y viernes que sábado y domingo); sin dias_semana, disponible
+      // todos los días del torneo, como siempre.
+      const canchasDeHoy = canchas.filter((c) => !c.dias_semana || c.dias_semana.length === 0 || c.dias_semana.includes(diaSemana));
+      if (canchasDeHoy.length === 0) continue;
 
       // arranca con toda la franja base libre, y le va restando a cada
       // jugador sus bloqueos de ese día — lo que sobra al final es el
@@ -165,7 +177,7 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
           );
           if (!jugadoresLibres) continue;
 
-          const canchaLibre = canchas.find((c) => libre(ocupacionCancha[c.id], desdeDate, hastaDate));
+          const canchaLibre = canchasDeHoy.find((c) => libre(ocupacionCancha[c.id], desdeDate, hastaDate));
           if (!canchaLibre) continue;
 
           return { horario: desdeDate, hastaDate, cancha: canchaLibre };
@@ -218,4 +230,142 @@ function hayConflictoCancha(partidosDelTorneo, partidoId, canchaId, horarioISO, 
   });
   if (chocaConPartido) return true;
   return bloqueosDeCancha.some((b) => desde < b.hasta && hasta > b.desde);
+}
+
+// ============================================================
+// CUADRO DE ZONAS DE 2 — formato propio del club (torneos.fase_grupos_formato
+// = 'cuadro_zonas'). Cada zona es UN partido (no todos contra todos); a partir
+// de ahí el ganador y el perdedor de cada zona alimentan una ronda de
+// "segunda chance" cruzada, y de ahí en más es eliminación directa hasta la
+// final. Las tablas de abajo son una transcripción exacta del Excel con el
+// que el club arma sus cuadros a mano hoy (una plantilla por cantidad de
+// zonas, de 3 a 14 zonas = 5 a 28 parejas): los cruces tienen asimetrías a
+// propósito (las zonas de número más bajo, que quedan con las parejas mejor
+// rankeadas, entran más tarde al cuadro — les cuesta menos llegar lejos), así
+// que en vez de intentar derivar una fórmula general se guarda la tabla tal
+// cual la usa el club. Cada referencia es "G"/"P" (ganador/perdedor) + el id
+// del cruce que la produce: "Z3" = partido de la zona 3, "O2" = octavos
+// partido 2, "D5" = dieciseisavos partido 5, etc.
+// ============================================================
+
+const CUARTOS_ESTANDAR = [["GO1", "GO2"], ["GO3", "GO4"], ["GO5", "GO6"], ["GO7", "GO8"]];
+const SEMI_FINAL_ESTANDAR = { SEMIFINAL: [["GC1", "GC2"], ["GC3", "GC4"]], FINAL: [["GS1", "GS2"]] };
+
+const PLANTILLAS_CUADRO = {
+  3: {
+    CUARTOS: [["PZ2", "PZ3"], ["GZ3", "PZ1"]],
+    SEMIFINAL: [["GZ1", "GC1"], ["GZ2", "GC2"]],
+    FINAL: [["GS1", "GS2"]]
+  },
+  4: {
+    CUARTOS: [["GZ1", "PZ3"], ["GZ4", "PZ2"], ["GZ2", "PZ4"], ["GZ3", "PZ1"]],
+    ...SEMI_FINAL_ESTANDAR
+  },
+  5: {
+    OCTAVOS: [["PZ5", "PZ2"], ["PZ1", "PZ4"]],
+    CUARTOS: [["GZ1", "PZ3"], ["GZ4", "GO1"], ["GO2", "GZ3"], ["GZ5", "GZ2"]],
+    ...SEMI_FINAL_ESTANDAR
+  },
+  6: {
+    OCTAVOS: [["PZ3", "PZ6"], ["GZ5", "PZ2"], ["PZ4", "PZ5"], ["GZ6", "PZ1"]],
+    CUARTOS: [["GZ1", "GO1"], ["GZ4", "GO2"], ["GZ2", "GO3"], ["GZ3", "GO4"]],
+    ...SEMI_FINAL_ESTANDAR
+  },
+  7: {
+    OCTAVOS: [["PZ3", "PZ7"], ["GZ4", "PZ6"], ["GZ5", "PZ2"], ["GZ7", "PZ4"], ["GZ3", "PZ5"], ["GZ6", "PZ1"]],
+    CUARTOS: [["GZ1", "GO1"], ["GO2", "GO3"], ["GZ2", "GO4"], ["GO5", "GO6"]],
+    ...SEMI_FINAL_ESTANDAR
+  },
+  8: {
+    OCTAVOS: [["GZ1", "PZ7"], ["GZ8", "PZ6"], ["GZ4", "PZ3"], ["GZ5", "PZ2"], ["GZ2", "PZ8"], ["GZ7", "PZ5"], ["GZ3", "PZ4"], ["GZ6", "PZ1"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  9: {
+    DIECISEISAVOS: [["PZ6", "PZ7"], ["PZ8", "PZ9"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GZ8", "GZ9"], ["GZ4", "PZ3"], ["GZ5", "PZ2"], ["GZ2", "GD2"], ["GZ7", "PZ4"], ["GZ3", "PZ5"], ["GZ6", "PZ1"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  10: {
+    DIECISEISAVOS: [["PZ6", "PZ7"], ["PZ3", "PZ10"], ["PZ5", "PZ8"], ["PZ4", "PZ9"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GZ8", "GZ9"], ["GZ4", "GD2"], ["GZ5", "PZ2"], ["GZ2", "GD3"], ["GZ7", "GZ10"], ["GZ3", "GD4"], ["GZ6", "PZ1"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  11: {
+    DIECISEISAVOS: [["PZ6", "PZ7"], ["PZ3", "PZ10"], ["PZ2", "PZ11"], ["PZ5", "PZ8"], ["PZ4", "PZ9"], ["GZ11", "PZ1"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GZ8", "GZ9"], ["GZ4", "GD2"], ["GZ5", "GD3"], ["GZ2", "GD4"], ["GZ7", "GZ10"], ["GZ3", "GD5"], ["GZ6", "GD6"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  12: {
+    DIECISEISAVOS: [["PZ7", "PZ10"], ["GZ9", "PZ6"], ["PZ3", "PZ11"], ["GZ12", "PZ2"], ["PZ8", "PZ9"], ["GZ10", "PZ4"], ["PZ5", "PZ12"], ["GZ11", "PZ1"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GZ8", "GD2"], ["GZ4", "GD3"], ["GZ5", "GD4"], ["GZ2", "GD5"], ["GZ7", "GD6"], ["GZ3", "GD7"], ["GZ6", "GD8"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  13: {
+    DIECISEISAVOS: [["PZ10", "PZ11"], ["GZ8", "PZ6"], ["GZ9", "PZ3"], ["GZ13", "PZ7"], ["GZ12", "PZ2"], ["PZ8", "PZ12"], ["GZ7", "PZ5"], ["GZ10", "PZ4"], ["PZ9", "PZ13"], ["PZ1", "GZ11"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GD2", "GD3"], ["GZ4", "GD4"], ["GZ5", "GD5"], ["GZ2", "GD6"], ["GD7", "GD8"], ["GZ3", "GD9"], ["GZ6", "GD10"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  },
+  14: {
+    DIECISEISAVOS: [["PZ10", "PZ11"], ["GZ8", "PZ7"], ["GZ9", "PZ3"], ["GZ13", "PZ6"], ["GZ5", "PZ14"], ["GZ12", "PZ2"], ["PZ12", "PZ13"], ["GZ7", "PZ8"], ["GZ10", "PZ4"], ["GZ14", "PZ5"], ["GZ6", "PZ9"], ["GZ11", "PZ1"]],
+    OCTAVOS: [["GZ1", "GD1"], ["GD2", "GD3"], ["GZ4", "GD4"], ["GD5", "GD6"], ["GZ2", "GD7"], ["GD8", "GD9"], ["GZ3", "GD10"], ["GD11", "GD12"]],
+    CUARTOS: CUARTOS_ESTANDAR,
+    ...SEMI_FINAL_ESTANDAR
+  }
+};
+
+// Arma las zonas (de a 2 parejas) según el ranking: la pareja mejor rankeada
+// va como cabeza de serie de la zona 1, la segunda mejor de la zona 2, etc.
+// (la "ventaja" que pidió el club de estar en una zona de número bajo), y a
+// cada cabeza de serie se le cruza, a propósito, la pareja MENOS rankeada
+// disponible ("contra los que juega no tienen que tener puntos"). Si el total
+// de parejas es impar, la última zona (la del cabeza de serie más débil)
+// queda con una sola pareja: pasa de ronda sin jugar su partido de zona (bye).
+// `parejasConPuntos`: [{...pareja, puntos:number}] — puntos = suma del
+// ranking de ambos jugadores de la pareja en la categoría de este torneo.
+function armarZonasPorRanking(parejasConPuntos) {
+  const ordenadas = [...parejasConPuntos].sort((a, b) => b.puntos - a.puntos);
+  const n = Math.ceil(ordenadas.length / 2);
+  const cabezas = ordenadas.slice(0, n);
+  const resto = ordenadas.slice(n).sort((a, b) => a.puntos - b.puntos); // de menor a mayor puntaje
+  return cabezas.map((cabeza, i) => (resto[i] ? [cabeza, resto[i]] : [cabeza]));
+}
+
+// Resuelve una referencia de plantilla ("GZ3", "PO2", ...) contra el mapa de
+// resultados ya conocidos. Devuelve undefined si el cruce que la produce
+// todavía no tiene resultado cargado, o null si ese cruce fue un bye (no hay
+// perdedor porque no se jugó).
+function resolverRefCuadro(ref, mapaSlots) {
+  const entrada = mapaSlots[ref.slice(1)];
+  if (!entrada) return undefined;
+  return ref[0] === "G" ? entrada.ganador : entrada.perdedor;
+}
+
+// Resuelve los cruces de UNA ronda de la plantilla contra los resultados ya
+// conocidos (mapaSlots: { "Z3": {ganador, perdedor}, ... }). Devuelve null si
+// falta algún resultado previo (todavía no se puede armar esta ronda). Un
+// cruce con un solo lado resuelto (el otro viene de un bye en cadena) se
+// devuelve como `walkover: true`: no se juega, pasa directo el lado que sí
+// existe.
+function resolverRondaCuadro(matchesPlantilla, prefijo, mapaSlots) {
+  const partidos = [];
+  for (let i = 0; i < matchesPlantilla.length; i++) {
+    const [refHome, refAway] = matchesPlantilla[i];
+    const home = resolverRefCuadro(refHome, mapaSlots);
+    const away = resolverRefCuadro(refAway, mapaSlots);
+    if (home === undefined || away === undefined) return null;
+    const slot = prefijo + (i + 1);
+    if (!home || !away) {
+      const ganadorWalkover = home || away || null;
+      if (ganadorWalkover) partidos.push({ slot, pareja1_id: ganadorWalkover, pareja2_id: null, walkover: true });
+    } else {
+      partidos.push({ slot, pareja1_id: home, pareja2_id: away, walkover: false });
+    }
+  }
+  return partidos;
 }
