@@ -98,6 +98,21 @@ insert into categorias (nombre, orden) values
   ('3ra', 25), ('2da', 26), ('1ra', 27), ('Damas', 28)
 on conflict (nombre) do nothing;
 
+-- ---------- ETIQUETAS DE JUGADOR (uso interno del admin) ----------
+-- Etiquetas libres con color (ej: "Veterano") para que el admin las use como ayuda
+-- visual al acomodar horarios/partidos — a diferencia de "categorias", NO son
+-- públicas: nada de esto se muestra a los jugadores ni en las vistas públicas.
+create table if not exists etiquetas_jugador (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null unique,
+  color text not null default '#6a3dff',
+  orden int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- por si la tabla ya existía de una instalación anterior
+alter table jugadores add column if not exists etiqueta_id uuid references etiquetas_jugador(id) on delete set null;
+
 -- ---------- ADMINISTRADORES ----------
 -- Quienes pueden crear torneos, complejos, cargar resultados, etc.
 -- Para convertir a alguien en admin: que primero se registre normal en la app
@@ -142,8 +157,13 @@ create table if not exists jugador_del_mes (
   created_at timestamptz not null default now()
 );
 
--- ---------- DISPONIBILIDAD HORARIA DEL JUGADOR ----------
--- dia_semana: 0=domingo ... 6=sábado
+-- ---------- HORARIOS BLOQUEADOS DEL JUGADOR ----------
+-- OJO: el nombre de la tabla quedó de una versión anterior, en la que cada fila
+-- era un horario en el que el jugador SÍ podía jugar. Ahora es al revés: cada
+-- fila es un horario en el que NO puede (bloqueado) — quien no cargó ninguna
+-- fila para un día se asume disponible todo ese día. dia_semana: 0=domingo ... 6=sábado.
+-- torneo_id null = bloqueo general del perfil (aplica siempre); con torneo_id
+-- cargado, es un bloqueo puntual para ESE torneo nada más (además del general).
 create table if not exists disponibilidad (
   id uuid primary key default gen_random_uuid(),
   jugador_id uuid not null references jugadores(id) on delete cascade,
@@ -183,6 +203,11 @@ alter table torneos add column if not exists fase_grupos_formato text not null d
 alter table torneos add column if not exists tamano_grupo int not null default 3; -- parejas por grupo (solo aplica si fase_grupos_formato='grupos')
 alter table torneos add column if not exists avanzan_por_grupo int not null default 2; -- cuántas parejas de cada grupo pasan a la siguiente fase
 
+-- torneo_id null = bloqueo general del perfil (aplica siempre); con torneo_id
+-- cargado, es un bloqueo puntual para ESE torneo nada más (además del general).
+-- va acá (no junto a la tabla) porque necesita que "torneos" ya exista.
+alter table disponibilidad add column if not exists torneo_id uuid references torneos(id) on delete cascade;
+
 -- Canchas habilitadas para cada torneo (permite reasignar por clima u otro motivo)
 create table if not exists torneo_canchas (
   id uuid primary key default gen_random_uuid(),
@@ -190,6 +215,24 @@ create table if not exists torneo_canchas (
   cancha_id uuid not null references canchas(id) on delete cascade,
   unique (torneo_id, cancha_id)
 );
+
+-- ---------- BLOQUEOS DE CANCHA (funcionalidad nueva) ----------
+-- Un bloqueo de cancha es distinto de la disponibilidad de un jugador:
+-- la disponibilidad es una preferencia de horario de UN jugador (no impide
+-- que otros jueguen ahí); un bloqueo de cancha hace que ESA cancha quede
+-- literalmente inutilizable para TODOS en esa ventana (lluvia, mantenimiento,
+-- otro evento del club, etc.) — nunca se combinan ni se guardan en la misma
+-- tabla, para no confundir ambos conceptos.
+create table if not exists canchas_bloqueos (
+  id uuid primary key default gen_random_uuid(),
+  cancha_id uuid not null references canchas(id) on delete cascade,
+  desde timestamptz not null,
+  hasta timestamptz not null,
+  motivo text,
+  created_at timestamptz not null default now(),
+  check (hasta > desde)
+);
+create index if not exists idx_canchas_bloqueos_cancha on canchas_bloqueos(cancha_id, desde, hasta);
 
 -- Categorías que compiten en cada torneo (un torneo puede abarcar varias, ej: de 2da a 8va)
 create table if not exists torneo_categorias (
@@ -347,6 +390,7 @@ create index if not exists idx_jugadores_categoria on jugadores(categoria);
 create index if not exists idx_jugadores_activo on jugadores(activo);
 create index if not exists idx_jugador_del_mes_jugador on jugador_del_mes(jugador_id);
 create index if not exists idx_disponibilidad_jugador on disponibilidad(jugador_id);
+create index if not exists idx_disponibilidad_torneo on disponibilidad(torneo_id);
 create index if not exists idx_torneos_complejo on torneos(complejo_id);
 create index if not exists idx_torneo_canchas_torneo on torneo_canchas(torneo_id);
 create index if not exists idx_torneo_categorias_torneo on torneo_categorias(torneo_id);
@@ -521,18 +565,28 @@ $$;
 drop function if exists partidos_publicos(uuid);
 create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   id uuid, ronda text, categoria text, grupo int, horario timestamptz, estado text, sets jsonb,
-  cancha_id uuid, cancha_nombre text,
+  cancha_id uuid, cancha_nombre text, complejo_nombre text,
   pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
-  pareja1_nombre text, pareja2_nombre text, created_at timestamptz
+  pareja1_nombre text, pareja2_nombre text,
+  -- nombre/apellido (+ foto) de cada uno de los 4 jugadores por separado (además
+  -- del "pareja1_nombre" ya concatenado, que se sigue usando en otras vistas) —
+  -- lo pide la tarjeta de Zona/Ronda y la fila "orden de juego" para mostrar a
+  -- cada jugador con su propio nombre y avatar, nunca a la pareja como un bloque
+  j1a_nombre text, j1a_apellido text, j1a_foto text, j1b_nombre text, j1b_apellido text, j1b_foto text,
+  j2a_nombre text, j2a_apellido text, j2a_foto text, j2b_nombre text, j2b_apellido text, j2b_foto text,
+  created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
   select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.horario, pa.estado, pa.sets,
-    pa.cancha_id, c.nombre,
+    pa.cancha_id, c.nombre, comp.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
     coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),
     coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, '?'),
+    j1a.nombre, j1a.apellido, j1a.foto_url, j1b.nombre, j1b.apellido, j1b.foto_url,
+    j2a.nombre, j2a.apellido, j2a.foto_url, j2b.nombre, j2b.apellido, j2b.foto_url,
     pa.created_at
   from partidos pa
   left join canchas c on c.id = pa.cancha_id
+  left join complejos comp on comp.id = c.complejo_id
   left join parejas p1 on p1.id = pa.pareja1_id
   left join jugadores j1a on j1a.id = p1.jugador1_id
   left join jugadores j1b on j1b.id = p1.jugador2_id
@@ -824,7 +878,9 @@ $$;
 -- ============================================================
 alter table complejos enable row level security;
 alter table canchas enable row level security;
+alter table canchas_bloqueos enable row level security;
 alter table categorias enable row level security;
+alter table etiquetas_jugador enable row level security;
 alter table puntos_ronda enable row level security;
 alter table jugadores enable row level security;
 alter table disponibilidad enable row level security;
@@ -856,6 +912,13 @@ drop policy if exists "canchas_select" on canchas;
 create policy "canchas_select" on canchas for select using (true);
 drop policy if exists "canchas_write" on canchas;
 create policy "canchas_write" on canchas for all using (is_admin()) with check (is_admin());
+
+-- canchas_bloqueos: lectura pública (para que el calendario público muestre
+-- la cancha como bloqueada), escritura solo admin — mismo patrón que canchas
+drop policy if exists "canchas_bloqueos_select" on canchas_bloqueos;
+create policy "canchas_bloqueos_select" on canchas_bloqueos for select using (true);
+drop policy if exists "canchas_bloqueos_write" on canchas_bloqueos;
+create policy "canchas_bloqueos_write" on canchas_bloqueos for all using (is_admin()) with check (is_admin());
 
 -- reservas: cada uno ve las suyas (las que organizó o a las que lo invitaron) y el
 -- admin las ve todas. El alta real de una reserva pasa por reservar_cancha() (más
@@ -893,6 +956,11 @@ drop policy if exists "categorias_select" on categorias;
 create policy "categorias_select" on categorias for select using (true);
 drop policy if exists "categorias_write" on categorias;
 create policy "categorias_write" on categorias for all using (is_admin()) with check (is_admin());
+
+-- etiquetas_jugador: NO es pública (a diferencia de categorias) — solo el admin
+-- las puede leer o escribir, es una herramienta interna para armar horarios.
+drop policy if exists "etiquetas_jugador_all" on etiquetas_jugador;
+create policy "etiquetas_jugador_all" on etiquetas_jugador for all using (is_admin()) with check (is_admin());
 
 -- puntos_ronda: lectura pública, solo admin edita los valores
 drop policy if exists "puntos_ronda_select" on puntos_ronda;
