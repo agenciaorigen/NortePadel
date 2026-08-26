@@ -21,6 +21,7 @@ let cacheCanchas = [];
 let cacheJugadoresAdmin = [];
 let cacheCategorias = [];
 let cacheEtiquetas = []; // etiquetas_jugador — uso interno del admin, con color
+let cacheRankingCategoriaAdmin = {}; // jugador_id -> [{categoria, puntos_ranking, partidos_jugados, partidos_ganados}], para el bloque "categorías de ranking" del admin
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
 let ultimosPartidos = [];
@@ -512,7 +513,10 @@ sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
 // ============================================================
 let generoRankingActual = localStorage.getItem("np_genero_ranking") || null;
 async function cargarRanking() {
-  const { data } = await sb.rpc("jugadores_publicos");
+  // ranking_categoria_publico() (no jugadores_publicos()): devuelve una fila por cada
+  // categoría en la que el jugador tiene puntos, así el mismo jugador puede aparecer
+  // en el ranking de más de una categoría a la vez.
+  const { data } = await sb.rpc("ranking_categoria_publico");
   const todos = data || [];
   const categorias = [...new Set(todos.map((j) => j.categoria).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
@@ -811,7 +815,7 @@ async function cargarAscendidos() {
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
   if (!miJugador) { card.style.display = "none"; return; }
-  const { data } = await sb.rpc("jugadores_publicos");
+  const { data } = await sb.rpc("ranking_categoria_publico");
   const delGrupo = (data || []).filter((j) => j.categoria === miJugador.categoria)
     .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
   const pos = delGrupo.findIndex((j) => j.id === miJugador.id);
@@ -1244,8 +1248,15 @@ async function cargarJugadoresAdmin() {
   if (!isAdmin) return;
   if (cacheCategorias.length === 0) await cargarCategorias();
   if (cacheEtiquetas.length === 0) await cargarEtiquetas();
-  const { data } = await sb.from("jugadores").select("*").eq("activo", true).order("apellido");
+  const [{ data }, { data: rankingRows }] = await Promise.all([
+    sb.from("jugadores").select("*").eq("activo", true).order("apellido"),
+    sb.from("ranking_categoria").select("*")
+  ]);
   cacheJugadoresAdmin = data || [];
+  cacheRankingCategoriaAdmin = {};
+  (rankingRows || []).forEach((r) => {
+    (cacheRankingCategoriaAdmin[r.jugador_id] ||= []).push(r);
+  });
   renderListaJugadoresAdmin();
   llenarSelect(document.getElementById("dtSelectJugador1"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
   llenarSelect(document.getElementById("dtSelectJugador2"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
@@ -1291,11 +1302,64 @@ function renderListaJugadoresAdmin() {
         <select id="jaEtiqueta-${j.id}" class="jaEtiqueta">${opcionesEtiqueta}</select>
       </div>
       <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
+      <div class="ja-ranking-extra" style="margin-top:8px">
+        <div class="match-meta">Categorías de ranking (puede estar en más de una a la vez):</div>
+        <div class="jaRankingLista"></div>
+        <div class="row" style="margin-top:6px;gap:8px">
+          <select class="jaNuevaCategoria"></select>
+          <button type="button" class="secondary small btnAgregarCategoriaRanking">+ Agregar categoría</button>
+        </div>
+      </div>`;
+    const renderRankingExtra = () => {
+      const filas = cacheRankingCategoriaAdmin[j.id] || [];
+      div.querySelector(".jaRankingLista").innerHTML = filas.length === 0
+        ? '<p class="empty" style="margin:4px 0">Sin filas todavía (se crea una para su categoría principal al cargar el ranking).</p>'
+        : filas.map((rc) => `
+          <div class="row jaRankingFila" data-categoria="${rc.categoria}" style="margin-top:4px;gap:8px;align-items:center">
+            <span style="flex:1">${rc.categoria}</span>
+            <input type="number" class="jaRankingPuntos" value="${rc.puntos_ranking}" style="max-width:100px" />
+            <button type="button" class="secondary small danger btnQuitarCategoriaRanking">Quitar</button>
+          </div>`).join("");
+      const nombresLibres = cacheCategorias.map((c) => c.nombre).filter((n) => !filas.some((rc) => rc.categoria === n));
+      const selNueva = div.querySelector(".jaNuevaCategoria");
+      selNueva.innerHTML = nombresLibres.map((n) => `<option value="${n}">${n}</option>`).join("");
+      div.querySelectorAll(".jaRankingFila").forEach((fila) => {
+        const categoria = fila.dataset.categoria;
+        fila.querySelector(".jaRankingPuntos").addEventListener("change", async (e) => {
+          const puntos_ranking = Number(e.target.value);
+          if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
+          const { error } = await sb.from("ranking_categoria").update({ puntos_ranking }).eq("jugador_id", j.id).eq("categoria", categoria);
+          if (error) { toast("Error: " + error.message); return; }
+          toast("Puntos actualizados");
+          await cargarJugadoresAdmin();
+          cargarRanking();
+        });
+        fila.querySelector(".btnQuitarCategoriaRanking").addEventListener("click", async () => {
+          if (!confirm(`¿Sacar a ${j.nombre} ${j.apellido} del ranking de ${categoria}?`)) return;
+          const { error } = await sb.from("ranking_categoria").delete().eq("jugador_id", j.id).eq("categoria", categoria);
+          if (error) { toast("Error: " + error.message); return; }
+          toast("Categoría quitada del ranking");
+          await cargarJugadoresAdmin();
+          cargarRanking();
+        });
+      });
+      div.querySelector(".btnAgregarCategoriaRanking").addEventListener("click", async () => {
+        const categoria = selNueva.value;
+        if (!categoria) { toast("No quedan categorías para agregar"); return; }
+        const { error } = await sb.from("ranking_categoria").insert({ jugador_id: j.id, categoria, puntos_ranking: 0 });
+        if (error) { toast("Error: " + error.message); return; }
+        toast(`${j.nombre} ${j.apellido} ahora también rankea en ${categoria}`);
+        await cargarJugadoresAdmin();
+        cargarRanking();
+      });
+    };
+    renderRankingExtra();
+    div.insertAdjacentHTML("beforeend", `
       <div class="row" style="margin-top:8px;gap:8px">
         <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
-    `;
+    `);
     div.querySelector(".btnGuardarJugador").addEventListener("click", async () => {
       const nombre = div.querySelector(".jaNombre").value.trim();
       const apellido = div.querySelector(".jaApellido").value.trim();

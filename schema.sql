@@ -57,6 +57,29 @@ drop view if exists vista_ranking;
 alter table jugadores alter column puntos_ranking type numeric(10,1) using puntos_ranking::numeric(10,1);
 alter table jugadores alter column puntos_ranking set default 0;
 
+-- ---------- RANKING POR CATEGORÍA (un jugador puede estar anotado y sumar puntos en más de una categoría a la vez) ----------
+-- jugadores.categoria/puntos_ranking siguen siendo la "categoría principal" (perfil, alta de
+-- jugador, inscripción por defecto) y no se tocan. Esta tabla es la que permite que la MISMA
+-- persona tenga una fila de ranking en 2+ categorías simultáneamente (ej: juega 4ta y 5ta) —
+-- cada fila es independiente y el admin puede agregar/editar/borrar las que haga falta.
+create table if not exists ranking_categoria (
+  jugador_id uuid not null references jugadores(id) on delete cascade,
+  categoria text not null,
+  puntos_ranking numeric(10,1) not null default 0,
+  partidos_jugados int not null default 0,
+  partidos_ganados int not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (jugador_id, categoria)
+);
+
+-- alta inicial: cada jugador arranca con su categoría principal ya como una fila de ranking_categoria
+-- (idempotente — no pisa nada si ya se corrió antes o si el admin ya cargó categorías extra)
+insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
+select id, categoria, puntos_ranking, partidos_jugados, partidos_ganados from jugadores
+on conflict (jugador_id, categoria) do nothing;
+
+create index if not exists idx_ranking_categoria_categoria on ranking_categoria(categoria);
+
 -- ---------- RESERVAS (jugar/entrenar con amigos, día a día, fuera del circuito de torneos) ----------
 create table if not exists reservas (
   id uuid primary key default gen_random_uuid(),
@@ -473,11 +496,28 @@ begin
         partidos_ganados = partidos_ganados - 1
       where id in (old_ganador.jugador1_id, old_ganador.jugador2_id);
 
+      if old.categoria is not null then
+        update ranking_categoria set
+          puntos_ranking = puntos_ranking - coalesce(old_pts_ganador, 0),
+          partidos_jugados = partidos_jugados - 1,
+          partidos_ganados = partidos_ganados - 1,
+          updated_at = now()
+        where categoria = old.categoria and jugador_id in (old_ganador.jugador1_id, old_ganador.jugador2_id);
+      end if;
+
       if old_perdedor.id is not null then
         update jugadores set
           puntos_ranking = puntos_ranking - coalesce(old_pts_perdedor, 0),
           partidos_jugados = partidos_jugados - 1
         where id in (old_perdedor.jugador1_id, old_perdedor.jugador2_id);
+
+        if old.categoria is not null then
+          update ranking_categoria set
+            puntos_ranking = puntos_ranking - coalesce(old_pts_perdedor, 0),
+            partidos_jugados = partidos_jugados - 1,
+            updated_at = now()
+          where categoria = old.categoria and jugador_id in (old_perdedor.jugador1_id, old_perdedor.jugador2_id);
+        end if;
       end if;
     end if;
 
@@ -502,12 +542,39 @@ begin
       partidos_ganados = partidos_ganados + 1
     where id in (ganador.jugador1_id, ganador.jugador2_id);
 
+    -- mismo resultado, pero en la categoría del partido dentro de ranking_categoria: así un
+    -- jugador que compite en más de una categoría a la vez suma en la que corresponde, sin
+    -- perder lo que ya tenía en las demás. Si todavía no tenía fila en esa categoría (recién
+    -- arranca a jugarla), se crea sola.
+    if new.categoria is not null then
+      insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
+      select j, new.categoria, coalesce(pts_ganador, 0), 1, 1
+      from unnest(array[ganador.jugador1_id, ganador.jugador2_id]) as j
+      where j is not null
+      on conflict (jugador_id, categoria) do update set
+        puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
+        partidos_jugados = ranking_categoria.partidos_jugados + 1,
+        partidos_ganados = ranking_categoria.partidos_ganados + 1,
+        updated_at = now();
+    end if;
+
     -- puntos + partido jugado para la pareja perdedora
     if perdedor.id is not null then
       update jugadores set
         puntos_ranking = puntos_ranking + coalesce(pts_perdedor, 0),
         partidos_jugados = partidos_jugados + 1
       where id in (perdedor.jugador1_id, perdedor.jugador2_id);
+
+      if new.categoria is not null then
+        insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
+        select j, new.categoria, coalesce(pts_perdedor, 0), 1, 0
+        from unnest(array[perdedor.jugador1_id, perdedor.jugador2_id]) as j
+        where j is not null
+        on conflict (jugador_id, categoria) do update set
+          puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
+          partidos_jugados = ranking_categoria.partidos_jugados + 1,
+          updated_at = now();
+      end if;
     end if;
 
     -- notificación in-app a los 4 jugadores
@@ -587,6 +654,20 @@ create or replace function jugadores_publicos() returns table (
 ) language sql stable security definer set search_path = public as $$
   select id, nombre, apellido, categoria, nivel, foto_url, puntos_ranking, partidos_jugados, partidos_ganados
   from jugadores where activo = true;
+$$;
+
+-- ranking por categoría: a diferencia de jugadores_publicos() (una fila por jugador, su
+-- categoría principal), esta devuelve una fila por cada categoría en la que el jugador
+-- tiene puntos — así la misma persona aparece en el ranking de las 2+ categorías donde juega.
+drop function if exists ranking_categoria_publico();
+create or replace function ranking_categoria_publico() returns table (
+  id uuid, nombre text, apellido text, categoria text, foto_url text,
+  puntos_ranking numeric(10,1), partidos_jugados int, partidos_ganados int
+) language sql stable security definer set search_path = public as $$
+  select j.id, j.nombre, j.apellido, rc.categoria, j.foto_url,
+         rc.puntos_ranking, rc.partidos_jugados, rc.partidos_ganados
+  from ranking_categoria rc join jugadores j on j.id = rc.jugador_id
+  where j.activo = true;
 $$;
 
 -- si existía de una versión anterior con otras columnas de salida, hay que tirarla:
@@ -1041,6 +1122,17 @@ drop policy if exists "jugadores_update" on jugadores;
 create policy "jugadores_update" on jugadores for update using (auth_user_id = auth.uid() or is_admin()) with check (auth_user_id = auth.uid() or is_admin());
 drop policy if exists "jugadores_delete" on jugadores;
 create policy "jugadores_delete" on jugadores for delete using (is_admin());
+
+-- ranking_categoria: cada uno ve sus propias filas (todas sus categorías); admin ve/edita todas.
+-- Solo el admin escribe (igual que categoria/puntos_ranking en jugadores) — un jugador no puede
+-- auto-asignarse a una categoría extra ni tocar sus puntos. Para el público se usa
+-- ranking_categoria_publico().
+alter table ranking_categoria enable row level security;
+drop policy if exists "ranking_categoria_select" on ranking_categoria;
+create policy "ranking_categoria_select" on ranking_categoria for select
+  using (is_admin() or exists (select 1 from jugadores j where j.id = ranking_categoria.jugador_id and j.auth_user_id = auth.uid()));
+drop policy if exists "ranking_categoria_write" on ranking_categoria;
+create policy "ranking_categoria_write" on ranking_categoria for all using (is_admin()) with check (is_admin());
 
 -- disponibilidad: dueño del perfil o admin
 drop policy if exists "disponibilidad_all" on disponibilidad;
