@@ -290,7 +290,7 @@
     <div class="card">
       <div class="pj-stats" id="dtInicioStats"></div>
     </div>
-    <div class="card">
+    <div class="card" id="dtInscripcionCard">
       <p class="match-meta" id="inscripcionEstado"></p>
       <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
     </div>
@@ -584,7 +584,13 @@
         <button type="button" class="secondary small" id="btnCancelarEditarTorneo" style="margin-top:8px">Cancelar</button>
       </div>
 
-      <div class="card">
+      <!-- Antes estas 4 cards (Inscripciones/Canchas/Bloqueos/Partidos) iban todas
+           seguidas en una sola pantalla larguísima — para cargar un resultado había
+           que scrollear más allá de las otras tres. Ahora son secciones con su
+           propio pill-nav (mismo patrón que torneoSubnav) y se ve una por vez. -->
+      <div class="pill-row" id="admGestionSubnav" style="margin-bottom:12px"></div>
+
+      <div class="card" id="admSeccionInscripciones">
         <h2>Inscripciones y parejas</h2>
         <div id="admParejas"></div>
         <div id="admSinPareja"></div>
@@ -595,7 +601,7 @@
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
 
-      <div class="card">
+      <div class="card" id="admSeccionCanchas">
         <h2>Canchas del torneo</h2>
         <div id="admCanchas"></div>
         <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
@@ -613,7 +619,7 @@
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
       </div>
 
-      <div class="card">
+      <div class="card" id="admSeccionBloqueos">
         <h2>Bloqueos de cancha</h2>
         <p class="match-meta" style="margin-bottom:6px">Una cancha bloqueada queda inutilizable para TODOS en ese horario (lluvia, mantenimiento, otro evento) — el armado automático y la planilla la respetan. Esto es distinto de la disponibilidad de un jugador, que es solo su preferencia personal y no bloquea la cancha para nadie más.</p>
         <div id="admBloqueosLista"></div>
@@ -628,7 +634,7 @@
         <button class="secondary small" id="admBtnBloquearCancha" style="margin-top:8px">Bloquear horario</button>
       </div>
 
-      <div class="card partidos-poster">
+      <div class="card partidos-poster" id="admSeccionPartidos">
         <h2>Partidos</h2>
         <button class="primary" id="btnArmarPartidos">1. Generar fixture (cruces, sin horario)</button>
         <button class="secondary" id="btnGenerarCalendario" style="margin-top:8px">2. Generar calendario (asignar cancha y horario)</button>

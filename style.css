@@ -667,6 +667,16 @@ tr:first-child td { font-weight: 700; }
 @media (min-width: 700px) { .orden-grid { grid-template-columns: 1fr 1fr; } }
 
 /* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
+/* En mobile, la llave es un cuadro ancho y alto: hay que deslizar para el
+   costado Y bajar al mismo tiempo, y es fácil perderse pensando que no hay
+   más partidos cuando en realidad hay que scrollear. Estos botones (uno por
+   ronda/zona) saltan directo con scrollIntoView — mueve la página en las dos
+   direcciones que hagan falta de una sola vez. En desktop no hace falta,
+   ahí ya se ve toda la llave de un vistazo. */
+.llave-rondas-nav { display: none; }
+@media (max-width: 699px) {
+  .llave-rondas-nav { display: flex; margin-bottom: 10px; }
+}
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
 .llave { display: flex; gap: 32px; }
 .llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 204px; }

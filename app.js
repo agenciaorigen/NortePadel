@@ -1688,6 +1688,15 @@ async function abrirTorneo(id, pantalla) {
   torneoActualId = id;
   await refrescarDetalleTorneo();
   if (miToken !== tokenNavegacionTorneo) return; // ya hay una navegación más nueva en curso
+  // sin pantalla explícita (entrar desde la lista de torneos, o un link
+  // directo a /torneo/:id): mientras se puede anotar gente se sigue mostrando
+  // Inicio primero, pero una vez que el torneo pasó a "en curso" (o ya
+  // terminó) hay que ir directo a Calendario — no tiene sentido aterrizar en
+  // inscriptos/categorías cuando lo que se está jugando es lo que importa. Se
+  // mira torneo.estado (no hayCalendarioTorneoActual) porque ese es a nivel
+  // de TODO el torneo, no de una sola categoría que ya tenga fixture armado.
+  const torneoEnCursoOTerminado = torneoActualData && (torneoActualData.estado === "en_curso" || torneoActualData.estado === "finalizado");
+  if (!pantalla && torneoEnCursoOTerminado && hayCalendarioTorneoActual) pantalla = "calendario";
   mostrarPantallaTorneo(pantalla);
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
@@ -2197,12 +2206,14 @@ async function refrescarDetalleTorneo() {
   const categorias = categoriasTorneoActual.join(", ") || "todas las categorías";
   document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
 
-  // una vez que el torneo ya arrancó (o terminó) coordinar el pago de la
-  // inscripción ya no tiene sentido — se deja de mostrar costo y el botón de
-  // WhatsApp para no confundir a alguien que entra a ver resultados
-  const torneoYaEmpezo = t.estado === "en_curso" || t.estado === "finalizado";
+  // una vez que se cerró la inscripción (etapa "inscripcion_cerrada" en
+  // adelante: en_curso, finalizado) coordinar el pago o anotarse ya no tiene
+  // sentido — se deja de mostrar costo, el botón de WhatsApp y la card de
+  // "Anotarme" para no confundir a alguien que entra a ver el calendario/las
+  // llaves con contenido que ya no aplica.
+  const inscripcionYaCerrada = t.estado !== "inscripcion";
   const contCosto = document.getElementById("dtCosto");
-  if (t.costo && Number(t.costo) > 0 && !torneoYaEmpezo) {
+  if (t.costo && Number(t.costo) > 0 && !inscripcionYaCerrada) {
     contCosto.style.display = "block";
     contCosto.innerHTML = `<span class="badge solid">💰 Costo: $${t.costo}</span>` +
       (configApp.whatsapp_numero ? botonWhatsappPagoHtml("btnPagarWhatsapp", "margin-left:8px") : "");
@@ -2211,6 +2222,7 @@ async function refrescarDetalleTorneo() {
     contCosto.style.display = "none";
     contCosto.innerHTML = "";
   }
+  document.getElementById("dtInscripcionCard").style.display = inscripcionYaCerrada ? "none" : "block";
 
   await actualizarAccesoInscripcion();
   await cargarSponsorsTorneo();
@@ -2413,6 +2425,36 @@ document.getElementById("admSelectTorneoGestion").addEventListener("change", asy
 // canchas CON alta, bloqueos, y partidos/planilla CON acciones — todo lo que
 // antes vivía mezclado en la vista pública bajo el toggle "Organizar", ahora
 // vive solo acá.
+// Las 4 cards largas de "Administrar este torneo" (Inscripciones/Canchas/
+// Bloqueos/Partidos) vivían todas seguidas en una sola pantalla — para llegar
+// a "Cargar resultado" (dentro de Partidos) había que scrollear más allá de
+// las otras tres. Mismo patrón que renderTorneoSubnav: un pill-nav que
+// muestra una sección por vez, así "Partidos" queda a un toque en vez de un
+// scroll largo. seccionGestionActiva se mantiene entre refrescos de la
+// pantalla (no vuelve a "Inscripciones" cada vez que se recarga algo).
+let seccionGestionActiva = "inscripciones";
+const SECCIONES_GESTION = {
+  inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones" },
+  canchas: { id: "admSeccionCanchas", label: "Canchas" },
+  bloqueos: { id: "admSeccionBloqueos", label: "Bloqueos" },
+  partidos: { id: "admSeccionPartidos", label: "Partidos" }
+};
+function renderAdminGestionSubnav() {
+  const cont = document.getElementById("admGestionSubnav");
+  cont.innerHTML = Object.entries(SECCIONES_GESTION)
+    .map(([key, info]) => `<button type="button" class="pill ${key === seccionGestionActiva ? "active" : ""}" data-seccion="${key}">${info.label}</button>`)
+    .join("");
+  cont.querySelectorAll(".pill").forEach((btn) => btn.addEventListener("click", () => mostrarSeccionGestion(btn.dataset.seccion)));
+  mostrarSeccionGestion(seccionGestionActiva);
+}
+function mostrarSeccionGestion(clave) {
+  seccionGestionActiva = clave;
+  Object.entries(SECCIONES_GESTION).forEach(([key, info]) => {
+    document.getElementById(info.id).style.display = key === clave ? "block" : "none";
+  });
+  document.getElementById("admGestionSubnav").querySelectorAll(".pill").forEach((btn) => btn.classList.toggle("active", btn.dataset.seccion === clave));
+}
+
 async function cargarGestionTorneo(id) {
   torneoGestionId = id;
   const { data: t, error } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria, estado_fase)").eq("id", id).single();
@@ -2427,6 +2469,7 @@ async function cargarGestionTorneo(id) {
   document.getElementById("admGestionTorneoWrap").style.display = "block";
   document.getElementById("admGestionNombre").textContent = t.nombre;
   document.getElementById("admGestionEstado").innerHTML = badgeEstadoTorneo(t);
+  renderAdminGestionSubnav();
 
   const btnToggleInsc = document.getElementById("btnToggleInscripcion");
   if (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada") {
@@ -2527,8 +2570,12 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
   if (escrito === null) return;
   if (escrito.trim() !== nombre.trim()) { toast("No coincide el nombre — no se borró nada."); return; }
 
-  const { error } = await sb.from("torneos").delete().eq("id", torneoGestionId);
+  const { data, error } = await sb.from("torneos").delete().eq("id", torneoGestionId).select();
   if (error) { toast("Error al borrar: " + error.message); return; }
+  if (!data || data.length === 0) {
+    toast(`No se pudo borrar "${nombre}" — no tenés permisos de administrador o ya estaba borrado.`);
+    return;
+  }
 
   toast(`"${nombre}" borrado`);
   torneoGestionId = null;
@@ -3462,7 +3509,16 @@ function renderPartidosLlave(containerId, partidos) {
     return;
   }
 
-  cont.innerHTML = '<div class="llave-scroll"><div class="llave">' +
+  // botones "Octavos / Cuartos / Semis / Final" (o "Zona 1 / Zona 2 / ...")
+  // para saltar de ronda en un toque en mobile — ver comentario en style.css.
+  // Con una sola columna no aportan nada, así que no se muestran.
+  const navRondas = columnas.length > 1
+    ? '<div class="pill-row llave-rondas-nav">' +
+      columnas.map((col, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
+      "</div>"
+    : "";
+
+  cont.innerHTML = navRondas + '<div class="llave-scroll"><div class="llave">' +
     columnas.map((col, i) => {
       // separador visual entre el bloque de zonas y el de eliminación directa
       const esPrimeraDeEliminacion = !col.zona && columnasZona.length > 0 && i === columnasZona.length;
@@ -3470,7 +3526,7 @@ function renderPartidosLlave(containerId, partidos) {
       if (col.zona) clases.push("llave-zona");
       if (esPrimeraDeEliminacion) clases.push("llave-separador");
       return `
-      <div class="${clases.join(" ")}">
+      <div class="${clases.join(" ")}" data-col-index="${i}">
         <h3>${col.titulo}</h3>
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
@@ -3478,6 +3534,16 @@ function renderPartidosLlave(containerId, partidos) {
 
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
+  });
+  cont.querySelectorAll("[data-llave-col]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      cont.querySelectorAll("[data-llave-col]").forEach((b) => b.classList.toggle("active", b === btn));
+      const columna = cont.querySelector(`[data-col-index="${btn.dataset.llaveCol}"]`);
+      // scrollIntoView mueve tanto el scroll horizontal de .llave-scroll como
+      // el scroll vertical de la página, en un solo llamado nativo — soluciona
+      // de una vez el "hay que bajar Y deslizar" que confundía en mobile.
+      if (columna) columna.scrollIntoView({ behavior: "smooth", inline: "start", block: "start" });
+    });
   });
 }
 

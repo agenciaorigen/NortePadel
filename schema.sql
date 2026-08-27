@@ -618,6 +618,129 @@ create trigger trg_actualizar_ranking
 before update on partidos
 for each row execute function actualizar_ranking();
 
+-- Si se borra un partido que ya estaba "jugado" (a mano, o en cascada porque
+-- se borró el torneo entero: on delete cascade SÍ dispara este trigger, es un
+-- delete real fila por fila) hay que revertir los puntos que ya se le habían
+-- sumado a esas 4 parejas/jugadores — si no, el ranking queda con puntos de
+-- partidos que ya no existen. Misma cuenta que la corrección de resultado de
+-- más arriba, aplicada sobre old en vez de new.
+create or replace function revertir_ranking_al_borrar_partido() returns trigger as $$
+declare
+  ganador parejas%rowtype;
+  perdedor_id uuid;
+  perdedor parejas%rowtype;
+  pts_ganador int := 0;
+  pts_perdedor int := 0;
+begin
+  if old.estado = 'jugado' and old.ganador_pareja_id is not null then
+    select * into ganador from parejas where id = old.ganador_pareja_id;
+    perdedor_id := case when old.pareja1_id = old.ganador_pareja_id then old.pareja2_id else old.pareja1_id end;
+    select * into perdedor from parejas where id = perdedor_id;
+
+    if old.ronda = 'Final' then
+      select puntos into pts_ganador from puntos_ronda where ronda = 'Campeón';
+      select puntos into pts_perdedor from puntos_ronda where ronda = 'Sub';
+    elsif old.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+      select puntos into pts_perdedor from puntos_ronda where ronda = old.ronda;
+    end if;
+
+    if ganador.id is not null then
+      update jugadores set
+        puntos_ranking = puntos_ranking - coalesce(pts_ganador, 0),
+        partidos_jugados = partidos_jugados - 1,
+        partidos_ganados = partidos_ganados - 1
+      where id in (ganador.jugador1_id, ganador.jugador2_id);
+
+      if old.categoria is not null then
+        update ranking_categoria set
+          puntos_ranking = puntos_ranking - coalesce(pts_ganador, 0),
+          partidos_jugados = partidos_jugados - 1,
+          partidos_ganados = partidos_ganados - 1,
+          updated_at = now()
+        where categoria = old.categoria and jugador_id in (ganador.jugador1_id, ganador.jugador2_id);
+      end if;
+    end if;
+
+    if perdedor.id is not null then
+      update jugadores set
+        puntos_ranking = puntos_ranking - coalesce(pts_perdedor, 0),
+        partidos_jugados = partidos_jugados - 1
+      where id in (perdedor.jugador1_id, perdedor.jugador2_id);
+
+      if old.categoria is not null then
+        update ranking_categoria set
+          puntos_ranking = puntos_ranking - coalesce(pts_perdedor, 0),
+          partidos_jugados = partidos_jugados - 1,
+          updated_at = now()
+        where categoria = old.categoria and jugador_id in (perdedor.jugador1_id, perdedor.jugador2_id);
+      end if;
+    end if;
+  end if;
+
+  return old;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_revertir_ranking_al_borrar on partidos;
+create trigger trg_revertir_ranking_al_borrar
+before delete on partidos
+for each row execute function revertir_ranking_al_borrar_partido();
+
+-- El de arriba no alcanza solo: "parejas" también tiene "on delete cascade"
+-- desde torneos, y esa cascada puede (y en la práctica, sí) borrar la fila de
+-- parejas ANTES que la de partidos — para entonces el trigger de arriba ya no
+-- puede levantar jugador1_id/jugador2_id porque la pareja ya no existe. Este
+-- segundo trigger cubre ese caso mirándolo al revés: antes de borrar UNA
+-- pareja, revisa sus propios partidos "jugado" (que a esta altura todavía
+-- existen, porque el cascade de partidos recién corre después de este borrado)
+-- y revierte lo que esa pareja puntual se llevó en cada uno. Si el otro
+-- trigger ya se adelantó (torneo chico donde el orden salió al revés), acá no
+-- encuentra partidos para esa pareja y no hace nada — no se duplica la resta
+-- pase lo que pase con el orden real de la cascada.
+create or replace function revertir_ranking_al_borrar_pareja() returns trigger as $$
+declare
+  p record;
+  gano boolean;
+  pts int;
+begin
+  for p in
+    select * from partidos
+    where estado = 'jugado' and ganador_pareja_id is not null
+      and (pareja1_id = old.id or pareja2_id = old.id)
+  loop
+    gano := p.ganador_pareja_id = old.id;
+    pts := 0;
+    if p.ronda = 'Final' then
+      select puntos into pts from puntos_ronda where ronda = (case when gano then 'Campeón' else 'Sub' end);
+    elsif not gano and p.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+      select puntos into pts from puntos_ronda where ronda = p.ronda;
+    end if;
+
+    update jugadores set
+      puntos_ranking = puntos_ranking - coalesce(pts, 0),
+      partidos_jugados = partidos_jugados - 1,
+      partidos_ganados = partidos_ganados - (case when gano then 1 else 0 end)
+    where id in (old.jugador1_id, old.jugador2_id);
+
+    if p.categoria is not null then
+      update ranking_categoria set
+        puntos_ranking = puntos_ranking - coalesce(pts, 0),
+        partidos_jugados = partidos_jugados - 1,
+        partidos_ganados = partidos_ganados - (case when gano then 1 else 0 end),
+        updated_at = now()
+      where categoria = p.categoria and jugador_id in (old.jugador1_id, old.jugador2_id);
+    end if;
+  end loop;
+
+  return old;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_revertir_ranking_al_borrar_pareja on parejas;
+create trigger trg_revertir_ranking_al_borrar_pareja
+before delete on parejas
+for each row execute function revertir_ranking_al_borrar_pareja();
+
 -- ============================================================
 -- TRIGGER: al asignar horario/cancha a un partido, notificar a los 4 jugadores
 -- ============================================================
