@@ -390,7 +390,7 @@ tr:first-child td { font-weight: 700; }
   to { transform: translateX(-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track, .ascendidos-track { animation: none; }
+  .marquee-track, .ascendidos-track, .sponsor-marquee-track { animation: none; }
 }
 
 /* ---------- Ascendieron este mes (tira rotativa, Inicio) ---------- */
@@ -1098,10 +1098,35 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   color: var(--muted); margin: 0 0 10px;
 }
 
+/* ---------- Auspiciantes en mobile: barra que se desliza sola ----------
+   Reemplaza al renglón chico (.sponsor-strip, logos de 40px) que quedaba
+   perdido al final de Inicio. Mismo mecanismo que .marquee-track de arriba,
+   logos bastante más grandes para que se lean bien. En desktop no se usa:
+   ahí los auspiciantes ya están grandes en la columna lateral (#sidebarAds). */
+.sponsor-marquee { width: 100%; overflow: hidden; margin-bottom: 20px; }
+.sponsor-marquee-track {
+  display: flex; gap: 20px; width: max-content; align-items: center;
+  animation: marquee-scroll 22s linear infinite;
+}
+.sponsor-marquee-track a, .sponsor-marquee-track span.sponsor-item {
+  flex-shrink: 0; display: block; background: #fff;
+  border-radius: var(--radius-sm); padding: 10px 16px;
+}
+.sponsor-marquee-track img { height: 64px; max-width: 220px; object-fit: contain; display: block; }
+
 /* ============================================================
    ESCRITORIO: nav lateral + columna de publicidad fija
    ============================================================ */
 #sidebarAds { display: none; }
+
+@media (min-width: 960px) {
+  /* en desktop los auspiciantes van en la columna lateral, no en la barra móvil */
+  .sponsor-marquee { display: none !important; }
+}
+@media (max-width: 959px) {
+  /* en mobile los auspiciantes van en la barra móvil (arriba), no en el renglón chico */
+  #sponsorsInlineCard { display: none !important; }
+}
 
 @media (min-width: 960px) {
   body { padding-bottom: 0; padding-left: 88px; }

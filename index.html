@@ -115,11 +115,14 @@
       </div>
     </button>
 
-    <div class="energia-banda">
-      <div class="energia-texto">
-        <h3>En noviembre vamos a Brasil</h3>
-        <p>Padel Tour 2026</p>
-      </div>
+    <!-- En mobile no hay columna lateral (ver #sidebarAds) — los auspiciantes
+         pasan a una barra que se desliza sola (mismo mecanismo que la banda
+         de arriba, "marquee-scroll"), bien grande, en vez del renglón chico
+         de logos que quedaba más abajo del todo. En desktop esta barra no se
+         ve: ahí los auspiciantes ya están grandes en la columna lateral. -->
+    <div class="sponsor-marquee" id="sponsorMarqueeMobile" style="display:none">
+      <p class="sponsor-label">Auspician</p>
+      <div class="sponsor-marquee-track" id="sponsorMarqueeTrack"></div>
     </div>
 
     <div class="destacados-band">
@@ -144,6 +147,15 @@
       <div id="flyerDestacado"></div>
       <div class="flyer-grid" id="flyerMini"></div>
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
+    </div>
+
+    <!-- En mobile vive acá, arriba de Noticias. En desktop, moverBannerEnergiaSegunAncho()
+         la reubica dentro de #sidebarAds (#sidebarEnergiaSlot) sin duplicar el markup. -->
+    <div class="energia-banda" id="energiaBanda">
+      <div class="energia-texto">
+        <h3>En noviembre vamos a Brasil</h3>
+        <p>Padel Tour 2026</p>
+      </div>
     </div>
 
     <div class="seccion" id="noticiasCard" style="display:none">
@@ -595,8 +607,10 @@
         <div id="admParejas"></div>
         <div id="admSinPareja"></div>
         <label style="margin-top:12px">Inscribir una pareja manualmente</label>
-        <select id="dtSelectJugador1"></select>
-        <select id="dtSelectJugador2" style="margin-top:6px"></select>
+        <input type="text" id="dtSelectJugador1" list="dtListaJugadores1" placeholder="Buscar jugador 1 por nombre..." autocomplete="off" />
+        <datalist id="dtListaJugadores1"></datalist>
+        <input type="text" id="dtSelectJugador2" list="dtListaJugadores2" placeholder="Buscar jugador 2 por nombre..." autocomplete="off" style="margin-top:6px" />
+        <datalist id="dtListaJugadores2"></datalist>
         <select id="dtSelectCategoriaInscribir" style="margin-top:6px"><option value="">Elegí la categoría</option></select>
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
@@ -796,6 +810,8 @@
     <h3>Próximo torneo</h3>
     <div id="sidebarFlyer"></div>
   </div>
+  <!-- Destino desktop de #energiaBanda (ver moverBannerEnergiaSegunAncho() en app.js) -->
+  <div class="card" id="sidebarEnergiaSlot"></div>
   <div class="card" id="sidebarSponsorsCard" style="display:none">
     <p class="sponsor-label">Auspician</p>
     <div class="sponsor-strip vertical" id="sidebarSponsors"></div>

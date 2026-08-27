@@ -410,6 +410,12 @@ create table if not exists notificaciones (
   leido boolean not null default false,
   created_at timestamptz not null default now()
 );
+-- torneo_id/partido_id/pantalla: a dónde navegar al tocar la notificación (ej: "te
+-- cambiaron el horario" -> torneo_id + partido_id + pantalla='calendario'). pantalla
+-- null = notificación solo informativa (ej: invitación a jugar), no navega a ningún lado.
+alter table notificaciones add column if not exists torneo_id uuid references torneos(id) on delete set null;
+alter table notificaciones add column if not exists partido_id uuid references partidos(id) on delete set null;
+alter table notificaciones add column if not exists pantalla text;
 
 -- ---------- PUNTOS POR RONDA (ranking por eliminación directa) ----------
 -- Cuando se carga el resultado de un partido de Semifinal/Cuartos/Octavos/Dieciseisavos,
@@ -469,6 +475,34 @@ create index if not exists idx_flyers_torneo on flyers(torneo_id);
 create index if not exists idx_sponsors_torneo on sponsors(torneo_id);
 create index if not exists idx_push_subscriptions_jugador on push_subscriptions(jugador_id);
 create index if not exists idx_notificaciones_jugador on notificaciones(jugador_id);
+
+-- ============================================================
+-- TRIGGER: no dejar que la bandeja de notificaciones de un jugador crezca
+-- sin límite — al insertar una notificación nueva, se borran las viejas de
+-- ESE jugador (nunca las de otro) que ya pasaron los 60 días, y si aun así
+-- quedan más de 50 guardadas, se recorta a las 50 más recientes.
+-- ============================================================
+create or replace function limpiar_notificaciones_viejas() returns trigger as $$
+begin
+  delete from notificaciones
+  where jugador_id = new.jugador_id
+    and (
+      created_at < now() - interval '60 days'
+      or id in (
+        select id from notificaciones
+        where jugador_id = new.jugador_id
+        order by created_at desc
+        offset 50
+      )
+    );
+  return null;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_limpiar_notificaciones on notificaciones;
+create trigger trg_limpiar_notificaciones
+after insert on notificaciones
+for each row execute function limpiar_notificaciones_viejas();
 create index if not exists idx_historial_categoria_jugador on historial_categoria(jugador_id);
 create index if not exists idx_historial_categoria_fecha on historial_categoria(created_at);
 create index if not exists idx_noticias_fecha on noticias(created_at);
@@ -601,9 +635,9 @@ begin
       end if;
     end if;
 
-    -- notificación in-app a los 4 jugadores
-    insert into notificaciones (jugador_id, mensaje)
-    select j, 'Resultado cargado: revisá el partido en Norte Padel'
+    -- notificación in-app a los 4 jugadores (tocarla lleva a Resultados de ese torneo)
+    insert into notificaciones (jugador_id, mensaje, torneo_id, partido_id, pantalla)
+    select j, 'Resultado cargado: revisá el partido en Norte Padel', new.torneo_id, new.id, 'resultados'
     from unnest(array[ganador.jugador1_id, ganador.jugador2_id, perdedor.jugador1_id, perdedor.jugador2_id]) as j
     where j is not null;
   end if;
@@ -753,8 +787,9 @@ begin
     select * into p1 from parejas where id = new.pareja1_id;
     select * into p2 from parejas where id = new.pareja2_id;
 
-    insert into notificaciones (jugador_id, mensaje)
-    select j, 'Te asignaron horario de partido: ' || to_char(new.horario, 'DD/MM HH24:MI')
+    -- tocarla lleva directo al Calendario de ese torneo
+    insert into notificaciones (jugador_id, mensaje, torneo_id, partido_id, pantalla)
+    select j, 'Te asignaron horario de partido: ' || to_char(new.horario, 'DD/MM HH24:MI'), new.torneo_id, new.id, 'calendario'
     from unnest(array[p1.jugador1_id, p1.jugador2_id, p2.jugador1_id, p2.jugador2_id]) as j
     where j is not null;
   end if;
@@ -933,9 +968,11 @@ begin
     insert into parejas (torneo_id, jugador1_id, jugador2_id) values (p_torneo_id, v_mi_id, p_pareja_jugador_id);
   end if;
 
-  insert into notificaciones (jugador_id, mensaje)
+  -- tocarla lleva a "Mi inscripción" en ese torneo
+  insert into notificaciones (jugador_id, mensaje, torneo_id, pantalla)
   select p_pareja_jugador_id,
-    (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te anotó como su pareja en un torneo. ¡Ya quedaste inscripto!';
+    (select nombre || ' ' || apellido from jugadores where id = v_mi_id) || ' te anotó como su pareja en un torneo. ¡Ya quedaste inscripto!',
+    p_torneo_id, 'mi-inscripcion';
 end;
 $$;
 

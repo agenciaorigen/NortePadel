@@ -198,6 +198,41 @@ function agruparPorGenero(categorias) {
 }
 const ORDEN_GENEROS = ["Damas", "Caballeros", "Otras"];
 
+// Buscador de jugadores con el <input list> + <datalist> nativos del navegador
+// (con 600+ jugadores importados, un <select> con todos adentro es imposible
+// de usar — esto da el filtrado-al-tipear gratis, sin agregar ninguna
+// librería de autocompletado). El id real de cada jugador no cabe en el
+// value del <option> sin verse feo, así que se guarda aparte en un Map
+// colgado del propio input; ver idDesdeDatalist para leerlo de vuelta. Si dos
+// jugadores comparten exactamente el mismo nombre+categoría se desambiguan
+// con "(2)", "(3)"... al final del texto, así nunca se pisan en el mapa.
+function llenarDatalist(inputId, datalistId, items, labelFn) {
+  const input = document.getElementById(inputId);
+  const datalist = document.getElementById(datalistId);
+  if (!input || !datalist) return;
+  const mapa = new Map();
+  const vistos = new Map();
+  datalist.innerHTML = "";
+  items.forEach((it) => {
+    const base = labelFn(it);
+    const n = (vistos.get(base) || 0) + 1;
+    vistos.set(base, n);
+    const label = n > 1 ? `${base} (${n})` : base;
+    mapa.set(label, it.id);
+    const opt = document.createElement("option");
+    opt.value = label;
+    datalist.appendChild(opt);
+  });
+  input._mapaDatalist = mapa;
+}
+// Devuelve el id del jugador elegido, o "" si lo tipeado no coincide con
+// ninguna opción real de la lista (evita inscribir con un id inventado si
+// alguien escribe cualquier cosa y no termina de elegir de la lista).
+function idDesdeDatalist(inputId) {
+  const input = document.getElementById(inputId);
+  return input?._mapaDatalist?.get(input.value.trim()) || "";
+}
+
 function llenarSelect(select, items, labelFn, valueFn) {
   if (!select) return;
   const valorPrevio = select.value;
@@ -1285,8 +1320,9 @@ async function cargarJugadoresAdmin() {
     (cacheRankingCategoriaAdmin[r.jugador_id] ||= []).push(r);
   });
   renderListaJugadoresAdmin();
-  llenarSelect(document.getElementById("dtSelectJugador1"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
-  llenarSelect(document.getElementById("dtSelectJugador2"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido}`);
+  const labelJugadorBuscable = (j) => `${j.apellido}, ${j.nombre} — ${j.categoria || "sin categoría"}`;
+  llenarDatalist("dtSelectJugador1", "dtListaJugadores1", cacheJugadoresAdmin, labelJugadorBuscable);
+  llenarDatalist("dtSelectJugador2", "dtListaJugadores2", cacheJugadoresAdmin, labelJugadorBuscable);
   llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
@@ -1685,6 +1721,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
 let tokenNavegacionTorneo = 0;
 async function abrirTorneo(id, pantalla) {
   const miToken = ++tokenNavegacionTorneo;
+  if (id !== torneoActualId) calFiltroFechaAutoAplicada = false; // torneo distinto: elegir la fecha del calendario de nuevo sola
   torneoActualId = id;
   await refrescarDetalleTorneo();
   if (miToken !== tokenNavegacionTorneo) return; // ya hay una navegación más nueva en curso
@@ -2694,10 +2731,19 @@ document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", asyn
 // Inscribe una pareja completa a mano (ej: dos amigos que se lo pidieron directo al club).
 // Siempre entran los dos juntos, nunca un jugador suelto — así nunca queda nadie sin pareja.
 document.getElementById("btnInscribir").addEventListener("click", async () => {
-  const jugador1Id = document.getElementById("dtSelectJugador1").value;
-  const jugador2Id = document.getElementById("dtSelectJugador2").value;
+  const in1 = document.getElementById("dtSelectJugador1");
+  const in2 = document.getElementById("dtSelectJugador2");
+  const jugador1Id = idDesdeDatalist("dtSelectJugador1");
+  const jugador2Id = idDesdeDatalist("dtSelectJugador2");
   const categoria = document.getElementById("dtSelectCategoriaInscribir").value;
-  if (!jugador1Id || !jugador2Id || !torneoGestionId) return;
+  if (!torneoGestionId) return;
+  // valida que lo tipeado sea de verdad un jugador de la lista (y no texto
+  // suelto que quedó a medio escribir sin elegir ninguna opción)
+  if ((in1.value.trim() && !jugador1Id) || (in2.value.trim() && !jugador2Id)) {
+    toast("Elegí un jugador de la lista que aparece al escribir (no quedó seleccionado ninguno)");
+    return;
+  }
+  if (!jugador1Id || !jugador2Id) { toast("Buscá y elegí los dos jugadores"); return; }
   if (jugador1Id === jugador2Id) { toast("Elegí dos jugadores distintos"); return; }
   if (!categoria) { toast("Elegí en qué categoría los inscribís"); return; }
   // lo inscribe el admin a mano, así que queda confirmado directo (no hace falta el paso
@@ -2708,6 +2754,8 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id });
   if (e3) { toast("Se inscribieron pero no se pudo armar la pareja: " + e3.message); refrescarTrasAccionGestion(); return; }
   toast("Pareja inscripta");
+  in1.value = "";
+  in2.value = "";
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
 });
@@ -3611,6 +3659,10 @@ function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
 
 // ---------- Calendario y Resultados públicos (mismo componente para
 // Público y Jugador — el jugador ve exactamente lo mismo) ----------
+// true una vez que se eligió sola la fecha del calendario (o el usuario tocó
+// el selector a mano) para ESTE torneo — evita que cada re-render en vivo
+// vuelva a pisar la elección. Se resetea al entrar a otro torneo (abrirTorneo).
+let calFiltroFechaAutoAplicada = false;
 function renderCalendarioPublico() {
   const selCat = document.getElementById("calFiltroCategoria");
   if (!categoriasTorneoActual.includes(selCat.value)) selCat.value = "";
@@ -3622,11 +3674,27 @@ function renderCalendarioPublico() {
   // dejaba elegir cualquier día del calendario y mostraba la pantalla vacía.
   const selFecha = document.getElementById("calFiltroFecha");
   const fechasConPartidos = [...new Set(ultimosPartidos.filter((p) => p.horario).map((p) => p.horario.slice(0, 10)))].sort();
-  if (!fechasConPartidos.includes(selFecha.value)) selFecha.value = "";
+  // ojo con el orden acá: el <select> todavía tiene las <option> de la vuelta
+  // anterior en este punto, así que asignarle selFecha.value ahora (antes de
+  // reconstruir el innerHTML de abajo) no sirve de nada si la fecha elegida
+  // todavía no existe como opción — por eso se arma en una variable aparte
+  // (fechaFiltro) y recién se vuelca como "selected" al armar las <option>.
+  let fechaFiltro = fechasConPartidos.includes(selFecha.value) ? selFecha.value : "";
+  // a medida que el torneo avanza no tiene sentido arrancar viendo TODOS los
+  // partidos desde el primer día — se elige sola la fecha más relevante: la
+  // de hoy si hoy se juega, si no la próxima que viene, y si el torneo ya
+  // terminó, la última jugada. Solo pasa la primera vez que se ve el
+  // calendario de este torneo — tocar el selector a mano (aunque sea para
+  // volver a "Todas las fechas") lo deja fijo en lo que se haya elegido.
+  if (!calFiltroFechaAutoAplicada && !fechaFiltro && fechasConPartidos.length) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    fechaFiltro = fechasConPartidos.find((f) => f === hoy) || fechasConPartidos.find((f) => f > hoy) || fechasConPartidos[fechasConPartidos.length - 1];
+    calFiltroFechaAutoAplicada = true;
+  }
   selFecha.innerHTML = `<option value="">Todas las fechas</option>` +
     fechasConPartidos.map((f) => {
       const label = new Date(f + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
-      return `<option value="${f}" ${f === selFecha.value ? "selected" : ""}>${label}</option>`;
+      return `<option value="${f}" ${f === fechaFiltro ? "selected" : ""}>${label}</option>`;
     }).join("");
 
   const canchas = ultimasCanchasTorneo.map((c) => c.canchas).filter(Boolean);
@@ -3654,7 +3722,7 @@ function renderCalendarioPublico() {
   renderOrdenDeJuego("pubCalendario", visibles, canchasVisibles);
 }
 document.getElementById("calFiltroCategoria").addEventListener("change", renderCalendarioPublico);
-document.getElementById("calFiltroFecha").addEventListener("change", renderCalendarioPublico);
+document.getElementById("calFiltroFecha").addEventListener("change", () => { calFiltroFechaAutoAplicada = true; renderCalendarioPublico(); });
 // los accesos directos a Calendario/Resultados desde Inicio del torneo se sacaron:
 // duplicaban las mismas dos pestañas que ya están arriba, en torneoSubnav.
 
@@ -4015,6 +4083,8 @@ async function cargarSponsors() {
   const inline = document.getElementById("sponsorsInline");
   const sidebarCard = document.getElementById("sidebarSponsorsCard");
   const sidebar = document.getElementById("sidebarSponsors");
+  const marqueeCard = document.getElementById("sponsorMarqueeMobile");
+  const marqueeTrack = document.getElementById("sponsorMarqueeTrack");
 
   if (admin) {
     admin.innerHTML = (data && data.length > 0)
@@ -4028,11 +4098,38 @@ async function cargarSponsors() {
     if (inlineCard) inlineCard.style.display = "block";
     if (sidebar) sidebar.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (sidebarCard) sidebarCard.style.display = "flex";
+    if (marqueeTrack) {
+      const items = generales.map((s) => renderSponsorItem(s)).join("");
+      marqueeTrack.innerHTML = items + items; // duplicado exacto x2: lo pide marquee-scroll para el loop sin corte
+    }
+    if (marqueeCard) marqueeCard.style.display = "block";
   } else {
     if (inlineCard) inlineCard.style.display = "none";
     if (sidebarCard) sidebarCard.style.display = "none";
+    if (marqueeCard) marqueeCard.style.display = "none";
   }
 }
+
+// La banda "En noviembre vamos a Brasil / Padel Tour 2026" es un único elemento
+// del DOM que se reubica según el ancho (mismo breakpoint que #sidebarAds,
+// 960px): en mobile va arriba de Noticias (su lugar de origen en el HTML),
+// en desktop se muda al costado de los auspiciantes en la columna lateral.
+// Reubicar en vez de duplicar markup/CSS evita mantener dos copias.
+const bannerEnergiaHomeMobile = document.getElementById("energiaBanda")?.parentElement || null;
+const bannerEnergiaHomeMobileSiguiente = document.getElementById("noticiasCard");
+function moverBannerEnergiaSegunAncho() {
+  const banner = document.getElementById("energiaBanda");
+  const slotDesktop = document.getElementById("sidebarEnergiaSlot");
+  if (!banner || !slotDesktop || !bannerEnergiaHomeMobile) return;
+  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
+  if (esDesktop) {
+    if (banner.parentElement !== slotDesktop) slotDesktop.appendChild(banner);
+  } else if (banner.parentElement !== bannerEnergiaHomeMobile) {
+    bannerEnergiaHomeMobile.insertBefore(banner, bannerEnergiaHomeMobileSiguiente);
+  }
+}
+window.matchMedia("(min-width: 960px)").addEventListener("change", moverBannerEnergiaSegunAncho);
+moverBannerEnergiaSegunAncho();
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");
@@ -4176,18 +4273,33 @@ async function abrirNotificaciones() {
   if (!miJugador) { toast("Iniciá sesión para ver tus notificaciones"); cambiarVista("perfil"); return; }
   const { data } = await sb.from("notificaciones").select("*").eq("jugador_id", miJugador.id).order("created_at", { ascending: false }).limit(30);
   const lista = document.getElementById("listaNotificaciones");
+  // si tiene torneo_id + pantalla, se puede tocar para ir directo a esa pantalla del
+  // torneo (ej: "te cambiaron el horario" -> Calendario); si no, queda solo informativa
   lista.innerHTML = (data && data.length > 0)
-    ? data.map((n) => `
-      <div class="match-card${n.leido ? "" : " match-card-jugado"}" style="margin-bottom:8px">
+    ? data.map((n) => {
+        const puedeNavegar = n.torneo_id && n.pantalla;
+        const tag = puedeNavegar ? "button" : "div";
+        const atributos = puedeNavegar
+          ? `type="button" class="match-card clickeable notif-item${n.leido ? "" : " match-card-jugado"}" data-torneo-id="${n.torneo_id}" data-pantalla="${n.pantalla}"`
+          : `class="match-card${n.leido ? "" : " match-card-jugado"}"`;
+        return `
+      <${tag} ${atributos} style="margin-bottom:8px;text-align:left;width:100%">
         <div style="font-size:13px">${n.mensaje}</div>
-        <div class="match-meta" style="margin-top:4px">${new Date(n.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}${!n.leido ? ' · <span class="badge orange">nueva</span>' : ""}</div>
-      </div>`).join("")
+        <div class="match-meta" style="margin-top:4px">${new Date(n.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}${!n.leido ? ' · <span class="badge orange">nueva</span>' : ""}${puedeNavegar ? " · Tocá para ver →" : ""}</div>
+      </${tag}>`;
+      }).join("")
     : '<p class="empty">No tenés notificaciones todavía.</p>';
   document.getElementById("notifOverlay").style.display = "flex";
   await sb.from("notificaciones").update({ leido: true }).eq("jugador_id", miJugador.id).eq("leido", false);
   actualizarContadorNotificaciones();
 }
 document.getElementById("btnNotif").addEventListener("click", abrirNotificaciones);
+document.getElementById("listaNotificaciones").addEventListener("click", (e) => {
+  const item = e.target.closest(".notif-item");
+  if (!item) return;
+  document.getElementById("notifOverlay").style.display = "none";
+  abrirTorneo(item.dataset.torneoId, item.dataset.pantalla);
+});
 document.getElementById("btnCerrarNotif").addEventListener("click", () => { document.getElementById("notifOverlay").style.display = "none"; });
 document.getElementById("notifOverlay").addEventListener("click", (e) => {
   if (e.target.id === "notifOverlay") document.getElementById("notifOverlay").style.display = "none";
