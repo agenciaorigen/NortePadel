@@ -113,13 +113,22 @@ create table if not exists categorias (
 -- Categorías reales del circuito: Damas y Caballeros son escalafones separados
 -- (una "6ta Damas" y una "6ta Caballeros" son grupos de jugadores distintos).
 -- Se dejan también las genéricas viejas (no se borran, por si algún torneo ya las usa).
-insert into categorias (nombre, orden) values
+-- Solo se siembran la PRIMERÍSIMA vez (tabla todavía vacía): antes esto llevaba
+-- "on conflict do nothing", que solo evita duplicar una categoría que sigue
+-- existiendo — pero si el admin borraba una a propósito y después se volvía a
+-- ejecutar este script (como hace falta para cualquier otro cambio de base de
+-- datos), esa categoría ya no "chocaba" con nada y se insertaba de nuevo sola.
+-- Con el "where not exists" de abajo, una vez que la tabla tiene aunque sea una
+-- fila (ya se sembró alguna vez), este insert nunca más vuelve a tocarla.
+insert into categorias (nombre, orden)
+select v.nombre, v.orden from (values
   ('8va Damas', 1), ('7ma Damas', 2), ('6ta Damas', 3), ('5ta Damas', 4), ('4ta Damas', 5),
   ('8va Caballeros', 10), ('7ma Caballeros', 11), ('6ta Caballeros', 12), ('5ta Caballeros', 13),
   ('4ta Caballeros', 14), ('3ra Caballeros', 15),
   ('8va', 20), ('7ma', 21), ('6ta', 22), ('5ta', 23), ('4ta', 24),
   ('3ra', 25), ('2da', 26), ('1ra', 27), ('Damas', 28)
-on conflict (nombre) do nothing;
+) as v(nombre, orden)
+where not exists (select 1 from categorias);
 
 -- ---------- ETIQUETAS DE JUGADOR (uso interno del admin) ----------
 -- Etiquetas libres con color (ej: "Veterano") para que el admin las use como ayuda

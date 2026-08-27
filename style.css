@@ -35,7 +35,9 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  padding-bottom: 78px;
+  /* + el alto real de la barra inferior en celulares con "isla"/línea de inicio
+     (ver nav.tabbar) — si no, el contenido queda tapado detrás de esa franja */
+  padding-bottom: calc(78px + env(safe-area-inset-bottom));
 }
 /* fondo de toda la app: la foto de la cancha, difuminada y bien oscurecida (en vez del negro liso) */
 body::before {
@@ -60,7 +62,8 @@ header.topbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  /* + el recorte de arriba (notch/isla dinámica) instalada como app a pantalla completa */
+  padding: calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left));
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -1001,6 +1004,11 @@ nav.tabbar {
   background: var(--bg-elev);
   border-top: 1px solid var(--border);
   z-index: 10;
+  /* deja libre la franja de gestos/línea de inicio del celular en vez de que
+     los botones queden pegados (o tapados) justo ahí */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 nav.tabbar button {
   flex: 1;
@@ -1066,7 +1074,7 @@ nav.tabbar button.tab-mobile-only { display: flex; }
 .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
 .toast {
   position: fixed;
-  bottom: 86px; left: 50%; transform: translateX(-50%);
+  bottom: calc(86px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
   background: var(--card); border: 1px solid var(--border);
   color: var(--text); padding: 11px 18px; border-radius: var(--radius-sm);
   font-size: 13px; z-index: 50; max-width: 90%; text-align: center;
@@ -1090,6 +1098,8 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   text-decoration: none;
 }
 .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { flex-shrink: 1; text-align: center; }
+/* logo JPG: ya trae su propio fondo (nunca es transparente) — sin caja blanca encima */
+.sponsor-strip a.sponsor-sin-fondo, .sponsor-strip span.sponsor-item.sponsor-sin-fondo { background: transparent; padding: 0; }
 .sponsor-strip img { height: 40px; max-width: 140px; object-fit: contain; display: block; filter: grayscale(35%); opacity: .92; transition: filter .15s, opacity .15s; }
 .sponsor-strip a:hover img { filter: grayscale(0%); opacity: 1; }
 .sponsor-caption { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; }
@@ -1112,7 +1122,8 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   flex-shrink: 0; display: block; background: #fff;
   border-radius: var(--radius-sm); padding: 10px 16px;
 }
-.sponsor-marquee-track img { height: 64px; max-width: 220px; object-fit: contain; display: block; }
+.sponsor-marquee-track a.sponsor-sin-fondo, .sponsor-marquee-track span.sponsor-item.sponsor-sin-fondo { background: transparent; padding: 0; }
+.sponsor-marquee-track img { height: 80px; max-width: 260px; object-fit: contain; display: block; }
 
 /* ============================================================
    ESCRITORIO: nav lateral + columna de publicidad fija
@@ -1180,7 +1191,19 @@ nav.tabbar button.tab-mobile-only { display: flex; }
     top: 90px;
     /* alto atado al viewport (no al contenido de main, que puede ser muy largo) */
     height: calc(100vh - 110px);
+    /* si aun achicando #sidebarEnergiaSlot no entra todo (pantalla baja, muchos
+       auspiciantes), que la columna scrollee sola en vez de aplastar los logos */
+    overflow-y: auto;
   }
+
+  /* Padel Tour 2026 en esta columna es un acompañamiento, no el elemento
+     principal como cuando estaba en el medio de la pantalla — con su alto
+     original (retrato, ~340px) le dejaba la mitad del alto de toda la columna
+     y apretaba a los auspiciantes de abajo a un cuadradito. Panorámica y más
+     baja para dejarles aire. */
+  #sidebarEnergiaSlot .energia-banda { max-width: 100%; aspect-ratio: 16 / 9; margin-bottom: 0; padding: 14px; }
+  #sidebarEnergiaSlot .energia-texto h3 { font-size: 16px; margin-bottom: 4px; }
+  #sidebarEnergiaSlot .energia-texto p { font-size: 11px; }
 
   /* la columna de escritorio tiene aire de sobra, pero los sponsors siguen
      siendo un acompañamiento chico — no se agranda el logo, se agranda el espacio */
@@ -1193,6 +1216,7 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   #sidebarSponsorsCard .sponsor-strip.vertical a,
   #sidebarSponsorsCard .sponsor-strip.vertical span.sponsor-item {
     flex: 1; display: flex; align-items: center; justify-content: center;
+    min-height: 100px; /* si no entran todos, que la columna scrollee (ver #sidebarAds) en vez de achicarlos de más */
   }
   #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 130px; }
 

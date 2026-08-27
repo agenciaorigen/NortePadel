@@ -4068,12 +4068,18 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
 // ============================================================
 // SPONSORS / PUBLICIDAD
 // ============================================================
+// JPG no tiene transparencia (siempre trae algún fondo propio, aunque sea blanco
+// liso) — a esos no les agregamos la caja blanca de contraste, porque quedaría
+// una caja adentro de otra. PNG (y el resto) sí suelen ser logos con fondo
+// transparente y necesitan la caja blanca para leerse sobre el fondo oscuro.
 function renderSponsorItem(s, caption) {
+  const esJpg = /\.jpe?g(\?|#|$)/i.test(s.logo_url || "");
   const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${s.nombre.replace(/'/g, "\\'")}'}))" />` +
     (caption ? `<span class="sponsor-caption">${caption}</span>` : "");
+  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "");
   return s.link_url
-    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}">${contenido}</a>`
-    : `<span class="sponsor-item" title="${s.nombre}">${contenido}</span>`;
+    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}" class="${clase}">${contenido}</a>`
+    : `<span class="${clase}" title="${s.nombre}">${contenido}</span>`;
 }
 
 async function cargarSponsors() {
