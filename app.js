@@ -485,9 +485,19 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
     if (error) { toast("Error: " + error.message); return; }
     jugadorId = miJugador.id;
   } else {
-    const { data, error } = await sb.from("jugadores").insert(datos).select().single();
-    if (error) { toast("Error: " + error.message); return; }
-    jugadorId = data.id;
+    // ¿esta persona ya tiene un perfil precargado del ranking del circuito
+    // (torneo en curso, importado antes de que se registrara)? Si lo hay y es
+    // uno solo, lo reclama (así entra con sus puntos) en vez de crear uno nuevo en cero.
+    const { data: idReclamado } = await sb.rpc("reclamar_perfil_ranking", { p_nombre: nombre, p_apellido: apellido });
+    if (idReclamado) {
+      const { error } = await sb.from("jugadores").update(datos).eq("id", idReclamado);
+      if (error) { toast("Error: " + error.message); return; }
+      jugadorId = idReclamado;
+    } else {
+      const { data, error } = await sb.from("jugadores").insert(datos).select().single();
+      if (error) { toast("Error: " + error.message); return; }
+      jugadorId = data.id;
+    }
   }
 
   await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId).is("torneo_id", null);

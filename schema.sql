@@ -1316,6 +1316,53 @@ create policy "jugadores_update" on jugadores for update using (auth_user_id = a
 drop policy if exists "jugadores_delete" on jugadores;
 create policy "jugadores_delete" on jugadores for delete using (is_admin());
 
+-- Los jugadores del ranking del circuito (importado desde afuera, con el torneo
+-- ya en curso) se precargan con un email/cuenta provisoria (dominio
+-- "@circuito.nortepadel") para que el ranking ya se vea completo antes de que
+-- cada uno se registre de verdad. Cuando esa persona entra a la app por
+-- primera vez, hay que "reclamar" ese perfil pre-cargado (pasarle su cuenta
+-- real) en vez de crear uno nuevo en cero — pero jugadores_update de arriba
+-- no lo permite (auth_user_id todavía no es el suyo), así que hace falta esta
+-- función con privilegio elevado, acotada a ese único caso: solo puede
+-- reclamar un perfil TODAVÍA provisorio (no le puede pisar la cuenta a otra
+-- persona ya registrada) y solo cuando el nombre+apellido matchea una única
+-- fila (si hay más de una, no adivina — el admin lo resuelve a mano).
+create or replace function reclamar_perfil_ranking(p_nombre text, p_apellido text)
+returns uuid
+language plpgsql
+security definer set search_path = public as $$
+declare
+  v_id uuid;
+  v_email text;
+begin
+  if auth.uid() is null then
+    return null;
+  end if;
+
+  select id into v_id
+  from jugadores
+  where unaccent(upper(trim(nombre))) = unaccent(upper(trim(p_nombre)))
+    and unaccent(upper(trim(apellido))) = unaccent(upper(trim(p_apellido)))
+    and email like '%@circuito.nortepadel'
+  limit 2;
+
+  if (select count(*) from jugadores
+      where unaccent(upper(trim(nombre))) = unaccent(upper(trim(p_nombre)))
+        and unaccent(upper(trim(apellido))) = unaccent(upper(trim(p_apellido)))
+        and email like '%@circuito.nortepadel') <> 1 then
+    return null;
+  end if;
+
+  select email into v_email from auth.users where id = auth.uid();
+
+  update jugadores set auth_user_id = auth.uid(), email = coalesce(v_email, email) where id = v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function reclamar_perfil_ranking(text, text) to authenticated;
+
 -- ranking_categoria: cada uno ve sus propias filas (todas sus categorías); admin ve/edita todas.
 -- Solo el admin escribe (igual que categoria/puntos_ranking en jugadores) — un jugador no puede
 -- auto-asignarse a una categoría extra ni tocar sus puntos. Para el público se usa
