@@ -1404,6 +1404,10 @@ function renderListaJugadoresAdmin() {
         <select id="jaEtiqueta-${j.id}" class="jaEtiqueta">${opcionesEtiqueta}</select>
       </div>
       <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
+      <div class="ja-disponibilidad" style="margin-top:8px">
+        <div class="match-meta">Horarios en los que no puede jugar:</div>
+        <div id="dispAdmin-${j.id}"></div>
+      </div>
       <div class="ja-ranking-extra" style="margin-top:8px">
         <div class="match-meta">Categorías de ranking (puede estar en más de una a la vez):</div>
         <div class="jaRankingLista"></div>
@@ -1472,6 +1476,11 @@ function renderListaJugadoresAdmin() {
       if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
       const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking, etiqueta_id }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
+
+      await sb.from("disponibilidad").delete().eq("jugador_id", j.id).is("torneo_id", null);
+      const disponibilidades = leerRestriccionesDeForm(`dispAdmin-${j.id}`).map((r) => ({ jugador_id: j.id, torneo_id: null, ...r }));
+      if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
+
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
       cargarRanking();
@@ -1489,6 +1498,14 @@ function renderListaJugadoresAdmin() {
       cargarRanking();
     });
     cont.appendChild(div);
+    // el picker de disponibilidad necesita que su contenedor ya esté en el
+    // documento (getElementById no encuentra nodos todavía sueltos), por eso
+    // se arma recién acá, después del appendChild -- mismo componente que ya
+    // usa el jugador en su propio perfil (renderDisponibilidadForm), ahora
+    // también editable por el admin al cargar/corregir un jugador.
+    renderDisponibilidadForm(`dispAdmin-${j.id}`);
+    sb.from("disponibilidad").select("*").eq("jugador_id", j.id).is("torneo_id", null)
+      .then(({ data }) => precargarRestriccionesEnForm(`dispAdmin-${j.id}`, data));
   });
 }
 document.getElementById("buscarJugadorAdmin")?.addEventListener("input", renderListaJugadoresAdmin);
