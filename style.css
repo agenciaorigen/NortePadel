@@ -433,19 +433,20 @@ tr:first-child td { font-weight: 700; }
    en vez de Poppins acá puntualmente: a este tamaño Poppins se ve "inflado"
    en vez de contundente -- mismo criterio "scoreboard" que ya usan los
    números grandes (pj-stats, destacado-stat), ahora también en el título.
-   clamp() lo escala fluido en vez de saltar entre dos tamaños fijos. */
-.hero-club-titulo {
-  position: relative;
+   clamp() lo escala fluido en vez de saltar entre dos tamaños fijos.
+   Líneas quebradas (grilla rota) en vez de bloque único: la última entra
+   corrida hacia la derecha, en el verde de marca. */
+.hero-club-titulo { position: relative; margin: 0 0 14px; }
+.hero-club-titulo-line {
+  display: block;
   font-family: "Anton", "Poppins", sans-serif;
-  font-size: clamp(44px, 13vw, 92px);
-  line-height: .92;
+  font-size: clamp(34px, 10vw, 72px);
+  line-height: .94;
   font-weight: 400;
-  margin: 0 0 14px;
   letter-spacing: -.01em;
   text-transform: uppercase;
-  max-width: 90%;
 }
-.hero-club-titulo span { color: var(--accent); text-shadow: 0 0 46px rgba(180,255,57,.35); }
+.hero-club-titulo-line.accent { margin-left: 12vw; color: var(--accent); text-shadow: 0 0 46px rgba(180,255,57,.35); }
 .hero-club-sub { position: relative; color: #cfd2d2; font-size: 15.5px; margin: 0 0 22px; max-width: 36ch; }
 .hero-club-cta {
   position: relative;
@@ -1323,7 +1324,6 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   main { padding: 0; max-width: none; margin: 0; }
 
   .hero-club { padding: 44px 44px 40px; min-height: 300px; }
-  .hero-club-titulo { max-width: 62%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
   .destacados-band { padding: 24px 26px 28px; }
