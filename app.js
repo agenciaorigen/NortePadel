@@ -4156,8 +4156,14 @@ async function cargarSponsors() {
 
   if (admin) {
     admin.innerHTML = (data && data.length > 0)
-      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")).join("")
+      ? data.map((s) => `<div class="match-card">${renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")}<button type="button" class="secondary small danger btnBorrarSponsor" data-id="${s.id}" style="margin-top:8px">Borrar</button></div>`).join("")
       : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
+    admin.querySelectorAll(".btnBorrarSponsor").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await sb.from("sponsors").delete().eq("id", btn.dataset.id);
+        cargarSponsors();
+      });
+    });
   }
 
   const generales = (data || []).filter((s) => !s.torneo_id);
