@@ -298,9 +298,15 @@ tr:first-child td { font-weight: 700; }
   margin-top: 6px;
 }
 .pj-stats > div { text-align: left; }
+/* mismo criterio "scoreboard" que el título del héroe: Anton para todo número
+   grande que deba leerse como un dato duro, no solo negrita sobre Poppins */
+.pj-stats strong, .destacado-stat strong, .hero-club-widget strong, .num-score {
+  font-family: "Anton", "Poppins", sans-serif;
+  font-weight: 400;
+}
 .pj-stats strong {
-  display: block; font-size: clamp(22px, 6vw, 32px); font-weight: 900; line-height: 1;
-  letter-spacing: -.03em; color: var(--text); font-variant-numeric: tabular-nums;
+  display: block; font-size: clamp(22px, 6vw, 32px); line-height: 1;
+  letter-spacing: -.01em; color: var(--text); font-variant-numeric: tabular-nums;
 }
 .pj-stats span {
   display: block; font-size: 11px; color: var(--muted); text-transform: uppercase;
@@ -341,11 +347,13 @@ tr:first-child td { font-weight: 700; }
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  padding: 30px 22px 28px;
+  padding: 40px 24px 34px;
+  min-height: 400px;
+  display: flex; flex-direction: column; justify-content: flex-end;
   margin-bottom: 20px;
   background:
-    radial-gradient(420px 420px at var(--mx, 20%) var(--my, 20%), rgba(180,255,57,.1), transparent 60%),
-    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.4) 60%),
+    radial-gradient(520px 520px at var(--mx, 20%) var(--my, 20%), rgba(180,255,57,.14), transparent 60%),
+    linear-gradient(0deg, rgba(11,13,13,.96), rgba(11,13,13,.35) 65%),
     url('hero-cancha.jpg') center/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
@@ -353,23 +361,31 @@ tr:first-child td { font-weight: 700; }
 /* estela de pelota: mismo lima de marca, se apaga sola si el usuario pidió
    menos movimiento (ver hero-fx.js) -- puramente decorativo, aria-hidden */
 #heroTrail { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+/* título de portada de verdad -- antes quedaba casi del mismo tamaño que
+   cualquier h2 de la app, sin pesar como tal. Tipografía de impacto (Anton)
+   en vez de Poppins acá puntualmente: a este tamaño Poppins se ve "inflado"
+   en vez de contundente -- mismo criterio "scoreboard" que ya usan los
+   números grandes (pj-stats, destacado-stat), ahora también en el título.
+   clamp() lo escala fluido en vez de saltar entre dos tamaños fijos. */
 .hero-club-titulo {
   position: relative;
-  font-size: 32px;
-  line-height: 1.05;
-  font-weight: 900;
-  margin: 0 0 10px;
-  letter-spacing: -.02em;
-  max-width: 85%;
+  font-family: "Anton", "Poppins", sans-serif;
+  font-size: clamp(44px, 13vw, 92px);
+  line-height: .92;
+  font-weight: 400;
+  margin: 0 0 14px;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+  max-width: 90%;
 }
 .hero-club-titulo span { color: inherit; }
-.hero-club-sub { position: relative; color: #cfd2d2; font-size: 14px; margin: 0 0 18px; max-width: 34ch; }
+.hero-club-sub { position: relative; color: #cfd2d2; font-size: 15.5px; margin: 0 0 22px; max-width: 36ch; }
 .hero-club-cta {
   position: relative;
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--text); color: var(--bg);
   border: none; border-radius: 30px;
-  padding: 12px 20px; font-weight: 700; font-size: 14px;
+  padding: 14px 24px; font-weight: 700; font-size: 15px;
   cursor: pointer;
 }
 .hero-club-cta span { transition: transform .15s; }
@@ -385,7 +401,7 @@ tr:first-child td { font-weight: 700; }
   text-align: right;
 }
 .hero-club-widget-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.hero-club-widget strong { font-size: 18px; font-weight: 900; letter-spacing: -.02em; color: var(--text); line-height: 1.3; font-variant-numeric: tabular-nums; }
+.hero-club-widget strong { font-size: 20px; letter-spacing: 0; color: var(--text); line-height: 1.3; font-variant-numeric: tabular-nums; }
 .hero-club-widget-sub { font-size: 11px; color: var(--muted); }
 
 /* ---------- Banda con leyenda en movimiento ----------
@@ -511,7 +527,7 @@ tr:first-child td { font-weight: 700; }
   font-size: 10.5px; font-weight: 700;
 }
 .destacado-stat { position: relative; z-index: 1; }
-.destacado-stat strong { display: block; font-size: 27px; font-weight: 900; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.destacado-stat strong { display: block; font-size: 29px; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .destacado-stat span { font-size: 10.5px; color: #d8dbdb; text-transform: uppercase; letter-spacing: .04em; }
 .destacado-info { position: relative; z-index: 1; }
 .destacado-info strong {
@@ -1234,7 +1250,7 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   main { padding: 0; max-width: none; margin: 0; }
 
   .hero-club { padding: 44px 44px 40px; min-height: 300px; }
-  .hero-club-titulo { font-size: 46px; max-width: 60%; }
+  .hero-club-titulo { max-width: 62%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
   .destacados-band { padding: 24px 26px 28px; }
