@@ -648,6 +648,35 @@ async function cargarRanking() {
     return;
   }
   document.getElementById("rankingVacio").style.display = "none";
+
+  // podio para el top 3 -- mismo dato que ya arma la tabla de abajo, solo se
+  // lee dos veces de "completa" en vez de tocar el resto del render. Si hay
+  // menos de 3 jugadores en la categoría, se oculta y queda solo la tabla.
+  const podioCont = document.getElementById("rankingPodio");
+  if (podioCont) {
+    if (completa.length >= 3) {
+      const top3 = completa.slice(0, 3);
+      const orden = [top3[1], top3[0], top3[2]]; // 2do / 1ro / 3ro, para que el 1ro quede al medio
+      podioCont.innerHTML = orden.map((j, i) => {
+        const puesto = i === 1 ? 1 : i === 0 ? 2 : 3;
+        return `<div class="pod pod-${puesto}" data-abrir-perfil="${j.id}">
+          <span class="pod-rank">${puesto}</span>
+          <div class="pod-ring">${avatarHtml(j.foto_url, puesto === 1 ? 64 : 52)}</div>
+          <p class="pod-nombre">${j.nombre} ${j.apellido}</p>
+          <p class="pod-pts">${j.puntos_ranking}</p>
+        </div>`;
+      }).join("");
+      podioCont.querySelectorAll("[data-abrir-perfil]").forEach((el) => {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => abrirPerfilJugador(el.dataset.abrirPerfil));
+      });
+      podioCont.style.display = "grid";
+    } else {
+      podioCont.innerHTML = "";
+      podioCont.style.display = "none";
+    }
+  }
+
   completa.forEach((j, idx) => {
     const posicion = idx + 1;
     // clasifica al Master de fin de año: primeros 20. La foto grande (con borde

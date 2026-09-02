@@ -211,6 +211,47 @@ tr:first-child td { font-weight: 700; }
 .pos-2 { color: #c9d3e0; }
 .pos-3 { color: #ff9d5c; }
 
+/* ---------- Podio del ranking: top 3 arriba de la tabla, mismo criterio de
+   colores que .pos-1/2/3 (oro/plata/bronce) que ya usaba solo el número de
+   posición -- ahora también el podio, nada nuevo inventado. ---------- */
+.podium {
+  /* minmax(0, 1fr), no 1fr solo -- si no, un nombre largo empuja la columna
+     más allá del ancho del card y el podio se corta en mobile */
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end;
+  margin-bottom: 18px;
+}
+.pod {
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--bg-elev); border: 1px solid var(--border); border-bottom: none;
+  padding: 16px 10px 14px; text-align: center; position: relative; cursor: pointer;
+}
+.pod-rank {
+  position: absolute; top: 10px; left: 10px;
+  font-family: "Anton", "Poppins", sans-serif; font-size: 12px; color: var(--muted);
+}
+.pod-ring { display: flex; justify-content: center; margin-bottom: 8px; }
+.pod-nombre {
+  font-size: 12px; font-weight: 700; margin: 0 0 2px; line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.pod-pts {
+  font-family: "Anton", "Poppins", sans-serif; font-size: 21px; margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.pod-1 { order: 2; padding-top: 22px; }
+.pod-1 .avatar { border-color: #ffd700; }
+.pod-1 .pod-pts { color: #ffd700; }
+.pod-2 { order: 1; }
+.pod-2 .avatar { border-color: #c9d3e0; }
+.pod-2 .pod-pts { color: #c9d3e0; }
+.pod-3 { order: 3; }
+.pod-3 .avatar { border-color: #ff9d5c; }
+.pod-3 .pod-pts { color: #ff9d5c; }
+@media (min-width: 960px) {
+  .pod-nombre { font-size: 14px; }
+  .pod-pts { font-size: 26px; }
+}
+
 /* ---------- Badges: chicos, elegantes, solo metadata — nunca sobredimensionados ---------- */
 .badge {
   display: inline-block;
@@ -280,7 +321,10 @@ tr:first-child td { font-weight: 700; }
 
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
-.pj-header .avatar { border: 2px solid rgba(245,245,245,.4); font-size: 34px; }
+/* mismo anillo degradé que ya usa el logo del header (var(--gradient)) --
+   nada nuevo, solo se reusa acá para la foto de perfil */
+#pjFoto { background: var(--gradient); padding: 3px; border-radius: 50%; width: fit-content; flex-shrink: 0; }
+.pj-header .avatar { border: 2px solid var(--bg); font-size: 34px; }
 .pj-header h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
 .pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pj-medalla {
@@ -336,10 +380,14 @@ tr:first-child td { font-weight: 700; }
 }
 .torneo-hero-overlay { position: relative; z-index: 1; }
 .torneo-hero-overlay .badge { margin-bottom: 10px; }
-.torneo-hero-overlay h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+/* mismo criterio que el héroe de Inicio: título de portada, no un h2 más */
+.torneo-hero-overlay h2 {
+  margin: 0; font-family: "Anton", "Poppins", sans-serif; font-weight: 400;
+  text-transform: uppercase; letter-spacing: -.01em;
+  font-size: clamp(28px, 7vw, 44px); line-height: .96;
+}
 @media (min-width: 960px) {
   .torneo-hero { min-height: 260px; padding: 38px; }
-  .torneo-hero-overlay h2 { font-size: 34px; }
 }
 
 /* ---------- Hero Inicio ---------- */
@@ -423,7 +471,8 @@ tr:first-child td { font-weight: 700; }
 .marquee-track {
   display: flex; gap: 14px; width: max-content;
   color: var(--text);
-  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-family: "Anton", "Poppins", sans-serif;
+  font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
   animation: marquee-scroll 16s linear infinite;
 }
 .marquee-dot { opacity: .5; }
@@ -465,8 +514,9 @@ tr:first-child td { font-weight: 700; }
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
-  font-size: 22px; font-weight: 800; margin: 0 0 8px;
-  color: var(--text); text-transform: none; letter-spacing: -.01em; line-height: 1.1;
+  font-family: "Anton", "Poppins", sans-serif;
+  font-size: 26px; font-weight: 400; margin: 0 0 8px;
+  color: var(--text); text-transform: uppercase; letter-spacing: -.01em; line-height: .98;
 }
 .energia-texto p { font-size: 13px; color: #d8dbdb; margin: 0; }
 
@@ -560,8 +610,9 @@ tr:first-child td { font-weight: 700; }
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
-  display: block; font-size: 22px; font-weight: 800;
-  letter-spacing: -.01em; line-height: 1.15;
+  display: block; font-family: "Anton", "Poppins", sans-serif;
+  font-size: 25px; font-weight: 400; text-transform: uppercase;
+  letter-spacing: -.01em; line-height: 1;
 }
 .flyer-destacado-info span { font-size: 12px; color: #d8dbdb; }
 
@@ -670,7 +721,7 @@ tr:first-child td { font-weight: 700; }
   box-shadow: var(--shadow);
 }
 .orden-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 4px; }
-.orden-cancha { font-family: "Poppins"; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #fff; line-height: 1.1; }
+.orden-cancha { font-family: "Anton", "Poppins", sans-serif; font-size: 23px; font-weight: 400; text-transform: uppercase; letter-spacing: -.005em; color: #fff; line-height: 1; }
 .orden-sep {
   text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
   color: rgba(255,255,255,.65); margin: 16px 0 10px; position: relative;
@@ -1019,7 +1070,10 @@ nav.tabbar .icon { position: relative; }
     linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.5) 65%),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
-.torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.torneo-card-poster .torneo-nombre {
+  font-family: "Anton", "Poppins", sans-serif; font-size: 20px; font-weight: 400;
+  text-transform: uppercase; letter-spacing: -.005em;
+}
 .torneo-card-poster .torneo-lugar,
 .torneo-card-poster .match-meta { color: #d8dbdb; }
 /* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
@@ -1208,11 +1262,11 @@ nav.tabbar button.tab-mobile-only { display: flex; }
 
 @media (min-width: 960px) {
   /* en desktop los auspiciantes van en la columna lateral, no en la barra móvil */
-  .sponsor-marquee { display: none !important; }
+  .sponsor-marquee { display: none; }
 }
 @media (max-width: 959px) {
   /* en mobile los auspiciantes van en la barra móvil (arriba), no en el renglón chico */
-  #sponsorsInlineCard { display: none !important; }
+  #sponsorsInlineCard { display: none; }
 }
 
 @media (min-width: 960px) {
