@@ -98,6 +98,7 @@
   <section id="view-inicio" class="view active">
 
     <div class="hero-club">
+      <canvas id="heroTrail" aria-hidden="true"></canvas>
       <div class="hero-club-widget" id="heroPosicionCard" style="display:none">
         <span class="hero-club-widget-label">Tu posición</span>
         <strong id="heroPosicionValor">—</strong>
@@ -857,9 +858,24 @@
 
 <div id="toast" class="toast" style="display:none"></div>
 
+<div id="installSheet" hidden>
+  <div class="install-row">
+    <span class="install-icon"><img src="icon-192.png" alt="" /></span>
+    <div>
+      <strong>Agregar Norte Padel a inicio</strong>
+      <p id="installSheetTexto">Sin tienda de apps — entrás directo, un ícono más al lado de las que ya usás.</p>
+    </div>
+  </div>
+  <div class="install-actions">
+    <button type="button" class="primary" id="btnInstalarApp">Instalar</button>
+    <button type="button" class="tertiary" id="btnInstalarAhoraNo">Ahora no</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="matching.js"></script>
+<script src="hero-fx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

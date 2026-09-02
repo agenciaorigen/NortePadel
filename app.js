@@ -3567,12 +3567,20 @@ function renderPartidosLlave(containerId, partidos) {
     return;
   }
 
+  // arranca mostrando la última columna generada (la ronda más avanzada, la
+  // que de verdad importa mientras el torneo está en curso) en vez de la
+  // primera -- antes había que ir tocando ronda por ronda para llegar hasta
+  // ahí. Además, esa última columna de eliminación (la Final, si el cuadro
+  // llegó hasta ahí) se destaca con su propio estilo -- ver .llave-final en
+  // style.css -- para reconocerla de un vistazo sin tener que leer el título.
+  const ultimaColumna = columnas.length - 1;
+
   // botones "Octavos / Cuartos / Semis / Final" (o "Zona 1 / Zona 2 / ...")
   // para saltar de ronda en un toque en mobile — ver comentario en style.css.
   // Con una sola columna no aportan nada, así que no se muestran.
   const navRondas = columnas.length > 1
     ? '<div class="pill-row llave-rondas-nav">' +
-      columnas.map((col, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
+      columnas.map((col, i) => `<button type="button" class="pill ${i === ultimaColumna ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
       "</div>"
     : "";
 
@@ -3580,9 +3588,11 @@ function renderPartidosLlave(containerId, partidos) {
     columnas.map((col, i) => {
       // separador visual entre el bloque de zonas y el de eliminación directa
       const esPrimeraDeEliminacion = !col.zona && columnasZona.length > 0 && i === columnasZona.length;
+      const esFinal = !col.zona && i === ultimaColumna;
       const clases = ["llave-columna"];
       if (col.zona) clases.push("llave-zona");
       if (esPrimeraDeEliminacion) clases.push("llave-separador");
+      if (esFinal) clases.push("llave-final");
       return `
       <div class="${clases.join(" ")}" data-col-index="${i}">
         <h3>${col.titulo}</h3>
@@ -3603,6 +3613,10 @@ function renderPartidosLlave(containerId, partidos) {
       if (columna) columna.scrollIntoView({ behavior: "smooth", inline: "start", block: "start" });
     });
   });
+  if (columnas.length > 1) {
+    const inicial = cont.querySelector(`[data-col-index="${ultimaColumna}"]`);
+    if (inicial) inicial.scrollIntoView({ behavior: "auto", inline: "start", block: "nearest" });
+  }
 }
 
 // ---------- Calendario público/jugador: "orden de juego" ----------
@@ -3637,10 +3651,19 @@ function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
       const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
       const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
       const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      const jugado = p.estado === "jugado";
+      // el resultado ya cargado se lee ahí mismo, en el círculo VS -- el
+      // póster de calendario sirve entonces también para compartir el
+      // resultado, sin mandar a otra pantalla a buscarlo.
+      const sets = p.sets || [];
+      const scoreTxt = sets.map((s) => `${s.p1}-${s.p2}`).join(" ");
+      const vsHtml = jugado && sets.length
+        ? `<span class="orden-vs-wrap"><span class="orden-vs">${sets[sets.length - 1].p1}-${sets[sets.length - 1].p2}</span>${sets.length > 1 ? `<span class="orden-score">${scoreTxt}</span>` : ""}</span>`
+        : `<span class="orden-vs">VS</span>`;
       return `<div class="orden-sep">${i === 0 ? `Empieza a las ${hora}` : `Seguido por · ${hora}`}</div>
-        <div class="orden-match ${p.estado === "jugado" ? "jugado" : ""}" data-abrir-partido="${p.id}">
+        <div class="orden-match ${jugado ? "jugado" : ""}" data-abrir-partido="${p.id}">
           <div class="orden-lado ${cls1}">${jugadorHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}${jugadorHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}</div>
-          <span class="orden-vs">VS</span>
+          ${vsHtml}
           <div class="orden-lado der ${cls2}">${jugadorHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}${jugadorHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}</div>
         </div>`;
     }).join("");

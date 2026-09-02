@@ -1,10 +1,11 @@
-const CACHE = "norte-padel-v39";
+const CACHE = "norte-padel-v40";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./config.js",
   "./app.js",
+  "./hero-fx.js",
   "./matching.js",
   "./manifest.json",
   "./icon-192.png",

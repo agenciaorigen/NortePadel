@@ -344,16 +344,20 @@ tr:first-child td { font-weight: 700; }
   padding: 30px 22px 28px;
   margin-bottom: 20px;
   background:
+    radial-gradient(420px 420px at var(--mx, 20%) var(--my, 20%), rgba(180,255,57,.1), transparent 60%),
     linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.4) 60%),
     url('hero-cancha.jpg') center/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
 }
+/* estela de pelota: mismo lima de marca, se apaga sola si el usuario pidió
+   menos movimiento (ver hero-fx.js) -- puramente decorativo, aria-hidden */
+#heroTrail { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 .hero-club-titulo {
   position: relative;
   font-size: 32px;
   line-height: 1.05;
-  font-weight: 800;
+  font-weight: 900;
   margin: 0 0 10px;
   letter-spacing: -.02em;
   max-width: 85%;
@@ -676,11 +680,16 @@ tr:first-child td { font-weight: 700; }
 .orden-nombre span { font-weight: 600; color: rgba(255,255,255,.7); }
 .orden-lado.ganador .orden-nombre strong { color: #e3d9ff; }
 .orden-lado.perdedor { opacity: .6; }
+.orden-vs-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
 .orden-vs {
   flex-shrink: 0; font-family: "Poppins"; font-weight: 900; font-size: 13px; color: #fff;
   background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
   width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
 }
+/* resultado ya cargado: el mismo círculo pasa a mostrar el set en vez de "VS",
+   y una segunda línea suma el resto -- así el póster también sirve para
+   compartir el resultado, no solo el cruce antes de jugarse */
+.orden-score { font-size: 8.5px; font-weight: 800; color: rgba(255,255,255,.85); background: rgba(11,13,13,.4); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 .orden-footer {
   display: flex; justify-content: space-between; align-items: center; margin-top: 16px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.6);
@@ -707,6 +716,14 @@ tr:first-child td { font-weight: 700; }
   color: var(--muted); margin-bottom: 2px;
 }
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
+/* la final se distingue por diseño, no solo por ser la última columna -- así
+   no hace falta llegar hasta el final del scroll para reconocerla de un vistazo */
+.llave-columna.llave-final h3 { color: var(--accent); }
+.llave-columna.llave-final .llave-partido {
+  border-color: rgba(180,255,57,.4);
+  background: linear-gradient(165deg, rgba(180,255,57,.08), var(--card) 60%);
+  box-shadow: 0 0 0 1px rgba(180,255,57,.08), 0 10px 26px -14px rgba(180,255,57,.4);
+}
 .llave-partido {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;
 }
@@ -1099,6 +1116,30 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   font-size: 13px; z-index: 50; max-width: 90%; text-align: center;
   box-shadow: var(--shadow);
 }
+
+/* ---------- Invitación a instalar: hoja propia, no bloqueante -----------
+   A diferencia de .overlay-bloqueante (que tapa todo y exige una acción),
+   esto es descartable con un toque afuera o "Ahora no" -- nunca le saca al
+   usuario lo que estaba mirando. Vive arriba de la tabbar, respeta el mismo
+   margen de seguridad que .toast. Ver hero-fx.js. */
+#installSheet {
+  position: fixed; left: 12px; right: 12px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  z-index: 40; max-width: 420px; margin: 0 auto;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 16px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 12px;
+  transform: translateY(0); transition: transform .25s ease, opacity .25s ease;
+}
+#installSheet[hidden] { display: none; }
+#installSheet.saliendo { transform: translateY(12px); opacity: 0; pointer-events: none; }
+.install-row { display: flex; align-items: center; gap: 12px; }
+.install-icon { width: 44px; height: 44px; border-radius: 12px; padding: 2px; background: var(--gradient); flex-shrink: 0; }
+.install-icon img { width: 100%; height: 100%; border-radius: 10px; display: block; background: var(--bg); }
+.install-row strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.install-row p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.install-actions { display: flex; gap: 10px; }
+.install-actions button.primary { margin-top: 0; width: auto; flex: 1; }
 
 /* ---------- Sponsors / publicidad: acompañan, no dominan ----------
    Se integran como "PRESENTAN" + logos chicos — nunca como el elemento
