@@ -160,6 +160,7 @@ button.primary {
   width: 100%;
   cursor: pointer;
 }
+button.primary:hover { opacity: .92; }
 button.primary:active { transform: scale(.98); }
 button.secondary {
   background: var(--bg-elev);
@@ -187,10 +188,24 @@ button.danger { border-color: var(--danger); color: var(--danger); background: t
 
 button:disabled { opacity: .5; cursor: not-allowed; }
 
+/* foco visible por teclado: los inputs ya lo tenían (ver arriba), los botones no —
+   mismo verde de marca en vez del azul por defecto del navegador, así el anillo de
+   foco queda coherente con la identidad en vez de desentonar */
+button:focus-visible,
+.pill:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 tr:first-child td { font-weight: 700; }
+
+/* número tipo "scoreboard": mismo tratamiento bold + tabular que .pj-stats/.destacado-stat,
+   para puntos de ranking y cualquier otro número que deba leerse como un dato duro */
+.num-score { font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 .pos-1 { color: #ffd700; }
 .pos-2 { color: #c9d3e0; }
@@ -212,6 +227,10 @@ tr:first-child td { font-weight: 700; }
 .badge.orange { background: rgba(255,194,77,.14); color: var(--state-warn); border: 1px solid rgba(255,194,77,.3); }
 .badge.danger { background: rgba(255,92,108,.14); color: var(--danger); border: 1px solid rgba(255,92,108,.3); }
 .badge.solid { background: rgba(111,224,138,.14); color: var(--state-ok); border: 1px solid rgba(111,224,138,.3); font-weight: 700; }
+/* antes esto era un style="" inline en app.js (color hardcodeado, salteando el
+   sistema de variables) — mismo dorado que ya usan avatar-master/pos-1/pj-medalla-oro
+   para "top de ranking", ahora como una variante más del componente .badge */
+.badge.master { background: rgba(255,215,0,.12); color: #ffd700; border-color: rgba(255,215,0,.4); font-weight: 700; }
 
 /* ranking público: menos "tabla" y más lista de leaderboard */
 #tablaRanking th { border-bottom: 2px solid var(--border); }
@@ -280,8 +299,8 @@ tr:first-child td { font-weight: 700; }
 }
 .pj-stats > div { text-align: left; }
 .pj-stats strong {
-  display: block; font-size: clamp(22px, 6vw, 32px); font-weight: 800; line-height: 1;
-  letter-spacing: -.02em; color: var(--text);
+  display: block; font-size: clamp(22px, 6vw, 32px); font-weight: 900; line-height: 1;
+  letter-spacing: -.03em; color: var(--text); font-variant-numeric: tabular-nums;
 }
 .pj-stats span {
   display: block; font-size: 11px; color: var(--muted); text-transform: uppercase;
@@ -362,7 +381,7 @@ tr:first-child td { font-weight: 700; }
   text-align: right;
 }
 .hero-club-widget-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.hero-club-widget strong { font-size: 18px; color: var(--text); line-height: 1.3; }
+.hero-club-widget strong { font-size: 18px; font-weight: 900; letter-spacing: -.02em; color: var(--text); line-height: 1.3; font-variant-numeric: tabular-nums; }
 .hero-club-widget-sub { font-size: 11px; color: var(--muted); }
 
 /* ---------- Banda con leyenda en movimiento ----------
@@ -488,7 +507,7 @@ tr:first-child td { font-weight: 700; }
   font-size: 10.5px; font-weight: 700;
 }
 .destacado-stat { position: relative; z-index: 1; }
-.destacado-stat strong { display: block; font-size: 27px; font-weight: 800; line-height: 1; letter-spacing: -.01em; }
+.destacado-stat strong { display: block; font-size: 27px; font-weight: 900; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .destacado-stat span { font-size: 10.5px; color: #d8dbdb; text-transform: uppercase; letter-spacing: .04em; }
 .destacado-info { position: relative; z-index: 1; }
 .destacado-info strong {

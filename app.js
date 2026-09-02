@@ -658,10 +658,10 @@ async function cargarRanking() {
     if (clasificaMaster) tr.className = "fila-master";
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
     const avatarClass = fotoGrande ? "avatar-master" : "";
-    const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
+    const badgeMaster = clasificaMaster ? `<span class="badge master">Master</span>` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido} ${badgeMaster}</span></div></td>
-      <td><strong>${j.puntos_ranking}</strong></td>
+      <td><strong class="num-score">${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
     tr.style.cursor = "pointer";
