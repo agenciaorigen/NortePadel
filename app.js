@@ -3705,9 +3705,16 @@ function renderPartidosLlave(containerId, partidos) {
 // si el jugador no cargó una) y matchVsRowHtml/llavePartidoCardHtml ya
 // resolvían este mismo patrón de "2 jugadores por lado", solo que acá con
 // estilo de póster en vez de tarjeta de app.
-function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
+// número de zona a partir de "Z3" -> 3 (para ordenar); lo que no tiene
+// slot_cuadro numérico (octavos, cuartos, semis, final) queda al final,
+// en el orden en que ya viene (por horario).
+function numeroZona(slotCuadro) {
+  const m = /^Z(\d+)$/.exec(slotCuadro || "");
+  return m ? Number(m[1]) : Infinity;
+}
+
+function renderOrdenDeJuego(containerId, partidos) {
   const cont = document.getElementById(containerId);
-  const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean);
   const conHorario = [...partidos].filter((p) => p.horario).sort((a, b) => new Date(a.horario) - new Date(b.horario));
   const sinHorario = partidos.filter((p) => !p.horario);
 
@@ -3722,34 +3729,35 @@ function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
       <div class="orden-nombre"><strong>${nombre || "?"}</strong>${apellido ? `<span>${apellido}</span>` : ""}</div>
     </div>`;
 
-  const posterHtml = (cancha, partidosCancha) => {
-    if (partidosCancha.length === 0) return "";
-    const interior = partidosCancha.map((p, i) => {
+  // un "poster" por categoría, con sus partidos ordenados por zona (Z1, Z2, Z3...)
+  // -- así se encuentra un cruce puntual por categoría/zona en vez de tener que
+  // buscarlo cancha por cancha.
+  const posterHtml = (categoria, partidosCategoria) => {
+    if (partidosCategoria.length === 0) return "";
+    const ordenados = [...partidosCategoria].sort((a, b) => numeroZona(a.slot_cuadro) - numeroZona(b.slot_cuadro) || new Date(a.horario) - new Date(b.horario));
+    const interior = ordenados.map((p) => {
       const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
       const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
       const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
       const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-      return `<div class="orden-sep">${i === 0 ? `Empieza a las ${hora}` : `Seguido por · ${hora}`}</div>
+      const fechaCorta = new Date(p.horario).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+      const zonaLabel = p.slot_cuadro || p.ronda || "";
+      return `<div class="orden-sep">${zonaLabel ? `${zonaLabel} · ` : ""}${p.complejo_nombre || "predio a definir"} · ${fechaCorta} ${hora}</div>
         <div class="orden-match ${p.estado === "jugado" ? "jugado" : ""}" data-abrir-partido="${p.id}">
           <div class="orden-lado ${cls1}">${jugadorHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}${jugadorHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}</div>
           <span class="orden-vs">VS</span>
           <div class="orden-lado der ${cls2}">${jugadorHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}${jugadorHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}</div>
         </div>`;
     }).join("");
-    const fecha = new Date(partidosCancha[0].horario)
-      .toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" })
-      .toUpperCase();
-    const predio = cancha.complejos?.nombre || torneoActualData?.complejos?.nombre || "";
     return `<div class="orden-poster">
       <div class="orden-eyebrow">${torneoActualData?.nombre || ""}</div>
-      <div class="orden-predio">${predio}</div>
-      <div class="orden-cancha">${cancha.nombre}</div>
+      <div class="orden-cancha">Categoría ${categoria}</div>
       ${interior}
-      <div class="orden-footer"><span>${predio}</span><b>${fecha}</b></div>
     </div>`;
   };
 
-  const posters = canchas.map((c) => posterHtml(c, conHorario.filter((p) => p.cancha_id === c.id))).filter(Boolean).join("");
+  const categorias = [...new Set(conHorario.map((p) => p.categoria))];
+  const posters = categorias.map((cat) => posterHtml(cat, conHorario.filter((p) => p.categoria === cat))).filter(Boolean).join("");
   const notaSinHorario = sinHorario.length > 0
     ? `<p class="match-meta" style="margin-top:12px">Sin horario asignado (${sinHorario.length}): ` +
       sinHorario.map((p) => `${p.pareja1_nombre} vs ${p.pareja2_nombre}`).join(" · ") + "</p>"
@@ -3825,13 +3833,13 @@ function renderCalendarioPublico() {
   const fecha = document.getElementById("calFiltroFecha").value;
   if (fecha) visibles = visibles.filter((p) => p.horario && p.horario.slice(0, 10) === fecha);
   const predioSel = pills.querySelector(".pill.active")?.dataset.predio || "";
-  let canchasVisibles = ultimasCanchasTorneo;
   if (predioSel) {
-    canchasVisibles = ultimasCanchasTorneo.filter((c) => c.canchas?.complejo_id === predioSel);
-    const canchaIdsPredio = new Set(canchasVisibles.map((c) => c.canchas?.id));
+    const canchaIdsPredio = new Set(
+      ultimasCanchasTorneo.filter((c) => c.canchas?.complejo_id === predioSel).map((c) => c.canchas?.id)
+    );
     visibles = visibles.filter((p) => canchaIdsPredio.has(p.cancha_id));
   }
-  renderOrdenDeJuego("pubCalendario", visibles, canchasVisibles);
+  renderOrdenDeJuego("pubCalendario", visibles);
 }
 document.getElementById("calFiltroCategoria").addEventListener("change", renderCalendarioPublico);
 document.getElementById("calFiltroFecha").addEventListener("change", () => { calFiltroFechaAutoAplicada = true; renderCalendarioPublico(); });

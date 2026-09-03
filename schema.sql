@@ -905,7 +905,7 @@ $$;
 
 drop function if exists partidos_publicos(uuid);
 create or replace function partidos_publicos(p_torneo_id uuid) returns table (
-  id uuid, ronda text, categoria text, grupo int, horario timestamptz, estado text, sets jsonb,
+  id uuid, ronda text, categoria text, grupo int, slot_cuadro text, horario timestamptz, estado text, sets jsonb,
   cancha_id uuid, cancha_nombre text, complejo_nombre text,
   pareja1_id uuid, pareja2_id uuid, ganador_pareja_id uuid,
   pareja1_nombre text, pareja2_nombre text,
@@ -917,7 +917,7 @@ create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   j2a_nombre text, j2a_apellido text, j2a_foto text, j2b_nombre text, j2b_apellido text, j2b_foto text,
   created_at timestamptz
 ) language sql stable security definer set search_path = public as $$
-  select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.horario, pa.estado, pa.sets,
+  select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.slot_cuadro, pa.horario, pa.estado, pa.sets,
     pa.cancha_id, c.nombre, comp.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
     coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),

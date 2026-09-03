@@ -631,7 +631,6 @@ tr:first-child td { font-weight: 700; }
   box-shadow: var(--shadow);
 }
 .orden-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 4px; }
-.orden-predio { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.85); margin-bottom: 6px; }
 .orden-cancha { font-family: "Poppins"; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #fff; line-height: 1.1; }
 .orden-sep {
   text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
@@ -663,11 +662,6 @@ tr:first-child td { font-weight: 700; }
   background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
   width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
 }
-.orden-footer {
-  display: flex; justify-content: space-between; align-items: center; margin-top: 16px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.6);
-}
-.orden-footer b { color: #fff; }
 @media (min-width: 700px) { .orden-grid { grid-template-columns: 1fr 1fr; } }
 
 /* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
