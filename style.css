@@ -742,8 +742,14 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    mismo violeta que ya se usaba para "ganador" -- de un vistazo se nota en
    qué fase estás parado, sin agregar íconos ni elementos nuevos */
 .llave-fase:not(.llave-fase-zona) .llave-fase-titulo { color: var(--accent-3); }
-.llave-fase-columnas { display: flex; gap: 20px; }
-.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 204px; }
+/* align-items:flex-start (no stretch): antes las columnas de Zona se estiraban
+   a la altura de la zona más larga y el contenido quedaba centrado adentro
+   (justify-content:space-around) -- una zona con un solo partido flotaba a
+   mitad de columna en vez de ir pegada arriba, dando un aspecto escalonado y
+   confuso al lado de las demás. Ahora todas arrancan arriba, cada una con su
+   altura natural. */
+.llave-fase-columnas { display: flex; align-items: flex-start; gap: 20px; }
+.llave-columna { display: flex; flex-direction: column; gap: 14px; min-width: 204px; }
 .llave-columna h4 {
   text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .04em;
   color: var(--muted); margin: 0 0 2px;
