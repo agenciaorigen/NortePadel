@@ -3713,6 +3713,15 @@ function numeroZona(slotCuadro) {
   return m ? Number(m[1]) : Infinity;
 }
 
+// fecha (YYYY-MM-DD) de un horario, en el huso del club (Argentina/Paraguay,
+// UTC-3 todo el año) -- NUNCA con .slice(0,10) sobre el ISO en UTC: un
+// partido de las 21-23hs local ya cae en el día siguiente en UTC, y quedaba
+// agrupado/filtrado bajo la fecha equivocada.
+function fechaLocalAR(fechaOISO) {
+  const d = fechaOISO instanceof Date ? fechaOISO : new Date(fechaOISO);
+  return d.toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+}
+
 function renderOrdenDeJuego(containerId, partidos) {
   const cont = document.getElementById(containerId);
   const conHorario = [...partidos].filter((p) => p.horario).sort((a, b) => new Date(a.horario) - new Date(b.horario));
@@ -3739,8 +3748,8 @@ function renderOrdenDeJuego(containerId, partidos) {
       const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
       const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
       const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
-      const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-      const fechaCorta = new Date(p.horario).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+      const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      const fechaCorta = new Date(p.horario).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
       const zonaLabel = p.slot_cuadro || p.ronda || "";
       return `<div class="orden-sep">${zonaLabel ? `${zonaLabel} · ` : ""}${p.complejo_nombre || "predio a definir"} · ${fechaCorta} ${hora}</div>
         <div class="orden-match ${p.estado === "jugado" ? "jugado" : ""}" data-abrir-partido="${p.id}">
@@ -3785,7 +3794,7 @@ function renderCalendarioPublico() {
   // sus partidos ya programados) — antes era un <input type="date"> libre, que
   // dejaba elegir cualquier día del calendario y mostraba la pantalla vacía.
   const selFecha = document.getElementById("calFiltroFecha");
-  const fechasConPartidos = [...new Set(ultimosPartidos.filter((p) => p.horario).map((p) => p.horario.slice(0, 10)))].sort();
+  const fechasConPartidos = [...new Set(ultimosPartidos.filter((p) => p.horario).map((p) => fechaLocalAR(p.horario)))].sort();
   // ojo con el orden acá: el <select> todavía tiene las <option> de la vuelta
   // anterior en este punto, así que asignarle selFecha.value ahora (antes de
   // reconstruir el innerHTML de abajo) no sirve de nada si la fecha elegida
@@ -3799,7 +3808,7 @@ function renderCalendarioPublico() {
   // calendario de este torneo — tocar el selector a mano (aunque sea para
   // volver a "Todas las fechas") lo deja fijo en lo que se haya elegido.
   if (!calFiltroFechaAutoAplicada && !fechaFiltro && fechasConPartidos.length) {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaLocalAR(new Date());
     fechaFiltro = fechasConPartidos.find((f) => f === hoy) || fechasConPartidos.find((f) => f > hoy) || fechasConPartidos[fechasConPartidos.length - 1];
     calFiltroFechaAutoAplicada = true;
   }
@@ -3831,7 +3840,7 @@ function renderCalendarioPublico() {
   let visibles = ultimosPartidos;
   if (selCat.value) visibles = visibles.filter((p) => p.categoria === selCat.value);
   const fecha = document.getElementById("calFiltroFecha").value;
-  if (fecha) visibles = visibles.filter((p) => p.horario && p.horario.slice(0, 10) === fecha);
+  if (fecha) visibles = visibles.filter((p) => p.horario && fechaLocalAR(p.horario) === fecha);
   const predioSel = pills.querySelector(".pill.active")?.dataset.predio || "";
   if (predioSel) {
     const canchaIdsPredio = new Set(
