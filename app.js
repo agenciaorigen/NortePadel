@@ -3581,33 +3581,29 @@ function wirePlanillaDragAndDrop(containerId) {
   });
 }
 
-// tarjeta compacta de un partido para la vista Llave: nombres + resultado set por
-// set en línea, fecha/hora y cancha — el ganador se resalta en violeta/lila.
-// bloque de un jugador dentro de la tarjeta: avatar (foto si tiene, si no el ícono
-// de pelota) + apellido en negrita arriba, nombre chico y gris debajo — si no
-// vinieron nombre/apellido separados (jugador borrado, etc.) cae a un "?" como antes
-function jugadorBlockHtml(nombre, apellido, foto) {
-  if (!nombre && !apellido) return `<div class="llave-jugador">${avatarHtml(foto, 24)}<div><strong>?</strong></div></div>`;
-  return `<div class="llave-jugador">${avatarHtml(foto, 24)}<div><strong>${apellido || ""}</strong><span>${nombre || ""}</span></div></div>`;
-}
-
+// tarjeta compacta de un partido para la vista Llave: nombre de cada pareja en una
+// sola línea (ya viene armado desde partidos_publicos como "Nombre Apellido / Nombre
+// Apellido") + puntaje por set alineado a la derecha, fecha/hora y cancha — el
+// ganador se resalta en el verde de marca.
 function llavePartidoCardHtml(p) {
   const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
   const sets = p.sets || [];
-  const setsHtml = (lado) => sets.map((s) => `<span class="llave-set">${lado === 1 ? s.p1 : s.p2}</span>`).join("");
+  const setsHtml = (lado) => sets.length
+    ? sets.map((s) => `<span class="llave-set">${lado === 1 ? s.p1 : s.p2}</span>`).join("")
+    : '<span class="llave-set">—</span>';
   const horario = p.horario
     ? new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "horario a definir";
-  const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " " : ""}${p.cancha_nombre}` : "a definir";
+  const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "a definir");
   return `
     <div class="llave-partido" data-abrir-partido="${p.id}" style="cursor:pointer">
-      <div class="match-meta llave-meta llave-fecha">${iconoReloj()} ${horario}</div>
+      <div class="llave-fecha"><span>${iconoReloj()} ${horario}</span>${p.slot_cuadro ? `<span>${p.slot_cuadro}</span>` : ""}</div>
       <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
-        <div class="llave-jugadores">${jugadorBlockHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}${jugadorBlockHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}</div>
+        <span class="llave-pareja">${p.pareja1_nombre}</span>
         <span class="llave-sets">${setsHtml(1)}</span>
       </div>
       <div class="llave-fila ${ganador === 2 ? "ganador" : ""}">
-        <div class="llave-jugadores">${jugadorBlockHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}${jugadorBlockHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}</div>
+        <span class="llave-pareja">${p.pareja2_nombre}</span>
         <span class="llave-sets">${setsHtml(2)}</span>
       </div>
       <div class="match-meta llave-meta">${iconoPin()} Local: ${local}</div>
