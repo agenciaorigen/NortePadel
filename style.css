@@ -381,11 +381,12 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 }
 .hero-club-titulo {
   position: relative;
+  font-family: "Playfair Display", Georgia, serif;
   font-size: 32px;
   line-height: 1.05;
   font-weight: 800;
   margin: 0 0 10px;
-  letter-spacing: -.02em;
+  letter-spacing: -.01em;
   max-width: 85%;
 }
 .hero-club-titulo span { color: inherit; }
@@ -414,6 +415,26 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .hero-club-widget-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .hero-club-widget strong { font-size: 18px; color: var(--text); line-height: 1.3; }
 .hero-club-widget-sub { font-size: 11px; color: var(--muted); }
+
+/* ---------- Carrusel de hero (Inicio) ----------
+   Scroll-snap nativo, sin librería: en mobile el track solo tiene la slide
+   real del hero (los puntos quedan ocultos); en escritorio la 2da slide recibe
+   el flyer del torneo destacado (ver moverFlyerDestacadoSegunAncho en app.js). */
+.hero-carousel { position: relative; margin-bottom: 20px; }
+.hero-carousel-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  border-radius: var(--radius-lg);
+}
+.hero-carousel-track::-webkit-scrollbar { display: none; }
+.hero-carousel-slide { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
+.hero-carousel-slide .hero-club { margin-bottom: 0; }
+.hero-carousel-dots { display: none; }
+.hero-carousel-dots.visible { display: flex; justify-content: center; gap: 7px; margin-top: 12px; }
+.hero-carousel-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); border: none; padding: 0; cursor: pointer; }
+.hero-carousel-dot.active { background: var(--accent-bright); width: 20px; border-radius: 4px; transition: width .2s; }
 
 /* ---------- Banda con leyenda en movimiento ----------
    Antes era un rectángulo relleno de lima de punta a punta — el ejemplo más
@@ -543,6 +564,10 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 }
 .destacado-card.vacio::before { content: none; }
 .destacado-card.vacio .destacado-icono { font-size: 26px; margin-bottom: 6px; opacity: .8; }
+/* jugador del mes: ahora es siempre 1 sola tarjeta que rota (Jugador/Jugadora
+   por día), en mobile y escritorio -- 1 sola columna en vez de las 2 de
+   siempre con un hueco vacío al lado (ver renderJugadorDelMes en app.js) */
+.destacados-grid.destacados-grid-banner { grid-template-columns: 1fr; }
 .destacado-tag {
   position: relative; z-index: 1; align-self: flex-start;
   background: rgba(21,24,24,.8);
@@ -1126,7 +1151,7 @@ body.is-admin #btnAdminPanel { display: flex; }
    Reemplaza al renglón chico (.sponsor-strip, logos de 40px) que quedaba
    perdido al final de Inicio. Mismo mecanismo que .marquee-track de arriba,
    logos bastante más grandes para que se lean bien. En desktop no se usa:
-   ahí los auspiciantes ya están grandes en la columna lateral (#sidebarAds). */
+   ahí los auspiciantes van en la fila "Presentan" (#sponsorsInlineCard). */
 .sponsor-marquee { width: 100%; overflow: hidden; margin-bottom: 20px; }
 .sponsor-marquee-track {
   display: flex; gap: 20px; width: max-content; align-items: center;
@@ -1140,12 +1165,12 @@ body.is-admin #btnAdminPanel { display: flex; }
 .sponsor-marquee-track img { height: 80px; max-width: 260px; object-fit: contain; display: block; }
 
 /* ============================================================
-   ESCRITORIO: nav lateral + columna de publicidad fija
+   ESCRITORIO: nav horizontal arriba + una sola columna de contenido
+   (ya no hay columna lateral de publicidad — ver .hero-carousel)
    ============================================================ */
-#sidebarAds { display: none; }
-
 @media (min-width: 960px) {
-  /* en desktop los auspiciantes van en la columna lateral, no en la barra móvil */
+  /* en desktop los auspiciantes van en la fila "Presentan" del contenido
+     principal (#sponsorsInlineCard), no en la barra móvil */
   .sponsor-marquee { display: none !important; }
 }
 @media (max-width: 959px) {
@@ -1154,39 +1179,83 @@ body.is-admin #btnAdminPanel { display: flex; }
 }
 
 @media (min-width: 960px) {
-  body { padding-bottom: 0; padding-left: 88px; }
+  :root { --topbar-h: 70px; --navbar-h: 58px; }
+  body { padding-bottom: 0; padding-left: 0; padding-top: calc(var(--topbar-h) + var(--navbar-h)); }
 
-  header.topbar { padding: 16px 32px; }
+  /* header + nav quedaban como dos franjas de un verde sólido (--bg-elev)
+     bien distinto del fondo oscuro difuminado de la app, como si fueran una
+     caja pegada arriba en vez de parte de la misma pantalla. Pasan a un
+     mismo vidrio translúcido (deja ver el fondo de atrás) sin línea divisoria
+     entre las dos, para que se lean como una sola franja prendida al fondo. */
+  header.topbar, nav.tabbar {
+    background: rgba(var(--bg-rgb), .78);
+    backdrop-filter: blur(16px) saturate(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  }
+  header.topbar { padding: 16px 32px; border-bottom: none; }
   header.topbar h1 { font-size: 18px; }
 
+  /* de sidebar izquierdo a franja horizontal fija, apilada debajo de header.topbar
+     (misma barra de siempre, mismos botones — solo cambia su geometría acá).
+     Son links de texto, no botones: sin ícono ni fondo de pill, el activo se
+     distingue solo por color (mismo tratamiento que la referencia). */
   nav.tabbar {
     position: fixed;
-    left: 0; top: 0; bottom: 0; right: auto;
-    width: 88px;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 8px;
-    padding-top: 96px;
+    top: var(--topbar-h); left: 0; right: 0; bottom: auto;
+    width: auto; height: var(--navbar-h);
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 34px;
+    padding: 0 32px;
     border-top: none;
-    border-right: 1px solid var(--border);
+    border-right: none;
+    border-bottom: 1px solid var(--border);
   }
-  nav.tabbar button { flex: none; padding: 10px 4px; }
-  nav.tabbar .icon svg { width: 20px; height: 20px; }
+  nav.tabbar button { flex: none; padding: 0; font-size: 13.5px; letter-spacing: .01em; }
+  nav.tabbar .icon { display: none; }
+  nav.tabbar button.active .icon { background: none; }
 
   .app-body {
-    max-width: 1440px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: 32px 40px 60px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 260px;
-    gap: 32px;
-    align-items: start;
   }
   main { padding: 0; max-width: none; margin: 0; }
 
   .hero-club { padding: 44px 44px 40px; min-height: 300px; }
   .hero-club-titulo { font-size: 46px; max-width: 60%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
+
+  /* slide 2 del carrusel: el flyer del torneo destacado, mudado acá por JS
+     (ver moverFlyerDestacadoSegunAncho) — pasa de afiche vertical "contain" a
+     imagen de fondo a pantalla completa de la slide, como el hero. */
+  #heroSlideTorneo .flyer-destacado {
+    aspect-ratio: unset; height: 100%; min-height: 300px;
+    background-size: cover; border-radius: var(--radius-lg); margin-bottom: 0; box-shadow: var(--shadow);
+  }
+  /* 3ra slide del carrusel: misma .hero-club de siempre, otra foto de fondo */
+  .hero-club-ranking {
+    background:
+      linear-gradient(200deg, rgba(var(--accent-rgb),.35), transparent 55%),
+      linear-gradient(0deg, rgba(var(--bg-rgb),.94), rgba(var(--bg-rgb),.4) 60%),
+      url('pelotas.jpg') center/cover no-repeat, var(--bg);
+  }
+
+  /* "Próximo partido destacado": mismo .match-pair de siempre (Torneo/Llave),
+     agrandado solo en este contexto — no toca sus otros usos. Las fotos van
+     bien grandes a propósito, para que se reconozca a los jugadores de un
+     vistazo (pedido explícito, ya se habían agrandado una vez antes). */
+  .match-pair-destacado .match-pair { padding: 34px 40px; gap: 24px; }
+  .match-pair-destacado .match-pair-lado { gap: 14px; }
+  .match-pair-destacado .match-pair-player { gap: 14px; }
+  .match-pair-destacado .match-pair-player .avatar { width: 140px; height: 140px; font-size: 54px; }
+  .match-pair-destacado .match-pair-nombre { font-size: 19px; white-space: normal; }
+  .match-pair-destacado .match-pair-vs {
+    width: auto; height: auto; background: none; color: var(--accent-bright);
+    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 30px;
+  }
+  .match-pair-destacado .match-meta { text-align: center; margin-top: 14px; }
 
   .destacados-band { padding: 24px 26px 28px; }
   /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
@@ -1198,6 +1267,16 @@ body.is-admin #btnAdminPanel { display: flex; }
   .destacado-stat strong { font-size: 34px; }
   .destacado-info strong { font-size: 21px; }
 
+  /* banner único de jugador del mes (ver renderJugadorDelMes en app.js):
+     misma tarjeta .destacado-card de siempre, en una sola columna ancha
+     (grid-template-columns ya es 1fr siempre, ver regla base). */
+  .destacados-grid.destacados-grid-banner { max-width: none; }
+  .destacados-grid-banner .destacado-card {
+    min-height: 220px; flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 26px;
+  }
+  .destacados-grid-banner .destacado-stat strong { font-size: 44px; }
+  .destacados-grid-banner .destacado-info strong { font-size: 26px; }
+
   .pj-stats strong { font-size: clamp(26px, 2.4vw, 40px); }
 
   /* en escritorio ya hay ancho de sobra: en vez de forzar todas las zonas en
@@ -1206,42 +1285,6 @@ body.is-admin #btnAdminPanel { display: flex; }
      lateral con "snap" queda solo para mobile, donde sí hace falta. */
   .llave-scroll { overflow-x: visible; }
   .llave { flex-wrap: wrap; }
-
-  #sidebarAds {
-    display: flex;
-    flex-direction: column;
-    position: sticky;
-    top: 90px;
-    /* alto atado al viewport (no al contenido de main, que puede ser muy largo) */
-    height: calc(100vh - 110px);
-    /* si aun achicando #sidebarEnergiaSlot no entra todo (pantalla baja, muchos
-       auspiciantes), que la columna scrollee sola en vez de aplastar los logos */
-    overflow-y: auto;
-  }
-
-  /* Padel Tour 2026 en esta columna es un acompañamiento, no el elemento
-     principal como cuando estaba en el medio de la pantalla — con su alto
-     original (retrato, ~340px) le dejaba la mitad del alto de toda la columna
-     y apretaba a los auspiciantes de abajo a un cuadradito. Panorámica y más
-     baja para dejarles aire. */
-  #sidebarEnergiaSlot .energia-banda { max-width: 100%; aspect-ratio: 16 / 9; margin-bottom: 0; padding: 14px; }
-  #sidebarEnergiaSlot .energia-texto h3 { font-size: 16px; margin-bottom: 4px; }
-  #sidebarEnergiaSlot .energia-texto p { font-size: 11px; }
-
-  /* la columna de escritorio tiene aire de sobra, pero los sponsors siguen
-     siendo un acompañamiento chico — no se agranda el logo, se agranda el espacio */
-  .sponsor-strip.vertical a, .sponsor-strip.vertical span.sponsor-item { padding: 14px; }
-
-  /* si hay pocos sponsors cargados, que ocupen todo el alto libre de la columna
-     en vez de quedar arriba con espacio vacío abajo */
-  #sidebarSponsorsCard { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  #sidebarSponsorsCard .sponsor-strip.vertical { flex: 1; justify-content: center; gap: 20px; }
-  #sidebarSponsorsCard .sponsor-strip.vertical a,
-  #sidebarSponsorsCard .sponsor-strip.vertical span.sponsor-item {
-    flex: 1; display: flex; align-items: center; justify-content: center;
-    min-height: 100px; /* si no entran todos, que la columna scrollee (ver #sidebarAds) en vez de achicarlos de más */
-  }
-  #sidebarSponsorsCard .sponsor-strip.vertical img { height: auto; width: 100%; max-height: 130px; }
 
   /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
   #listaJugadores, #listaComplejos, #listaTorneos, #admPartidosLista {

@@ -171,6 +171,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
+document.getElementById("btnHeroRanking").addEventListener("click", () => cambiarVista("ranking"));
 document.getElementById("marqueeBanda").addEventListener("click", () => {
   if (torneoDestacadoId) abrirTorneo(torneoDestacadoId);
   else cambiarVista("torneos");
@@ -752,14 +753,13 @@ async function cargarInicio() {
 
   const destacado = document.getElementById("flyerDestacado");
   const grid = document.getElementById("flyerMini");
-  const sidebar = document.getElementById("sidebarFlyer");
   const vacio = document.getElementById("inicioSinTorneos");
   destacado.innerHTML = "";
   grid.innerHTML = "";
 
   if (proximos.length === 0) {
     vacio.style.display = "block";
-    if (sidebar) sidebar.innerHTML = '<p class="empty" style="padding:0">Sin torneos próximos.</p>';
+    moverFlyerDestacadoSegunAncho();
     return;
   }
   vacio.style.display = "none";
@@ -781,11 +781,7 @@ async function cargarInicio() {
     div.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
     grid.appendChild(div);
   });
-  if (sidebar) {
-    const t = proximos[0];
-    sidebar.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" style="width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer" /><div class="match-meta meta-caption" style="margin-top:6px">${t.nombre}</div>`;
-    sidebar.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
-  }
+  moverFlyerDestacadoSegunAncho();
 }
 
 // ampliable=true agrega el data-attribute que capta el listener delegado de más abajo
@@ -815,12 +811,36 @@ function iconoTrofeo() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill=
 function iconoCalendarioChico() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg>'; }
 
 const TAG_DESTACADO = { Damas: "Jugadora del mes", Caballeros: "Jugador del mes" };
+let cacheJugadorDelMes = null;
 async function cargarJugadorDelMes() {
   const { data } = await sb.rpc("jugador_del_mes_publico");
   const porGenero = { Damas: null, Caballeros: null };
   (data || []).forEach((row) => { if (row.genero in porGenero) porGenero[row.genero] = row; });
+  cacheJugadorDelMes = porGenero;
+  renderJugadorDelMes();
+}
 
-  document.getElementById("jugadorDelMesContenido").innerHTML = ["Damas", "Caballeros"].map((genero) => {
+// Se elige UNA de las dos filas que ya trae la RPC (que siempre puede traer
+// hasta una por género): si hay las dos, se rota por día del mes para no
+// dejar siempre al mismo género afuera; si solo hay una, se usa esa. Antes
+// esto era solo para el banner único de escritorio y en mobile se mostraban
+// siempre las 2 tarjetas juntas; ahora rota igual en mobile (Jugador y
+// Jugadora también se van turnando ahí). Sin tocar la RPC ni schema.sql.
+function renderJugadorDelMes() {
+  const porGenero = cacheJugadorDelMes;
+  if (!porGenero) return;
+  const contenedor = document.getElementById("jugadorDelMesContenido");
+  // ahora siempre es 1 sola tarjeta que rota (antes esta clase era solo para
+  // el banner ancho de escritorio; en mobile pasaba de grid 2 columnas a 1
+  // con las 2 tarjetas de siempre) -- se agrega siempre, el tamaño grande
+  // de banner sigue siendo solo de escritorio (ver @media min-width:960px)
+  contenedor.classList.add("destacados-grid-banner");
+
+  const generoRotado = new Date().getDate() % 2 === 0 ? "Caballeros" : "Damas";
+  const generoElegido = porGenero[generoRotado] ? generoRotado : (porGenero.Damas ? "Damas" : "Caballeros");
+  const generos = [generoElegido];
+
+  contenedor.innerHTML = generos.map((genero) => {
     const row = porGenero[genero];
     if (!row) {
       return `
@@ -851,6 +871,7 @@ async function cargarJugadorDelMes() {
     card.addEventListener("click", () => abrirPerfilJugador(card.dataset.jugadorId));
   });
 }
+window.matchMedia("(min-width: 960px)").addEventListener("change", renderJugadorDelMes);
 
 // tira rotativa de "ascendieron este mes" en Inicio; si son pocos igual da vueltas
 // despacio, y si son muchos alcanza para no amontonarlos todos en pantalla a la vez
@@ -904,7 +925,31 @@ async function cargarUltimosProximos() {
   // llevan a la misma pantalla única de Torneo ("").
   renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, ""));
   renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos, () => abrirTorneo(idTorneo, ""));
+
+  // "Próximo partido destacado" (solo escritorio): el partido más próximo de
+  // este mismo array, reusando matchVsRowHtml (ya arma el VS con la foto de
+  // cada jugador) en vez de un componente nuevo.
+  renderProximoDestacado(proximos[0], idTorneo);
 }
+
+function renderProximoDestacado(p, idTorneo) {
+  const wrap = document.getElementById("inicioProximoDestacadoWrap");
+  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
+  if (!esDesktop || !p) { wrap.style.display = "none"; return; }
+  const horario = p.horario
+    ? new Date(p.horario).toLocaleString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "Horario a definir";
+  const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "A definir");
+  const contenido = document.getElementById("inicioProximoDestacadoContenido");
+  contenido.innerHTML = `
+    <div class="match-pair-destacado" style="cursor:pointer">
+      ${matchVsRowHtml(p)}
+      <p class="match-meta">${p.categoria ? `${p.categoria} · ` : ""}${iconoCalendarioChico()} ${horario} · ${iconoPin()} ${local}</p>
+    </div>`;
+  contenido.querySelector(".match-pair-destacado").addEventListener("click", () => abrirTorneo(idTorneo, ""));
+  wrap.style.display = "block";
+}
+window.matchMedia("(min-width: 960px)").addEventListener("change", () => cargarUltimosProximos());
 
 function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
   const wrap = document.getElementById(wrapId);
@@ -3734,83 +3779,87 @@ function llavePartidoCardHtml(p) {
 function renderPartidosLlave(containerId, partidos) {
   const cont = document.getElementById(containerId);
 
-  const grupales = partidos.filter((p) => p.grupo != null);
-  const gruposOrdenados = [...new Set(grupales.map((p) => p.grupo))].sort((a, b) => a - b);
-  const columnasZona = gruposOrdenados.map((g) => ({
-    titulo: `Zona ${g}`, zona: true,
-    partidos: grupales.filter((p) => p.grupo === g)
-  }));
+  // Con una sola categoría a la vista (se eligió una puntual en el <select>),
+  // "Zona 1"/"Zona 2" alcanza para distinguir. Con varias mezcladas ("Todas"),
+  // el mismo "Zona 1" se repetía en cada categoría sin poder saber cuál era
+  // cuál -- ahí las columnas pasan a ser por CATEGORÍA en cambio (agrupa
+  // todas sus zonas juntas); el número de zona se sigue viendo en cada
+  // partido, como el tag chico "Z1"/"Z2"/"Z3" que ya arma llavePartidoCardHtml.
+  const categoriasEnVista = [...new Set(partidos.map((p) => p.categoria))].filter(Boolean);
+  const variasCategorias = categoriasEnVista.length > 1;
 
+  const grupales = partidos.filter((p) => p.grupo != null);
   // cuadro de zonas del club (fase_grupos_formato "cuadro_zonas"): cada zona
   // es un solo partido con slot_cuadro "Z1"/"Z2"/... y ronda "Zona" (no usa
-  // `grupo`, que es del formato "Grupos" de todos-contra-todos) — se arma una
-  // columna por número de zona igual que arriba, para que también se vea
-  // organizado en la Llave y no todo junto bajo un único cartel "Zona".
+  // `grupo`, que es del formato "Grupos" de todos-contra-todos)
   const zonasCuadro = partidos.filter((p) => p.ronda === "Zona" && p.slot_cuadro);
-  const numsZonaCuadro = [...new Set(zonasCuadro.map((p) => Number(p.slot_cuadro.slice(1))))].sort((a, b) => a - b);
-  const columnasZonaCuadro = numsZonaCuadro.map((n) => ({
-    titulo: `Zona ${n}`, zona: true,
-    partidos: zonasCuadro.filter((p) => Number(p.slot_cuadro.slice(1)) === n)
-  }));
+
+  let columnasZonas;
+  if (variasCategorias) {
+    const deZona = [...grupales, ...zonasCuadro];
+    columnasZonas = categoriasEnVista
+      .filter((cat) => deZona.some((p) => p.categoria === cat))
+      .map((cat) => ({
+        titulo: cat, zona: true,
+        partidos: deZona.filter((p) => p.categoria === cat)
+          .sort((a, b) => (a.slot_cuadro || "").localeCompare(b.slot_cuadro || "") || (a.grupo || 0) - (b.grupo || 0))
+      }));
+  } else {
+    // Con una sola categoría a la vista igual puede haber que distinguir
+    // masculino/femenino (categorías tipo "Cuarta A Damas"/"Cuarta A
+    // Caballeros", mismo criterio que ya usa generoDeCategoria/agruparPorGenero
+    // en el resto de la app) -- se antepone el nombre de la categoría elegida
+    // en vez de dejar "Zona 1"/"Zona 2" pelado.
+    const prefijo = categoriasEnVista[0] ? `${categoriasEnVista[0]} · ` : "";
+    const gruposOrdenados = [...new Set(grupales.map((p) => p.grupo))].sort((a, b) => a - b);
+    const numsZonaCuadro = [...new Set(zonasCuadro.map((p) => Number(p.slot_cuadro.slice(1))))].sort((a, b) => a - b);
+    columnasZonas = [
+      ...gruposOrdenados.map((g) => ({ titulo: `${prefijo}Zona ${g}`, zona: true, partidos: grupales.filter((p) => p.grupo === g) })),
+      ...numsZonaCuadro.map((n) => ({ titulo: `${prefijo}Zona ${n}`, zona: true, partidos: zonasCuadro.filter((p) => Number(p.slot_cuadro.slice(1)) === n) }))
+    ];
+  }
 
   // las columnas de eliminación se arman con los nombres de ronda que realmente existen,
   // en el orden en que se generaron (no una lista fija) — así sirve tanto para el cuadro
   // clásico de 16/8/4/2 como para un torneo chico que arranca directo en semifinal, o con
-  // nombres genéricos ("Ronda de 6") si el cuadro es irregular
+  // nombres genéricos ("Ronda de 6") si el cuadro es irregular. Con varias categorías
+  // mezcladas, cada ronda se separa una columna por categoría (mismo criterio de arriba).
   const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
   const nombresOrdenados = [...new Set(
     [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
   )];
-  const columnasRonda = nombresOrdenados.map((r) => ({
-    titulo: r, zona: false,
-    partidos: eliminacion.filter((p) => p.ronda === r)
-  }));
+  const columnasRonda = [];
+  nombresOrdenados.forEach((r) => {
+    const deEstaRonda = eliminacion.filter((p) => p.ronda === r);
+    if (variasCategorias) {
+      categoriasEnVista.filter((cat) => deEstaRonda.some((p) => p.categoria === cat)).forEach((cat) => {
+        columnasRonda.push({ titulo: `${r} · ${cat}`, zona: false, partidos: deEstaRonda.filter((p) => p.categoria === cat) });
+      });
+    } else {
+      columnasRonda.push({ titulo: r, zona: false, partidos: deEstaRonda });
+    }
+  });
 
-  // Etapas: "Zonas" agrupa TODAS las columnas de zona bajo una sola pestaña —
-  // así Z1/Z2/Z3 dejan de competir con Cuartos/Semis/Final por lugar arriba;
-  // la zona se sigue viendo, pero como encabezado de columna DENTRO de la
-  // etapa "Zonas", no como una pestaña propia más. Cada ronda de eliminación
-  // ya es una etapa de por sí (una columna == una etapa).
-  const columnasZonas = [...columnasZona, ...columnasZonaCuadro];
-  const etapas = [
-    ...(columnasZonas.length ? [{ titulo: "Zonas", columnas: columnasZonas }] : []),
-    ...columnasRonda.map((col) => ({ titulo: col.titulo, columnas: [col] }))
-  ];
-
-  if (etapas.length === 0) {
+  const columnasTodas = [...columnasZonas, ...columnasRonda];
+  if (columnasTodas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
     return;
   }
 
-  // pestañas "Zonas / Cuartos / Semis / Final" — con una sola etapa no aportan
-  // nada, así que no se muestran.
-  const navEtapas = etapas.length > 1
-    ? '<div class="pill-row llave-etapas-nav">' +
-      etapas.map((et, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-etapa="${i}">${et.titulo}</button>`).join("") +
-      "</div>"
-    : "";
-
+  // Sin pestañas "Zonas/Cuartos/Semis/Final": todas las columnas quedan una
+  // al lado de la otra en el mismo scroll horizontal (con snap en mobile, ver
+  // .llave-scroll/.llave-columna) -- se recorren deslizando a la derecha en
+  // vez de tener que elegir una pestaña arriba.
   const columnaHtml = (col) => `
       <div class="llave-columna ${col.zona ? "llave-zona" : ""}">
         <h3>${col.titulo}</h3>
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
 
-  cont.innerHTML = navEtapas + etapas.map((et, i) => `
-    <div class="llave-etapa-panel" data-etapa-index="${i}" ${i === 0 ? "" : 'style="display:none"'}>
-      <div class="llave-scroll"><div class="llave">${et.columnas.map(columnaHtml).join("")}</div></div>
-    </div>`).join("");
+  cont.innerHTML = `<div class="llave-scroll"><div class="llave">${columnasTodas.map(columnaHtml).join("")}</div></div>`;
 
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
-  });
-  cont.querySelectorAll("[data-llave-etapa]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      cont.querySelectorAll("[data-llave-etapa]").forEach((b) => b.classList.toggle("active", b === btn));
-      cont.querySelectorAll(".llave-etapa-panel").forEach((panel) => {
-        panel.style.display = panel.dataset.etapaIndex === btn.dataset.llaveEtapa ? "" : "none";
-      });
-    });
   });
   wireCargaResultado(cont);
 }
@@ -4117,8 +4166,6 @@ async function cargarSponsors() {
   const admin = document.getElementById("listaSponsors");
   const inlineCard = document.getElementById("sponsorsInlineCard");
   const inline = document.getElementById("sponsorsInline");
-  const sidebarCard = document.getElementById("sidebarSponsorsCard");
-  const sidebar = document.getElementById("sidebarSponsors");
   const marqueeCard = document.getElementById("sponsorMarqueeMobile");
   const marqueeTrack = document.getElementById("sponsorMarqueeTrack");
 
@@ -4132,8 +4179,6 @@ async function cargarSponsors() {
   if (generales.length > 0) {
     if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (inlineCard) inlineCard.style.display = "block";
-    if (sidebar) sidebar.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
-    if (sidebarCard) sidebarCard.style.display = "flex";
     if (marqueeTrack) {
       const items = generales.map((s) => renderSponsorItem(s)).join("");
       marqueeTrack.innerHTML = items + items; // duplicado exacto x2: lo pide marquee-scroll para el loop sin corte
@@ -4141,31 +4186,65 @@ async function cargarSponsors() {
     if (marqueeCard) marqueeCard.style.display = "block";
   } else {
     if (inlineCard) inlineCard.style.display = "none";
-    if (sidebarCard) sidebarCard.style.display = "none";
     if (marqueeCard) marqueeCard.style.display = "none";
   }
 }
 
-// La banda "En noviembre vamos a Brasil / Padel Tour 2026" es un único elemento
-// del DOM que se reubica según el ancho (mismo breakpoint que #sidebarAds,
-// 960px): en mobile va arriba de Noticias (su lugar de origen en el HTML),
-// en desktop se muda al costado de los auspiciantes en la columna lateral.
-// Reubicar en vez de duplicar markup/CSS evita mantener dos copias.
-const bannerEnergiaHomeMobile = document.getElementById("energiaBanda")?.parentElement || null;
-const bannerEnergiaHomeMobileSiguiente = document.getElementById("noticiasCard");
-function moverBannerEnergiaSegunAncho() {
-  const banner = document.getElementById("energiaBanda");
-  const slotDesktop = document.getElementById("sidebarEnergiaSlot");
-  if (!banner || !slotDesktop || !bannerEnergiaHomeMobile) return;
+// ============================================================
+// CARRUSEL DE HERO (Inicio, escritorio): 2da slide = flyer del torneo
+// destacado, reubicado (no duplicado) — mismo mecanismo que el banner de
+// energía de arriba. Los puntos se arman con JS chico + scroll-snap nativo,
+// sin ninguna librería de carrusel.
+// ============================================================
+const flyerDestacadoHomeMobile = document.getElementById("flyerDestacado")?.parentElement || null;
+const flyerDestacadoHomeMobileSiguiente = document.getElementById("flyerMini");
+function moverFlyerDestacadoSegunAncho() {
+  const flyer = document.getElementById("flyerDestacado");
+  const slotDesktop = document.getElementById("heroSlideTorneo");
+  const slotRanking = document.getElementById("heroSlideRanking");
+  const dotsWrap = document.getElementById("heroCarouselDots");
+  if (!flyer || !slotDesktop || !flyerDestacadoHomeMobile || !dotsWrap) return;
   const esDesktop = window.matchMedia("(min-width: 960px)").matches;
   if (esDesktop) {
-    if (banner.parentElement !== slotDesktop) slotDesktop.appendChild(banner);
-  } else if (banner.parentElement !== bannerEnergiaHomeMobile) {
-    bannerEnergiaHomeMobile.insertBefore(banner, bannerEnergiaHomeMobileSiguiente);
+    if (flyer.parentElement !== slotDesktop) slotDesktop.appendChild(flyer);
+  } else if (flyer.parentElement !== flyerDestacadoHomeMobile) {
+    flyerDestacadoHomeMobile.insertBefore(flyer, flyerDestacadoHomeMobileSiguiente);
   }
+  // en mobile el carrusel vuelve a ser una sola slide (el hero de siempre) —
+  // las otras 2 (torneo destacado, ranking) solo existen como slides en
+  // escritorio, donde reemplazan a la columna lateral que ya no está.
+  const hayFlyer = flyer.children.length > 0;
+  slotDesktop.hidden = !(esDesktop && hayFlyer);
+  if (slotRanking) slotRanking.hidden = !esDesktop;
+  dotsWrap.classList.toggle("visible", esDesktop);
+  actualizarPuntosCarrusel();
 }
-window.matchMedia("(min-width: 960px)").addEventListener("change", moverBannerEnergiaSegunAncho);
-moverBannerEnergiaSegunAncho();
+window.matchMedia("(min-width: 960px)").addEventListener("change", moverFlyerDestacadoSegunAncho);
+
+// arma (una sola vez por cambio de cantidad) los puntos del carrusel y resalta
+// el que corresponde a la slide visible según el scroll del track
+function actualizarPuntosCarrusel() {
+  const track = document.getElementById("heroCarouselTrack");
+  const dotsWrap = document.getElementById("heroCarouselDots");
+  if (!track || !dotsWrap) return;
+  const cantidad = dotsWrap.classList.contains("visible")
+    ? Array.from(track.children).filter((el) => !el.hidden).length
+    : 0;
+  if (dotsWrap.dataset.cantidad !== String(cantidad)) {
+    dotsWrap.dataset.cantidad = String(cantidad);
+    dotsWrap.innerHTML = Array.from({ length: cantidad }, (_, i) =>
+      `<button type="button" class="hero-carousel-dot" data-slide="${i}" aria-label="Ir a la slide ${i + 1}"></button>`
+    ).join("");
+    dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot) => {
+      dot.addEventListener("click", () => {
+        track.scrollTo({ left: track.clientWidth * Number(dot.dataset.slide), behavior: "smooth" });
+      });
+    });
+  }
+  const activo = cantidad ? Math.round(track.scrollLeft / (track.clientWidth || 1)) : -1;
+  dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot, i) => dot.classList.toggle("active", i === activo));
+}
+document.getElementById("heroCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(actualizarPuntosCarrusel));
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");

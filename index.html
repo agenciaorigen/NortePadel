@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -82,15 +82,40 @@
   <!-- INICIO -->
   <section id="view-inicio" class="view active">
 
-    <div class="hero-club">
-      <div class="hero-club-widget" id="heroPosicionCard" style="display:none">
-        <span class="hero-club-widget-label">Tu posición</span>
-        <strong id="heroPosicionValor">—</strong>
-        <span class="hero-club-widget-sub" id="heroPosicionSub"></span>
+    <!-- Carrusel del hero: en mobile es una sola slide "real" (el hero de siempre);
+         en escritorio, moverFlyerDestacadoSegunAncho() (app.js) muda el flyer del
+         torneo destacado (#flyerDestacado, ya poblado por cargarInicio) a la 2da
+         slide, en vez de duplicar ese markup/dato — mismo mecanismo que ya usa
+         moverBannerEnergiaSegunAncho() con #energiaBanda. -->
+    <div class="hero-carousel" id="heroCarousel">
+      <div class="hero-carousel-track" id="heroCarouselTrack">
+        <div class="hero-carousel-slide">
+          <div class="hero-club">
+            <div class="hero-club-widget" id="heroPosicionCard" style="display:none">
+              <span class="hero-club-widget-label">Tu posición</span>
+              <strong id="heroPosicionValor">—</strong>
+              <span class="hero-club-widget-sub" id="heroPosicionSub"></span>
+            </div>
+            <h2 class="hero-club-titulo">Movimiento.<br /><span>Disciplina.</span><br />Resultado.</h2>
+            <p class="hero-club-sub">El circuito de pádel de Norte Padel: ranking en vivo, torneos todo el año.</p>
+            <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
+        <div class="hero-carousel-slide" id="heroSlideTorneo"></div>
+        <div class="hero-carousel-slide" id="heroSlideRanking">
+          <div class="hero-club hero-club-ranking">
+            <h2 class="hero-club-titulo">Ranking<br /><span>en vivo.</span></h2>
+            <p class="hero-club-sub">Mirá cómo vas en tu categoría, partido a partido.</p>
+            <button class="hero-club-cta" id="btnHeroRanking" type="button">Ver ranking <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
       </div>
-      <h2 class="hero-club-titulo">Movimiento.<br /><span>Disciplina.</span><br />Resultado.</h2>
-      <p class="hero-club-sub">El circuito de pádel de Norte Padel: ranking en vivo, torneos todo el año.</p>
-      <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
+      <div class="hero-carousel-dots" id="heroCarouselDots"></div>
+    </div>
+
+    <div class="seccion" id="inicioProximoDestacadoWrap" style="display:none">
+      <h3>Próximo partido destacado</h3>
+      <div id="inicioProximoDestacadoContenido"></div>
     </div>
 
     <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
@@ -115,18 +140,18 @@
       <div class="inicio-partidos-grid" id="inicioProximosGrid"></div>
     </div>
 
-    <!-- En mobile no hay columna lateral (ver #sidebarAds) — los auspiciantes
-         pasan a una barra que se desliza sola (mismo mecanismo que la banda
-         de arriba, "marquee-scroll"), bien grande, en vez del renglón chico
-         de logos que quedaba más abajo del todo. En desktop esta barra no se
-         ve: ahí los auspiciantes ya están grandes en la columna lateral. -->
+    <!-- En mobile los auspiciantes pasan a una barra que se desliza sola
+         (mismo mecanismo que la banda de arriba, "marquee-scroll"), bien
+         grande, en vez del renglón chico de logos que quedaba más abajo del
+         todo. En desktop esta barra no se ve: ahí los auspiciantes van en la
+         fila "Presentan" del contenido principal (#sponsorsInlineCard). -->
     <div class="sponsor-marquee" id="sponsorMarqueeMobile" style="display:none">
       <p class="sponsor-label">Auspician</p>
       <div class="sponsor-marquee-track" id="sponsorMarqueeTrack"></div>
     </div>
 
     <div class="destacados-band">
-      <div class="destacados-overline"><span>⭐ Jugadores del mes</span></div>
+      <div class="destacados-overline"><span>⭐ Destacado del mes</span></div>
       <div class="destacados-grid" id="jugadorDelMesContenido"></div>
     </div>
 
@@ -149,8 +174,8 @@
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </div>
 
-    <!-- En mobile vive acá, arriba de Noticias. En desktop, moverBannerEnergiaSegunAncho()
-         la reubica dentro de #sidebarAds (#sidebarEnergiaSlot) sin duplicar el markup. -->
+    <!-- Vive siempre acá, arriba de Noticias, en mobile y en desktop (ya no
+         hay columna lateral aparte donde reubicarla). -->
     <div class="energia-banda" id="energiaBanda">
       <div class="energia-texto">
         <h3>En noviembre vamos a Brasil</h3>
@@ -784,19 +809,6 @@
   </section>
 
 </main>
-
-<aside id="sidebarAds">
-  <div class="card">
-    <h3>Próximo torneo</h3>
-    <div id="sidebarFlyer"></div>
-  </div>
-  <!-- Destino desktop de #energiaBanda (ver moverBannerEnergiaSegunAncho() en app.js) -->
-  <div class="card" id="sidebarEnergiaSlot"></div>
-  <div class="card" id="sidebarSponsorsCard" style="display:none">
-    <p class="sponsor-label">Auspician</p>
-    <div class="sponsor-strip vertical" id="sidebarSponsors"></div>
-  </div>
-</aside>
 </div>
 
 <nav class="tabbar">
