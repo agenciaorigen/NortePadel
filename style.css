@@ -1,30 +1,37 @@
 :root {
-  /* Paleta "Cancha Nocturna": verde profesional sobre fondo casi negro —
-     menos neón, más "tour profesional" — con un acento cálido puntual
-     para EN VIVO y highlights, y el resto como estados (ok/warn/danger)
-     que nunca compiten con el verde. */
-  --bg: #0A0E10;
-  --bg-elev: #12181B;
-  --card: #182024;
-  --accent: #4F8F6E;       /* verde cancha nocturna — marca */
-  --accent-ink: #06120C;   /* texto sobre el verde */
-  --accent-2: #E2A25A;     /* uso puntual: EN VIVO / highlights cálidos */
-  --accent-3: #8A6FE0;     /* uso puntual: ganador en la llave */
-  --accent-teal: #4F8F6E;  /* uso puntual: fila de partido "order of play" (mismo verde de marca) */
+  /* Paleta "Cancha Nocturna" v2: dos tonos de verde, no uno solo —
+     --accent (profundo) para RELLENOS con texto blanco encima,
+     --accent-bright (vivo, = --state-ok) para TEXTO/ÍCONO/BRILLO sobre
+     fondo oscuro. Capas bg -> bg-elev -> card con separación real (antes
+     eran casi el mismo negro) para que las cards se despeguen del fondo. */
+  --bg: #05080A;
+  --bg-elev: #101E19;
+  --card: #25392F;
+  --accent: #0F7A46;          /* verde profundo — SOLO relleno con texto blanco encima */
+  --accent-bright: #6FE08A;   /* verde vivo — SOLO texto/ícono/brillo sobre fondo oscuro */
+  --accent-ink: #06120C;      /* texto oscuro — SOLO sobre un relleno claro */
+  --accent-2: #E2A25A;        /* uso puntual: EN VIVO / highlights cálidos */
+  --accent-3: #8A6FE0;        /* uso puntual: fase eliminatoria / pendiente de horario */
   --text: #EAF1EE;
-  --muted: #8CA39A;
-  --border: rgba(230,238,235,.08);
-  --state-ok: #6fe08a;
+  --muted: #9BB0A7;
+  --border: rgba(200,255,225,.14);
+  --state-ok: var(--accent-bright);
   --state-warn: #ffc24d;
   --danger: #ff5c6c;
-  --gradient: linear-gradient(135deg, var(--accent-2), var(--accent-3));
+  --gradient: linear-gradient(135deg, var(--accent), var(--accent-bright));
+  /* canales RGB para poder escribir rgba(var(--x-rgb),alpha) en vez de
+     repetir literales a mano en scrims/glows */
+  --bg-rgb: 5,8,10;
+  --accent-rgb: 15,122,70;
+  --accent-bright-rgb: 111,224,138;
   /* radios redondeados, tipo app deportiva moderna (no revista/no formulario) */
   --radius-sm: 12px;
   --radius: 16px;
   --radius-lg: 20px;
-  /* sombras muy sutiles: solo para separar del fondo, nunca un "dashboard viejo" */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
-  --shadow: 0 6px 20px rgba(0,0,0,.35);
+  /* sombras: neutras para elevación simple, + un brillo de marca puntual */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.35);
+  --shadow: 0 8px 24px rgba(0,0,0,.4);
+  --shadow-glow: 0 0 0 1px rgba(var(--accent-bright-rgb),.18), 0 10px 28px -6px rgba(var(--accent-bright-rgb),.5);
 }
 
 * { box-sizing: border-box; }
@@ -56,7 +63,12 @@ body::after {
   z-index: -1;
 }
 
-h1, h2, h3, button { font-family: "Big Shoulders Display", "Manrope", -apple-system, sans-serif; font-weight: 700; }
+h1, h2, h3, button,
+.pj-stats strong, .destacado-stat strong, .destacado-info strong,
+.hero-club-widget strong, .games-bar-nums {
+  font-family: "Big Shoulders Display", "Manrope", -apple-system, sans-serif;
+  font-weight: 700;
+}
 
 header.topbar {
   display: flex;
@@ -85,7 +97,7 @@ header.topbar h1 {
   flex: 1;
   letter-spacing: -.01em;
 }
-header.topbar h1 span { color: var(--accent); }
+header.topbar h1 span { color: var(--accent-bright); }
 header.topbar button {
   display: flex;
   align-items: center;
@@ -115,6 +127,13 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
 }
+/* separador de "capítulo" para pantallas con muchas cards seguidas
+   (Administración): reusa el verde de marca como ritmo visual, sin
+   agregar ningún elemento nuevo. */
+.card.card-accent { border-left: 3px solid var(--accent); padding-left: 22px; }
+/* halo verde sutil para las pocas cards que son el "momento importante"
+   de una pantalla vacía (login, anotarme, confirmar inscripción). */
+.card.card-glow { background: linear-gradient(160deg, rgba(var(--accent-rgb),.16), transparent 55%), var(--card); }
 
 /* bloque "liviano": agrupa una sección de Inicio sin ponerle una caja encima —
    la separación se hace con espacio y una línea fina, no con un card más.
@@ -123,7 +142,7 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
 .seccion { margin: 0 0 26px; }
 .seccion > h3 { margin-bottom: 12px; }
 
-h2 { font-size: 19px; font-weight: 800; margin: 0 0 14px; color: var(--text); letter-spacing: -.01em; }
+h2 { font-size: 21px; font-weight: 800; margin: 0 0 14px; color: var(--text); letter-spacing: -.015em; }
 h3 { font-size: 12.5px; font-weight: 700; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
 
 label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
@@ -159,8 +178,13 @@ button.primary {
   margin-top: 14px;
   width: 100%;
   cursor: pointer;
+  box-shadow: var(--shadow-glow);
 }
 button.primary:active { transform: scale(.98); }
+/* Los 3 CTA que de verdad "venden" (anotarse a un torneo) suman relleno
+   verde sólido en vez del blanco genérico — el resto de los botones
+   primary (sobre todo en Administración) se queda blanco a propósito. */
+button.primary.cta-hero { background: var(--accent); color: #fff; }
 button.secondary {
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -214,10 +238,22 @@ tr:first-child td { font-weight: 700; }
 .badge.solid { background: rgba(111,224,138,.14); color: var(--state-ok); border: 1px solid rgba(111,224,138,.3); font-weight: 700; }
 
 /* ranking público: menos "tabla" y más lista de leaderboard */
-#tablaRanking th { border-bottom: 2px solid var(--border); }
+#tablaRanking { border-radius: var(--radius-sm); overflow: hidden; }
+#tablaRanking th { border-bottom: 2px solid rgba(var(--accent-rgb),.4); }
 #tablaRanking td { padding: 12px 6px; border-bottom: 1px solid var(--border); }
 #tablaRanking tr:last-child td { border-bottom: none; }
 .tabla-posiciones td { border-bottom: 1px solid var(--border); }
+
+/* podio: la fila entera de los primeros 3 puestos se tiñe con su color de
+   medalla (usa las clases pos-1/2/3 que ya emite cargarRanking(), sin
+   agregar html/js nuevo) — gana por especificidad a .fila-master cuando
+   un top-3 también clasifica al Master, así el color de medalla manda. */
+#tablaRanking tr:has(.pos-1) { background: linear-gradient(90deg, rgba(255,215,0,.14), transparent 45%); }
+#tablaRanking tr:has(.pos-1) td:first-child { border-left: 3px solid #ffd700; }
+#tablaRanking tr:has(.pos-2) { background: linear-gradient(90deg, rgba(201,211,224,.12), transparent 45%); }
+#tablaRanking tr:has(.pos-2) td:first-child { border-left: 3px solid #c9d3e0; }
+#tablaRanking tr:has(.pos-3) { background: linear-gradient(90deg, rgba(255,157,92,.12), transparent 45%); }
+#tablaRanking tr:has(.pos-3) td:first-child { border-left: 3px solid #ff9d5c; }
 
 .fila-master td { background: rgba(255,215,0,.05); }
 .fila-master td:first-child { border-left: 2px solid #ffd700; }
@@ -237,7 +273,7 @@ tr:first-child td { font-weight: 700; }
   cursor: pointer;
   white-space: nowrap;
 }
-.pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+.pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ---------- Avatares / fotos de perfil ---------- */
 .avatar {
@@ -303,7 +339,8 @@ tr:first-child td { font-weight: 700; }
   min-height: 190px;
   margin-bottom: 16px;
   background:
-    linear-gradient(0deg, rgba(10,14,16,.96), rgba(10,14,16,.3) 70%),
+    linear-gradient(200deg, rgba(var(--accent-rgb),.35), transparent 55%),
+    linear-gradient(0deg, rgba(var(--bg-rgb),.96), rgba(var(--bg-rgb),.3) 70%),
     url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
   box-shadow: var(--shadow);
   display: flex; align-items: flex-end;
@@ -318,7 +355,7 @@ tr:first-child td { font-weight: 700; }
 .hero-icon-btn {
   position: absolute; top: 14px; right: 14px; z-index: 2;
   width: 38px; height: 38px; border-radius: 50%;
-  border: 1px solid var(--border); background: rgba(10,14,16,.55);
+  border: 1px solid var(--border); background: rgba(var(--bg-rgb),.55);
   color: var(--text); font-size: 16px; line-height: 1;
   align-items: center; justify-content: center; cursor: pointer;
 }
@@ -336,7 +373,8 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   padding: 30px 22px 28px;
   margin-bottom: 20px;
   background:
-    linear-gradient(0deg, rgba(10,14,16,.94), rgba(10,14,16,.4) 60%),
+    linear-gradient(200deg, rgba(var(--accent-rgb),.35), transparent 55%),
+    linear-gradient(0deg, rgba(var(--bg-rgb),.94), rgba(var(--bg-rgb),.4) 60%),
     url('hero-cancha.jpg') center/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
@@ -355,10 +393,11 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .hero-club-cta {
   position: relative;
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--text); color: var(--bg);
+  background: var(--accent); color: #fff;
   border: none; border-radius: 30px;
   padding: 12px 20px; font-weight: 700; font-size: 14px;
   cursor: pointer;
+  box-shadow: var(--shadow-glow);
 }
 .hero-club-cta span { transition: transform .15s; }
 .hero-club-cta:hover span { transform: translateX(3px); }
@@ -444,7 +483,9 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .energia-banda::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(10,14,16,.5), rgba(10,14,16,.9));
+  background:
+    linear-gradient(200deg, rgba(var(--accent-rgb),.3), transparent 55%),
+    linear-gradient(180deg, rgba(var(--bg-rgb),.5), rgba(var(--bg-rgb),.9));
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
@@ -462,7 +503,8 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   margin-bottom: 20px;
   box-shadow: var(--shadow);
   background:
-    linear-gradient(0deg, rgba(10,14,16,.8), rgba(10,14,16,.5)),
+    linear-gradient(200deg, rgba(var(--accent-rgb),.3), transparent 55%),
+    linear-gradient(0deg, rgba(var(--bg-rgb),.8), rgba(var(--bg-rgb),.5)),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
 .destacados-overline {
@@ -577,7 +619,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    ningún tamaño de pantalla. */
 .calendario-hora { color: var(--muted); font-weight: 700; white-space: nowrap; font-size: 12px; }
 .calendario-partido {
-  background: var(--accent-teal); color: #fff; border-radius: var(--radius-sm);
+  background: var(--accent); color: #fff; border-radius: var(--radius-sm);
   padding: 9px 11px; line-height: 1.35; width: 100%; height: 100%; white-space: normal; font-weight: 600;
   font-size: 12.5px;
 }
@@ -682,8 +724,8 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   border-radius: 7px; background: var(--bg-elev); color: var(--muted); font-variant-numeric: tabular-nums;
 }
 /* ganador resaltado en el verde de marca (--accent), igual que el resto de la app */
-.llave-fila.ganador .llave-pareja { color: var(--accent); font-weight: 800; }
-.llave-fila.ganador .llave-set { background: var(--accent); color: var(--accent-ink); }
+.llave-fila.ganador .llave-pareja { color: var(--accent-bright); font-weight: 800; }
+.llave-fila.ganador .llave-set { background: var(--accent); color: var(--text); }
 .llave-meta { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
 .tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -699,7 +741,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--muted);
   cursor: pointer;
 }
-.check-grid label:has(input:checked) { color: var(--bg); background: var(--text); border-color: var(--text); }
+.check-grid label:has(input:checked) { color: #fff; background: var(--accent); border-color: var(--accent); }
 
 .link-btn {
   background: none; border: none; color: var(--text); font-size: 12px;
@@ -780,7 +822,7 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
    uno con su propio avatar/foto (nunca un ícono único "por pareja"). */
 .match-pair {
   display: flex; align-items: center; gap: 12px;
-  background: var(--accent-teal); color: #fff;
+  background: var(--accent); color: #fff;
   border-radius: var(--radius); padding: 14px; margin: 10px 0;
 }
 .match-pair-lado { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -794,7 +836,7 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .match-pair.jugado { background: var(--bg-elev); border: 1px solid var(--border); }
 /* ganador en violeta — antes acá quedaba en lima, distinto del violeta que ya
    se usa en la Llave y en la grilla de sets para lo mismo; unificado */
-.match-pair-lado.ganador .match-pair-nombre { color: #d6cbf5; }
+.match-pair-lado.ganador .match-pair-nombre { color: var(--accent-bright); }
 .match-pair-lado.perdedor { opacity: .55; }
 
 .badge.live {
@@ -860,7 +902,7 @@ nav.tabbar .icon { position: relative; }
   min-width: 30px; text-align: center; padding: 5px 0; font-size: 13px; font-weight: 700;
   border-radius: 8px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
 }
-.sets-grid-fila.gana .sets-grid-box { background: rgba(106,61,255,.28); border-color: transparent; color: #dcd3ff; }
+.sets-grid-fila.gana .sets-grid-box { background: rgba(var(--accent-bright-rgb),.28); border-color: transparent; color: var(--accent-bright); }
 
 /* comparación de games ganados en el detalle de un partido jugado: no es un
    dato nuevo, se suma lo que cada pareja ya ganó en cada set. El lado
@@ -874,13 +916,13 @@ nav.tabbar .icon { position: relative; }
 }
 .games-bar-track { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--bg-elev); }
 .games-bar-fill { height: 100%; }
-.games-bar-fill.gana { background: var(--accent-3); }
+.games-bar-fill.gana { background: var(--accent-bright); }
 .games-bar-fill.pierde { background: rgba(245,245,245,.22); }
 .games-bar-nums {
   display: flex; justify-content: space-between; font-size: 15px; font-weight: 800;
   margin-top: 6px; font-variant-numeric: tabular-nums;
 }
-.games-bar-nums span.gana { color: #d6cbf5; }
+.games-bar-nums span.gana { color: var(--accent-bright); }
 
 /* resultado por sets, para CARGAR: mismas casillas pero editables — el Set 3 queda
    oculto hasta que hace falta (mejor de 3: si 1 a 1 en los dos primeros, se revela) */
@@ -918,7 +960,8 @@ nav.tabbar .icon { position: relative; }
   position: relative;
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(180deg, rgba(10,14,16,.88), rgba(10,14,16,.96) 45%),
+    linear-gradient(200deg, rgba(var(--accent-rgb),.28), transparent 55%),
+    linear-gradient(180deg, rgba(var(--bg-rgb),.88), rgba(var(--bg-rgb),.96) 45%),
     url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
 }
 
@@ -937,7 +980,8 @@ nav.tabbar .icon { position: relative; }
   position: relative;
   padding: 22px 18px 26px;
   background:
-    linear-gradient(0deg, rgba(10,14,16,.94), rgba(10,14,16,.5) 65%),
+    linear-gradient(200deg, rgba(var(--accent-rgb),.3), transparent 55%),
+    linear-gradient(0deg, rgba(var(--bg-rgb),.94), rgba(var(--bg-rgb),.5) 65%),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
 .torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
@@ -997,9 +1041,9 @@ nav.tabbar button {
   gap: 4px;
   cursor: pointer;
 }
-nav.tabbar button.active { color: var(--text); font-weight: 700; }
+nav.tabbar button.active { color: var(--accent-bright); font-weight: 700; }
 nav.tabbar .icon { display: flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 999px; transition: background .15s; }
-nav.tabbar button.active .icon { background: var(--card); }
+nav.tabbar button.active .icon { background: rgba(var(--accent-rgb),.22); }
 nav.tabbar .icon svg { width: 19px; height: 19px; display: block; }
 
 /* "Jugar" queda en el medio de la barra, destacado como acción principal
@@ -1029,7 +1073,7 @@ body.is-admin #btnAdminPanel { display: flex; }
 
 .overlay-bloqueante {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(10,14,16,.92);
+  background: rgba(var(--bg-rgb),.92);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
 }

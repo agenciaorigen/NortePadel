@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
-<meta name="theme-color" content="#0A0E10" />
+<meta name="theme-color" content="#05080A" />
 <!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
      abre como acceso directo al navegador, no como app a pantalla completa -->
 <meta name="mobile-web-app-capable" content="yes" />
@@ -297,10 +297,10 @@
         <h2 id="dtNombreHero"></h2>
       </div>
     </div>
-    <div class="card" id="dtInscripcionCard">
+    <div class="card card-glow" id="dtInscripcionCard">
       <p class="match-meta" id="inscripcionEstado"></p>
       <p style="margin-top:10px;display:none" id="dtCosto"></p>
-      <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
+      <button class="primary cta-hero" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
     </div>
     <div class="card">
       <label>Categoría</label>
@@ -345,20 +345,20 @@
       <p class="match-meta" id="parejaSeleccionadaTxt"></p>
       <button class="primary" id="btnInscribirme" style="margin-top:12px" disabled>Elegí tu pareja para continuar</button>
     </div>
-    <div class="card" id="confirmarInscripcionWrap" style="display:none">
+    <div class="card card-glow" id="confirmarInscripcionWrap" style="display:none">
       <h3>Paso 3 · Confirmar</h3>
       <div class="match-card">
         <p id="confirmarInscripcionResumen"></p>
         <div id="confirmarInscripcionWhatsapp"></div>
       </div>
-      <button class="primary" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
+      <button class="primary cta-hero" id="btnConfirmarInscripcion" style="margin-top:10px">Confirmar inscripción</button>
       <button class="secondary small" id="btnCambiarPareja" style="margin-top:8px">Cambiar pareja</button>
     </div>
   </section>
 
   <!-- MI INSCRIPCIÓN: se ve una vez ya anotado — nunca vuelve a mostrar el formulario -->
   <section id="view-mi-inscripcion" class="view">
-    <div class="card">
+    <div class="card card-glow">
       <h3>Mi inscripción</h3>
       <p id="miInscEstado"></p>
       <p class="match-meta" id="miInscResumen"></p>
@@ -435,7 +435,7 @@
 
   <!-- MI PERFIL (login / registro / edición) -->
   <section id="view-perfil" class="view">
-    <div class="card" id="authCard">
+    <div class="card card-glow" id="authCard">
       <h2 id="authTitulo">Ingresar</h2>
       <label>Email</label>
       <input id="authEmail" type="email" autocomplete="email" />
@@ -493,14 +493,14 @@
 
   <!-- ADMIN -->
   <section id="view-admin" class="view">
-    <div class="card" id="admSelectorTorneoCard">
+    <div class="card card-accent" id="admSelectorTorneoCard">
       <h2>Torneo en gestión</h2>
       <p class="match-meta" style="margin-bottom:6px">Elegí un torneo para administrar sus inscripciones, parejas, canchas, bloqueos y partidos. La edición de un torneo vive solo acá — la vista pública nunca muestra estas herramientas.</p>
       <select id="admSelectTorneoGestion"><option value="">Elegí un torneo</option></select>
     </div>
 
     <div id="admGestionTorneoWrap" style="display:none">
-      <div class="card">
+      <div class="card card-accent">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <h2 id="admGestionNombre" style="margin:0"></h2>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -519,7 +519,7 @@
         <div id="admDiagnostico"></div>
       </div>
 
-      <div class="card" id="editarTorneoCard" style="display:none">
+      <div class="card card-accent" id="editarTorneoCard" style="display:none">
         <h2>Editar torneo</h2>
         <p class="match-meta" id="teAvisoBloqueo" style="display:none">🔒 Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
         <label>Nombre</label>
@@ -580,7 +580,7 @@
            propio pill-nav (mismo patrón que torneoSubnav) y se ve una por vez. -->
       <div class="pill-row" id="admGestionSubnav" style="margin-bottom:12px"></div>
 
-      <div class="card" id="admSeccionInscripciones">
+      <div class="card card-accent" id="admSeccionInscripciones">
         <h2>Inscripciones y parejas</h2>
         <div id="admParejas"></div>
         <div id="admSinPareja"></div>
@@ -593,7 +593,7 @@
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
 
-      <div class="card" id="admSeccionCanchas">
+      <div class="card card-accent" id="admSeccionCanchas">
         <h2>Canchas del torneo</h2>
         <div id="admCanchas"></div>
         <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
@@ -611,7 +611,7 @@
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
       </div>
 
-      <div class="card" id="admSeccionBloqueos">
+      <div class="card card-accent" id="admSeccionBloqueos">
         <h2>Bloqueos de cancha</h2>
         <p class="match-meta" style="margin-bottom:6px">Una cancha bloqueada queda inutilizable para TODOS en ese horario (lluvia, mantenimiento, otro evento) — el armado automático y la planilla la respetan. Esto es distinto de la disponibilidad de un jugador, que es solo su preferencia personal y no bloquea la cancha para nadie más.</p>
         <div id="admBloqueosLista"></div>
@@ -648,7 +648,7 @@
          cuando se entra a administrar un torneo específico (ver admBtnVolverConfigGeneral
          y btnAdministrarEsteTorneo en app.js): esa pantalla queda solo para ESE torneo. -->
     <div id="admConfigGeneralWrap">
-    <div class="card">
+    <div class="card card-accent">
       <h2>Configuración general</h2>
       <label>WhatsApp del club (para coordinar pagos)</label>
       <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
@@ -657,7 +657,7 @@
       <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Nuevo complejo</h2>
       <label>Nombre</label>
       <input id="cNombre" placeholder="Ej: Norte Padel Club" />
@@ -668,12 +668,12 @@
       <button class="primary" id="btnCrearComplejo">Crear complejo</button>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Complejos y canchas</h2>
       <div id="listaComplejos"></div>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Categorías</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen para elegir en el perfil del jugador y al crear un torneo.</p>
       <div class="pill-row" id="listaCategoriasAdmin"></div>
@@ -683,7 +683,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Etiquetas de jugadores</h2>
       <p class="match-meta" style="margin-bottom:6px">Uso interno, solo para el admin: etiquetas con color (ej. "Veterano") para ayudarte a acomodar horarios y partidos. No las ven los jugadores.</p>
       <div class="pill-row" id="listaEtiquetasAdmin"></div>
@@ -694,7 +694,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Solicitudes de categoría</h2>
       <p class="match-meta" style="margin-bottom:6px">Jugadores que pidieron cambiar de categoría. Al aprobar, pasan a jugar (y sumar puntos) en la nueva.</p>
       <div id="listaSolicitudesCategoria"></div>
@@ -707,7 +707,7 @@
       <div id="listaReservasPendientes"></div>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Puntos por ronda</h2>
       <p class="match-meta" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedó eliminada. En la Final, el ganador suma "Campeón" y el perdedor suma "Sub".</p>
       <div class="row">
@@ -725,7 +725,7 @@
       <button class="secondary small" id="btnGuardarPuntosRonda" style="margin-top:10px">Guardar puntos</button>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <h2>Jugador del mes</h2>
       <label>Jugador</label>
       <select id="jdmSelect"></select>
@@ -736,7 +736,7 @@
     </div>
 
     <div id="auspiciantesWrap" style="display:none">
-      <div class="card">
+      <div class="card card-accent">
         <button type="button" class="link-btn" id="btnCerrarAuspiciantesTorneo" style="display:none;margin-bottom:8px">← Volver a este torneo</button>
         <h2>Auspiciantes / Publicidad</h2>
         <p class="match-meta" style="margin-bottom:6px">Un auspiciante "General" aparece en Inicio, la columna lateral y en todos los torneos. Si elegís un torneo puntual, el logo aparece solo ahí.</p>
@@ -754,7 +754,7 @@
     </div>
 
     <div id="admConfigGeneralWrap2">
-    <div class="card">
+    <div class="card card-accent">
       <h2>Noticias</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>
       <label>Título</label>
@@ -769,7 +769,7 @@
       <div id="listaNoticiasAdmin" style="margin-top:16px"></div>
     </div>
 
-    <div class="card">
+    <div class="card card-accent">
       <div class="torneo-card-header">
         <h2>Jugadores registrados</h2>
         <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>
