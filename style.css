@@ -674,14 +674,23 @@ tr:first-child td { font-weight: 700; }
 .llave-rondas-nav { display: none; }
 @media (max-width: 699px) {
   .llave-rondas-nav { display: flex; margin-bottom: 10px; }
+  /* en mobile cada columna ocupa casi toda la pantalla y el scroll "engancha"
+     columna por columna (scroll-snap nativo, sin JS) -- así cada zona/ronda
+     se ve como una pantalla propia en vez de un scroll continuo confuso */
+  .llave-scroll { scroll-snap-type: x mandatory; }
+  .llave-columna { min-width: calc(100vw - 32px); scroll-snap-align: start; }
 }
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
 .llave { display: flex; gap: 32px; }
 .llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 204px; }
 .llave-columna h3 {
-  text-align: center; font-size: 12px;
+  text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--muted); margin-bottom: 2px;
 }
+/* fase eliminatoria (cuartos/semis/final) diferenciada de las zonas con el
+   mismo violeta que ya se usaba para "ganador" -- de un vistazo se nota en
+   qué fase estás parado, sin agregar íconos ni elementos nuevos */
+.llave-columna:not(.llave-zona) h3 { color: var(--accent-3); }
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
