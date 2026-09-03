@@ -633,8 +633,8 @@ tr:first-child td { font-weight: 700; }
 .orden-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 4px; }
 .orden-cancha { font-family: "Poppins"; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #fff; line-height: 1.1; }
 .orden-sep {
-  text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
-  color: rgba(255,255,255,.65); margin: 16px 0 10px; position: relative;
+  text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: #fff; margin: 16px 0 10px; position: relative;
 }
 .orden-sep::before, .orden-sep::after { content: ""; position: absolute; top: 50%; width: 26%; height: 1px; background: rgba(255,255,255,.25); }
 .orden-sep::before { left: 0; } .orden-sep::after { right: 0; }
@@ -1173,6 +1173,11 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
   .destacados-band { padding: 24px 26px 28px; }
+  /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
+     foto de fondo (background-size:cover) termina agrandada/recortada de más
+     -- se limita el ancho de la grilla para que la proporción se mantenga
+     parecida a la del celular. */
+  .destacados-grid { max-width: 620px; }
   .destacado-card { min-height: 240px; padding: 20px; }
   .destacado-stat strong { font-size: 34px; }
   .destacado-info strong { font-size: 21px; }
