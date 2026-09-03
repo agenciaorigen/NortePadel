@@ -3846,10 +3846,14 @@ function renderPartidosLlave(containerId, partidos) {
         ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
+  // Zona: sus columnas (una por zona) van apiladas en VERTICAL, una debajo de
+  // la otra -- no una al lado de la otra como las fases (pedido explícito: los
+  // partidos de una categoría van en vertical, lo horizontal es el avance de
+  // fase Zona -> Cuartos -> Semis -> Final).
   const faseHtml = (fase) => `
       <div class="llave-fase ${fase.zona ? "llave-fase-zona" : ""}">
         <h3 class="llave-fase-titulo">${fase.titulo}</h3>
-        <div class="llave-fase-columnas">${fase.columnas.map(columnaHtml).join("")}</div>
+        <div class="llave-fase-columnas" ${fase.zona ? 'style="flex-direction:column"' : ""}>${fase.columnas.map(columnaHtml).join("")}</div>
       </div>`;
 
   cont.innerHTML = `<div class="llave-scroll"><div class="llave">${fases.map(faseHtml).join("")}</div></div>`;
