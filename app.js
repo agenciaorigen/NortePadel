@@ -911,11 +911,11 @@ async function cargarUltimosProximos() {
 
 function itemTickerResultadoHtml(p) {
   const sets = (p.sets || []).map((s) => `${s.p1}-${s.p2}`).join(", ");
-  return `<span class="ticker-item"><span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} <span class="ticker-set">${sets}</span></span>`;
+  return `<span class="ticker-item">${iconoTrofeo()}<span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} <span class="ticker-set">${sets}</span></span>`;
 }
 function itemTickerProximoHtml(p) {
   const horario = new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-  return `<span class="ticker-item"><span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} · ${horario}${p.complejo_nombre ? " · " + p.complejo_nombre : ""}</span>`;
+  return `<span class="ticker-item">${iconoReloj()}<span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} · ${horario}${p.complejo_nombre ? " · " + p.complejo_nombre : ""}</span>`;
 }
 // arma el track con el contenido duplicado (igual que .ascendidos-track): eso es
 // lo que permite el loop infinito sin salto, ver @keyframes marquee-scroll

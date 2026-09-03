@@ -122,12 +122,12 @@
          (ver cargarUltimosProximos en app.js) si no hay torneo destacado o no
          hay partidos para mostrar en ese lado. -->
     <button type="button" class="ticker-card" id="tickerResultados" style="display:none" aria-label="Ver resultados del torneo">
-      <p class="ticker-label">Últimos resultados</p>
-      <div class="marquee-track" id="tickerResultadosTrack"></div>
+      <p class="ticker-label"><span class="live-dot" style="background:var(--accent);animation:none;box-shadow:none"></span>Últimos resultados</p>
+      <div class="ticker-scroll"><div class="marquee-track" id="tickerResultadosTrack"></div></div>
     </button>
     <button type="button" class="ticker-card" id="tickerProximos" style="display:none" aria-label="Ver calendario del torneo">
-      <p class="ticker-label">Próximos partidos</p>
-      <div class="marquee-track" id="tickerProximosTrack"></div>
+      <p class="ticker-label"><span class="live-dot"></span>Próximos partidos</p>
+      <div class="ticker-scroll"><div class="marquee-track" id="tickerProximosTrack"></div></div>
     </button>
 
     <!-- En mobile no hay columna lateral (ver #sidebarAds) — los auspiciantes
