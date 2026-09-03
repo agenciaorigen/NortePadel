@@ -884,6 +884,51 @@ async function cargarAscendidos() {
   });
 }
 
+// Tiras de "Últimos resultados" / "Próximos partidos" en Inicio, del torneo
+// destacado (en curso o el próximo) — no dependen del orden de otras llamadas:
+// calculan su propio torneo destacado en vez de leer el global (que lo arma
+// manejarCambioSesion() por separado, sin garantía de haber corrido antes).
+async function cargarUltimosProximos() {
+  await calcularTorneoDestacado();
+  const idTorneo = torneoDestacadoId;
+  if (!idTorneo) {
+    document.getElementById("tickerResultados").style.display = "none";
+    document.getElementById("tickerProximos").style.display = "none";
+    return;
+  }
+  const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: idTorneo });
+  const partidos = data || [];
+  const ahora = new Date();
+
+  const jugados = partidos.filter((p) => p.estado === "jugado" && p.horario)
+    .sort((a, b) => new Date(b.horario) - new Date(a.horario)).slice(0, 3);
+  const proximos = partidos.filter((p) => p.horario && p.estado !== "jugado" && new Date(p.horario) >= ahora)
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 3);
+
+  renderTicker("tickerResultados", "tickerResultadosTrack", jugados, itemTickerResultadoHtml, () => abrirTorneo(idTorneo, "resultados"));
+  renderTicker("tickerProximos", "tickerProximosTrack", proximos, itemTickerProximoHtml, () => abrirTorneo(idTorneo, "calendario"));
+}
+
+function itemTickerResultadoHtml(p) {
+  const sets = (p.sets || []).map((s) => `${s.p1}-${s.p2}`).join(", ");
+  return `<span class="ticker-item"><span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} <span class="ticker-set">${sets}</span></span>`;
+}
+function itemTickerProximoHtml(p) {
+  const horario = new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+  return `<span class="ticker-item"><span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} · ${horario}${p.complejo_nombre ? " · " + p.complejo_nombre : ""}</span>`;
+}
+// arma el track con el contenido duplicado (igual que .ascendidos-track): eso es
+// lo que permite el loop infinito sin salto, ver @keyframes marquee-scroll
+function renderTicker(cardId, trackId, items, itemHtmlFn, onClick) {
+  const card = document.getElementById(cardId);
+  if (items.length === 0) { card.style.display = "none"; return; }
+  card.style.display = "block";
+  const dot = '<span class="marquee-dot">•</span>';
+  const set = items.map(itemHtmlFn).join(dot);
+  document.getElementById(trackId).innerHTML = set + dot + set + dot;
+  card.onclick = onClick;
+}
+
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
   if (!miJugador) { card.style.display = "none"; return; }
@@ -4518,6 +4563,7 @@ async function init() {
   await Promise.all([
     cargarComplejos(),
     cargarInicio(),
+    cargarUltimosProximos(),
     cargarJugadorDelMes(),
     cargarCampeones(),
     cargarAscendidos(),

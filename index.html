@@ -115,6 +115,21 @@
       </div>
     </button>
 
+    <!-- Últimos resultados / próximos partidos del torneo destacado: dos tiras
+         angostas que giran solas (mismo mecanismo que marqueeBanda de arriba),
+         una a continuación de la otra -- compacto, no exige tocar nada, y cada
+         ítem lleva al Calendario/Resultados de ese torneo. Se ocultan solas
+         (ver cargarUltimosProximos en app.js) si no hay torneo destacado o no
+         hay partidos para mostrar en ese lado. -->
+    <button type="button" class="ticker-card" id="tickerResultados" style="display:none" aria-label="Ver resultados del torneo">
+      <p class="ticker-label">Últimos resultados</p>
+      <div class="marquee-track" id="tickerResultadosTrack"></div>
+    </button>
+    <button type="button" class="ticker-card" id="tickerProximos" style="display:none" aria-label="Ver calendario del torneo">
+      <p class="ticker-label">Próximos partidos</p>
+      <div class="marquee-track" id="tickerProximosTrack"></div>
+    </button>
+
     <!-- En mobile no hay columna lateral (ver #sidebarAds) — los auspiciantes
          pasan a una barra que se desliza sola (mismo mecanismo que la banda
          de arriba, "marquee-scroll"), bien grande, en vez del renglón chico
@@ -859,9 +874,13 @@
 
 <div id="toast" class="toast" style="display:none"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script src="matching.js"></script>
-<script src="app.js"></script>
+<!-- version fija (no "@2" flotante) para que el navegador la cachee directo, sin
+     la vuelta extra de jsdelivr resolviendo cuál es la última 2.x en cada carga.
+     defer en las 4: así se descargan en paralelo (antes se esperaba a que bajara
+     el SDK de Supabase, entero, antes de siquiera empezar a pedir app.js). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.114.0/dist/umd/supabase.min.js" defer></script>
+<script src="config.js" defer></script>
+<script src="matching.js" defer></script>
+<script src="app.js" defer></script>
 </body>
 </html>

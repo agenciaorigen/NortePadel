@@ -396,6 +396,20 @@ tr:first-child td { font-weight: 700; }
   .marquee-track, .ascendidos-track, .sponsor-marquee-track { animation: none; }
 }
 
+/* ---------- Últimos resultados / Próximos partidos (Inicio) ---------- */
+.ticker-card {
+  display: block; width: 100%; text-align: left; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 0 9px; margin-bottom: 10px; cursor: pointer;
+}
+.ticker-label {
+  margin: 0 0 6px; padding: 0 14px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+}
+.ticker-card .ticker-item { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.ticker-card .ticker-cat { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 10px; }
+.ticker-card .ticker-set { color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; }
+
 /* ---------- Ascendieron este mes (tira rotativa, Inicio) ---------- */
 .ascendidos-wrap { overflow: hidden; }
 .ascendidos-track { display: flex; width: max-content; animation: marquee-scroll 28s linear infinite; }
