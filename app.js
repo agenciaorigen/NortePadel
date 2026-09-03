@@ -3514,6 +3514,12 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     return;
   }
 
+  // Antes, para cargar un resultado desde la Planilla había que dejarla e ir
+  // a la vista Lista aparte (arrastrar y soltar era lo único que se podía
+  // hacer acá) -- mismo ícono ✏️ y mismo formulario que ya existe en Lista y
+  // en la tarjeta pública (cargaResultadoPanelHtml/wireCargaResultado), para
+  // no duplicar el guardado ni el confirmar en un tercer lugar.
+  const puedeCargarResultado = (p) => editable && p.estado !== "jugado";
   const tarjetaHtml = (p, extraClase = "") => `
     <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" ${editable ? `draggable="true" data-partido="${p.id}"` : `data-abrir-partido="${p.id}"`}>
       <div class="calendario-equipo">${p.pareja1_nombre}</div>
@@ -3521,6 +3527,8 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       <div class="calendario-equipo">${p.pareja2_nombre}</div>
       ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
       ${p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
+      ${puedeCargarResultado(p) ? `<button type="button" class="btnTogglePartidoAdmin secondary small" draggable="false" data-p="${p.id}" style="margin-top:6px;width:100%" title="Cargar resultado" aria-label="Cargar resultado">✏️ Cargar resultado</button>` : ""}
+      ${puedeCargarResultado(p) ? cargaResultadoPanelHtml(p, true) : ""}
     </div>`;
   const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${celda.bloqueo.motivo || "Cancha bloqueada"}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${celda.bloqueo.motivo}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
@@ -3571,7 +3579,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   }
   cont.innerHTML = html;
 
-  if (editable) wirePlanillaDragAndDrop(containerId);
+  if (editable) { wirePlanillaDragAndDrop(containerId); wireCargaResultado(cont); }
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
@@ -3639,7 +3647,7 @@ function wirePlanillaDragAndDrop(containerId) {
 // sea siempre el mismo formulario y el mismo guardado, en un solo lugar. ----
 function cargaResultadoPanelHtml(p, oculto) {
   return `
-    <div class="match-admin-panel" data-carga-resultado="${p.id}" ${oculto ? 'style="display:none"' : ""}>
+    <div class="match-admin-panel" data-carga-resultado="${p.id}" draggable="false" ${oculto ? 'style="display:none"' : ""}>
       <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
       <div class="sets-entry" data-p="${p.id}">
         <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="display:none">Set 3</span></div>
@@ -3779,84 +3787,69 @@ function llavePartidoCardHtml(p) {
 function renderPartidosLlave(containerId, partidos) {
   const cont = document.getElementById(containerId);
 
-  // Con una sola categoría a la vista (se eligió una puntual en el <select>),
-  // "Zona 1"/"Zona 2" alcanza para distinguir. Con varias mezcladas ("Todas"),
-  // el mismo "Zona 1" se repetía en cada categoría sin poder saber cuál era
-  // cuál -- ahí las columnas pasan a ser por CATEGORÍA en cambio (agrupa
-  // todas sus zonas juntas); el número de zona se sigue viendo en cada
-  // partido, como el tag chico "Z1"/"Z2"/"Z3" que ya arma llavePartidoCardHtml.
-  const categoriasEnVista = [...new Set(partidos.map((p) => p.categoria))].filter(Boolean);
-  const variasCategorias = categoriasEnVista.length > 1;
-
+  // Esta vista siempre recibe los partidos de UNA sola categoría — Resultados
+  // obliga a elegir género y categoría antes de mostrar nada (ver
+  // renderResultadosPublico), así el nombre de la categoría no hace falta
+  // repetirlo acá (ya se ve en el selector de arriba). Se agrupa en FASES,
+  // una al lado de la otra en la misma fila (Zona | Octavos | Cuartos |
+  // Semis | Final): el nombre de la fase va una sola vez arriba del grupo,
+  // y cada partido de esa fase es su propia columna angosta al lado de las
+  // demás (antes las de eliminación quedaban todas amontonadas en una sola
+  // columna cuando había más de un partido en la misma ronda).
   const grupales = partidos.filter((p) => p.grupo != null);
   // cuadro de zonas del club (fase_grupos_formato "cuadro_zonas"): cada zona
   // es un solo partido con slot_cuadro "Z1"/"Z2"/... y ronda "Zona" (no usa
   // `grupo`, que es del formato "Grupos" de todos-contra-todos)
   const zonasCuadro = partidos.filter((p) => p.ronda === "Zona" && p.slot_cuadro);
+  const gruposOrdenados = [...new Set(grupales.map((p) => p.grupo))].sort((a, b) => a - b);
+  const numsZonaCuadro = [...new Set(zonasCuadro.map((p) => Number(p.slot_cuadro.slice(1))))].sort((a, b) => a - b);
+  const columnasZona = [
+    ...gruposOrdenados.map((g) => ({ titulo: `Zona ${g}`, partidos: grupales.filter((p) => p.grupo === g) })),
+    ...numsZonaCuadro.map((n) => ({ titulo: `Zona ${n}`, partidos: zonasCuadro.filter((p) => Number(p.slot_cuadro.slice(1)) === n) }))
+  ];
 
-  let columnasZonas;
-  if (variasCategorias) {
-    const deZona = [...grupales, ...zonasCuadro];
-    columnasZonas = categoriasEnVista
-      .filter((cat) => deZona.some((p) => p.categoria === cat))
-      .map((cat) => ({
-        titulo: cat, zona: true,
-        partidos: deZona.filter((p) => p.categoria === cat)
-          .sort((a, b) => (a.slot_cuadro || "").localeCompare(b.slot_cuadro || "") || (a.grupo || 0) - (b.grupo || 0))
-      }));
-  } else {
-    // Con una sola categoría a la vista igual puede haber que distinguir
-    // masculino/femenino (categorías tipo "Cuarta A Damas"/"Cuarta A
-    // Caballeros", mismo criterio que ya usa generoDeCategoria/agruparPorGenero
-    // en el resto de la app) -- se antepone el nombre de la categoría elegida
-    // en vez de dejar "Zona 1"/"Zona 2" pelado.
-    const prefijo = categoriasEnVista[0] ? `${categoriasEnVista[0]} · ` : "";
-    const gruposOrdenados = [...new Set(grupales.map((p) => p.grupo))].sort((a, b) => a - b);
-    const numsZonaCuadro = [...new Set(zonasCuadro.map((p) => Number(p.slot_cuadro.slice(1))))].sort((a, b) => a - b);
-    columnasZonas = [
-      ...gruposOrdenados.map((g) => ({ titulo: `${prefijo}Zona ${g}`, zona: true, partidos: grupales.filter((p) => p.grupo === g) })),
-      ...numsZonaCuadro.map((n) => ({ titulo: `${prefijo}Zona ${n}`, zona: true, partidos: zonasCuadro.filter((p) => Number(p.slot_cuadro.slice(1)) === n) }))
-    ];
-  }
+  const fases = [];
+  if (columnasZona.length) fases.push({ titulo: "Zona", zona: true, columnas: columnasZona });
 
-  // las columnas de eliminación se arman con los nombres de ronda que realmente existen,
+  // las fases de eliminación se arman con los nombres de ronda que realmente existen,
   // en el orden en que se generaron (no una lista fija) — así sirve tanto para el cuadro
   // clásico de 16/8/4/2 como para un torneo chico que arranca directo en semifinal, o con
-  // nombres genéricos ("Ronda de 6") si el cuadro es irregular. Con varias categorías
-  // mezcladas, cada ronda se separa una columna por categoría (mismo criterio de arriba).
+  // nombres genéricos ("Ronda de 6") si el cuadro es irregular. Cada partido de la ronda
+  // es su propia columna, con una sigla + número corto (Octavos -> O1, O2...) en vez de
+  // repetir el nombre completo de la ronda en cada una.
   const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
   const nombresOrdenados = [...new Set(
     [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
   )];
-  const columnasRonda = [];
   nombresOrdenados.forEach((r) => {
-    const deEstaRonda = eliminacion.filter((p) => p.ronda === r);
-    if (variasCategorias) {
-      categoriasEnVista.filter((cat) => deEstaRonda.some((p) => p.categoria === cat)).forEach((cat) => {
-        columnasRonda.push({ titulo: `${r} · ${cat}`, zona: false, partidos: deEstaRonda.filter((p) => p.categoria === cat) });
-      });
-    } else {
-      columnasRonda.push({ titulo: r, zona: false, partidos: deEstaRonda });
-    }
+    const sigla = (r.trim()[0] || "?").toUpperCase();
+    fases.push({
+      titulo: r, zona: false,
+      columnas: eliminacion.filter((p) => p.ronda === r).map((p, i) => ({ titulo: `${sigla}${i + 1}`, partidos: [p] }))
+    });
   });
 
-  const columnasTodas = [...columnasZonas, ...columnasRonda];
-  if (columnasTodas.length === 0) {
+  if (fases.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
     return;
   }
 
-  // Sin pestañas "Zonas/Cuartos/Semis/Final": todas las columnas quedan una
-  // al lado de la otra en el mismo scroll horizontal (con snap en mobile, ver
+  // Sin pestañas "Zonas/Cuartos/Semis/Final": todas las fases quedan una al
+  // lado de la otra en el mismo scroll horizontal (con snap en mobile, ver
   // .llave-scroll/.llave-columna) -- se recorren deslizando a la derecha en
   // vez de tener que elegir una pestaña arriba.
   const columnaHtml = (col) => `
-      <div class="llave-columna ${col.zona ? "llave-zona" : ""}">
-        <h3>${col.titulo}</h3>
+      <div class="llave-columna">
+        <h4>${col.titulo}</h4>
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
+  const faseHtml = (fase) => `
+      <div class="llave-fase ${fase.zona ? "llave-fase-zona" : ""}">
+        <h3 class="llave-fase-titulo">${fase.titulo}</h3>
+        <div class="llave-fase-columnas">${fase.columnas.map(columnaHtml).join("")}</div>
+      </div>`;
 
-  cont.innerHTML = `<div class="llave-scroll"><div class="llave">${columnasTodas.map(columnaHtml).join("")}</div></div>`;
+  cont.innerHTML = `<div class="llave-scroll"><div class="llave">${fases.map(faseHtml).join("")}</div></div>`;
 
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
@@ -3911,12 +3904,35 @@ document.getElementById("btnCerrarAuspiciantesTorneo").addEventListener("click",
   document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+// "Todas" mezcladas era justo lo que quedaba confuso (zonas de categorías
+// distintas mezcladas en la misma fila, sin poder distinguir Damas de
+// Caballeros) -- ahora es obligatorio elegir género (pestañas, mismo patrón
+// que ya usa el Ranking) y después categoría, nunca las dos juntas.
+let resFiltroGeneroActual = null;
 function renderResultadosPublico() {
+  const contGenero = document.getElementById("resFiltroGeneroPills");
   const sel = document.getElementById("resFiltroCategoria");
-  if (!categoriasTorneoActual.includes(sel.value)) sel.value = "";
-  sel.innerHTML = `<option value="">Todas</option>` +
-    categoriasTorneoActual.map((c) => `<option value="${c}" ${c === sel.value ? "selected" : ""}>${c}</option>`).join("");
-  const visibles = sel.value ? ultimosPartidos.filter((p) => p.categoria === sel.value) : ultimosPartidos;
+  const grupos = agruparPorGenero(categoriasTorneoActual);
+  const generosConDatos = ORDEN_GENEROS.filter((g) => grupos[g].length > 0);
+  if (!resFiltroGeneroActual || !generosConDatos.includes(resFiltroGeneroActual)) {
+    resFiltroGeneroActual = generosConDatos[0];
+  }
+  contGenero.innerHTML = generosConDatos.length > 1 ? generosConDatos.map((g) =>
+    `<button class="pill ${g === resFiltroGeneroActual ? "active" : ""}" data-genero="${g}">${g}</button>`
+  ).join("") : "";
+  contGenero.querySelectorAll(".pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      resFiltroGeneroActual = btn.dataset.genero;
+      sel.value = ""; // que elija la primera categoría de ese género
+      renderResultadosPublico();
+    });
+  });
+
+  const categoriasDelGenero = grupos[resFiltroGeneroActual] || [];
+  if (!categoriasDelGenero.includes(sel.value)) sel.value = categoriasDelGenero[0] || "";
+  sel.innerHTML = categoriasDelGenero.map((c) => `<option value="${c}" ${c === sel.value ? "selected" : ""}>${c}</option>`).join("");
+
+  const visibles = sel.value ? ultimosPartidos.filter((p) => p.categoria === sel.value) : [];
   renderPartidosLlave("pubResultadosLlave", visibles);
 }
 document.getElementById("resFiltroCategoria").addEventListener("change", renderResultadosPublico);

@@ -722,16 +722,32 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   .llave-columna { min-width: calc(100vw - 32px); scroll-snap-align: start; }
 }
 .llave-scroll { overflow-x: auto; padding: 4px 4px 10px; }
-.llave { display: flex; gap: 32px; }
-.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 204px; }
-.llave-columna h3 {
-  text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--muted); margin-bottom: 2px;
+/* dos niveles: .llave-fase agrupa TODOS los partidos de una misma ronda
+   (Zona, Octavos, Cuartos...) bajo un solo título arriba -- adentro,
+   .llave-fase-columnas pone cada partido de esa ronda en su propia columna
+   angosta al lado de las demás, en vez de amontonarlos en una sola. Las
+   fases van una al lado de la otra en la misma fila/scroll (ver
+   renderPartidosLlave). */
+.llave { display: flex; align-items: flex-start; gap: 40px; }
+.llave-fase { display: flex; flex-direction: column; gap: 14px; }
+.llave-fase-titulo {
+  /* NO center: con muchas columnas (9 zonas...) el título centrado en todo el
+     ancho de la fase quedaba fuera de la pantalla visible al arrancar el
+     scroll -- va pegado a la izquierda, arriba de la primera columna del
+     grupo, así siempre se ve de entrada. */
+  text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin: 0; white-space: nowrap;
 }
 /* fase eliminatoria (cuartos/semis/final) diferenciada de las zonas con el
    mismo violeta que ya se usaba para "ganador" -- de un vistazo se nota en
    qué fase estás parado, sin agregar íconos ni elementos nuevos */
-.llave-columna:not(.llave-zona) h3 { color: var(--accent-3); }
+.llave-fase:not(.llave-fase-zona) .llave-fase-titulo { color: var(--accent-3); }
+.llave-fase-columnas { display: flex; gap: 20px; }
+.llave-columna { display: flex; flex-direction: column; justify-content: space-around; gap: 14px; min-width: 204px; }
+.llave-columna h4 {
+  text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--muted); margin: 0 0 2px;
+}
 .llave-partido {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
   box-shadow: var(--shadow-sm);
@@ -1279,12 +1295,12 @@ body.is-admin #btnAdminPanel { display: flex; }
 
   .pj-stats strong { font-size: clamp(26px, 2.4vw, 40px); }
 
-  /* en escritorio ya hay ancho de sobra: en vez de forzar todas las zonas en
-     una sola fila con scroll lateral (y una columna cortada a la mitad, que
-     es justo lo que se veía mal), se acomodan solas en filas -- el scroll
-     lateral con "snap" queda solo para mobile, donde sí hace falta. */
-  .llave-scroll { overflow-x: visible; }
-  .llave { flex-wrap: wrap; }
+  /* dejar que las zonas "acomoden solas en filas" con flex-wrap era justo lo
+     que quedaba confuso con muchas zonas (9, 10...): se mezclaban con las
+     columnas de eliminación en un grid sin orden claro. Ahora, igual que en
+     mobile, todas las columnas van en una sola fila larga con scroll lateral
+     -- más para deslizar, pero se entiende de un vistazo: Zona -> Octavos ->
+     Cuartos -> Semi, siempre en ese orden de izquierda a derecha. */
 
   /* algunas listas aprovechan el ancho extra en vez de quedar en una sola columna */
   #listaJugadores, #listaComplejos, #listaTorneos, #admPartidosLista {
