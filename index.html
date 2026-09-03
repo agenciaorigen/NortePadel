@@ -83,10 +83,10 @@
   <section id="view-inicio" class="view active">
 
     <!-- Carrusel del hero: en mobile es una sola slide "real" (el hero de siempre);
-         en escritorio, moverFlyerDestacadoSegunAncho() (app.js) muda el flyer del
-         torneo destacado (#flyerDestacado, ya poblado por cargarInicio) a la 2da
-         slide, en vez de duplicar ese markup/dato — mismo mecanismo que ya usa
-         moverBannerEnergiaSegunAncho() con #energiaBanda. -->
+         en escritorio se suman 2 slides fijas más (Torneos, Ranking), ocultas/mostradas
+         por moverFlyerDestacadoSegunAncho() (app.js) según el ancho — mismo mecanismo
+         que ya usa moverBannerEnergiaSegunAncho() con #energiaBanda. El afiche del
+         torneo destacado sigue viéndose, como siempre, más abajo en "Próximos torneos". -->
     <div class="hero-carousel" id="heroCarousel">
       <div class="hero-carousel-track" id="heroCarouselTrack">
         <div class="hero-carousel-slide">
@@ -101,7 +101,13 @@
             <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
           </div>
         </div>
-        <div class="hero-carousel-slide" id="heroSlideTorneo"></div>
+        <div class="hero-carousel-slide" id="heroSlideTorneo">
+          <div class="hero-club hero-club-torneo">
+            <h2 class="hero-club-titulo">Torneos<br /><span>todo el año.</span></h2>
+            <p class="hero-club-sub">Categorías para todos los niveles, fecha a fecha.</p>
+            <button class="hero-club-cta" id="btnHeroTorneos2" type="button">Ver torneos <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
         <div class="hero-carousel-slide" id="heroSlideRanking">
           <div class="hero-club hero-club-ranking">
             <h2 class="hero-club-titulo">Ranking<br /><span>en vivo.</span></h2>

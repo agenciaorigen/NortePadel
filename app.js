@@ -171,6 +171,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
+document.getElementById("btnHeroTorneos2").addEventListener("click", () => cambiarVista("torneos"));
 document.getElementById("btnHeroRanking").addEventListener("click", () => cambiarVista("ranking"));
 document.getElementById("marqueeBanda").addEventListener("click", () => {
   if (torneoDestacadoId) abrirTorneo(torneoDestacadoId);
@@ -3814,18 +3815,20 @@ function renderPartidosLlave(containerId, partidos) {
   // las fases de eliminación se arman con los nombres de ronda que realmente existen,
   // en el orden en que se generaron (no una lista fija) — así sirve tanto para el cuadro
   // clásico de 16/8/4/2 como para un torneo chico que arranca directo en semifinal, o con
-  // nombres genéricos ("Ronda de 6") si el cuadro es irregular. Cada partido de la ronda
-  // es su propia columna, con una sigla + número corto (Octavos -> O1, O2...) en vez de
-  // repetir el nombre completo de la ronda en cada una.
+  // nombres genéricos ("Ronda de 6") si el cuadro es irregular. Cada fase es UNA sola
+  // columna con todos sus partidos apilados en vertical (igual que una Zona con varios
+  // partidos) — lo horizontal es solo el avance de fase (Zona -> Cuartos -> Semis -> Final).
   const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
   const nombresOrdenados = [...new Set(
     [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
   )];
   nombresOrdenados.forEach((r) => {
-    const sigla = (r.trim()[0] || "?").toUpperCase();
+    // sin título de columna: ya lo dice el título de la fase (h3) arriba, una
+    // sola vez -- repetirlo en el h4 de la columna quedaba redundante ahora
+    // que es una sola columna por fase.
     fases.push({
       titulo: r, zona: false,
-      columnas: eliminacion.filter((p) => p.ronda === r).map((p, i) => ({ titulo: `${sigla}${i + 1}`, partidos: [p] }))
+      columnas: [{ titulo: "", partidos: eliminacion.filter((p) => p.ronda === r) }]
     });
   });
 
@@ -3840,7 +3843,7 @@ function renderPartidosLlave(containerId, partidos) {
   // vez de tener que elegir una pestaña arriba.
   const columnaHtml = (col) => `
       <div class="llave-columna">
-        <h4>${col.titulo}</h4>
+        ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
   const faseHtml = (fase) => `
@@ -4207,30 +4210,26 @@ async function cargarSponsors() {
 }
 
 // ============================================================
-// CARRUSEL DE HERO (Inicio, escritorio): 2da slide = flyer del torneo
-// destacado, reubicado (no duplicado) — mismo mecanismo que el banner de
-// energía de arriba. Los puntos se arman con JS chico + scroll-snap nativo,
-// sin ninguna librería de carrusel.
+// CARRUSEL DE HERO (Inicio, escritorio): slides 2 y 3 son fijas (Torneos,
+// Ranking) con el mismo patrón .hero-club de siempre, cada una con su propia
+// foto de fondo — antes la slide de Torneos mostraba el afiche del torneo
+// destacado (#flyerDestacado) recortado a la fuerza en un rectángulo ancho,
+// lo que lo deformaba/tapaba mal; ahora esa slide es genérica (habla de
+// "torneos" en general, no de uno puntual) y el afiche real del próximo
+// torneo se ve como siempre más abajo, en "Próximos torneos", en su
+// proporción original. Los puntos se arman con JS chico + scroll-snap
+// nativo, sin ninguna librería de carrusel.
 // ============================================================
-const flyerDestacadoHomeMobile = document.getElementById("flyerDestacado")?.parentElement || null;
-const flyerDestacadoHomeMobileSiguiente = document.getElementById("flyerMini");
 function moverFlyerDestacadoSegunAncho() {
-  const flyer = document.getElementById("flyerDestacado");
-  const slotDesktop = document.getElementById("heroSlideTorneo");
+  const slotTorneo = document.getElementById("heroSlideTorneo");
   const slotRanking = document.getElementById("heroSlideRanking");
   const dotsWrap = document.getElementById("heroCarouselDots");
-  if (!flyer || !slotDesktop || !flyerDestacadoHomeMobile || !dotsWrap) return;
-  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
-  if (esDesktop) {
-    if (flyer.parentElement !== slotDesktop) slotDesktop.appendChild(flyer);
-  } else if (flyer.parentElement !== flyerDestacadoHomeMobile) {
-    flyerDestacadoHomeMobile.insertBefore(flyer, flyerDestacadoHomeMobileSiguiente);
-  }
+  if (!slotTorneo || !dotsWrap) return;
   // en mobile el carrusel vuelve a ser una sola slide (el hero de siempre) —
-  // las otras 2 (torneo destacado, ranking) solo existen como slides en
-  // escritorio, donde reemplazan a la columna lateral que ya no está.
-  const hayFlyer = flyer.children.length > 0;
-  slotDesktop.hidden = !(esDesktop && hayFlyer);
+  // las otras 2 (torneos, ranking) solo existen como slides en escritorio,
+  // donde reemplazan a la columna lateral que ya no está.
+  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
+  slotTorneo.hidden = !esDesktop;
   if (slotRanking) slotRanking.hidden = !esDesktop;
   dotsWrap.classList.toggle("visible", esDesktop);
   actualizarPuntosCarrusel();

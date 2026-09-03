@@ -1243,19 +1243,21 @@ body.is-admin #btnAdminPanel { display: flex; }
   .hero-club-titulo { font-size: 46px; max-width: 60%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
-  /* slide 2 del carrusel: el flyer del torneo destacado, mudado acá por JS
-     (ver moverFlyerDestacadoSegunAncho) — pasa de afiche vertical "contain" a
-     imagen de fondo a pantalla completa de la slide, como el hero. */
-  #heroSlideTorneo .flyer-destacado {
-    aspect-ratio: unset; height: 100%; min-height: 300px;
-    background-size: cover; border-radius: var(--radius-lg); margin-bottom: 0; box-shadow: var(--shadow);
+  /* slides 2 y 3 del carrusel: misma .hero-club de siempre, cada una con su
+     propia foto de fondo (antes la slide de Torneos mostraba el afiche del
+     torneo destacado forzado a este recuadro ancho, lo que lo recortaba mal
+     -- ahora es una foto genérica, como el hero de arriba). */
+  .hero-club-torneo {
+    background:
+      linear-gradient(200deg, rgba(var(--accent-rgb),.35), transparent 55%),
+      linear-gradient(0deg, rgba(var(--bg-rgb),.94), rgba(var(--bg-rgb),.4) 60%),
+      url('hero-torneos.jpg') center/cover no-repeat, var(--bg);
   }
-  /* 3ra slide del carrusel: misma .hero-club de siempre, otra foto de fondo */
   .hero-club-ranking {
     background:
       linear-gradient(200deg, rgba(var(--accent-rgb),.35), transparent 55%),
       linear-gradient(0deg, rgba(var(--bg-rgb),.94), rgba(var(--bg-rgb),.4) 60%),
-      url('pelotas.jpg') center/cover no-repeat, var(--bg);
+      url('hero-ranking.jpg') center/cover no-repeat, var(--bg);
   }
 
   /* "Próximo partido destacado": mismo .match-pair de siempre (Torneo/Llave),
@@ -1288,7 +1290,12 @@ body.is-admin #btnAdminPanel { display: flex; }
      (grid-template-columns ya es 1fr siempre, ver regla base). */
   .destacados-grid.destacados-grid-banner { max-width: none; }
   .destacados-grid-banner .destacado-card {
-    min-height: 220px; flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 26px;
+    /* banner ancho y bajo: con background-position:center (regla base) la
+       foto quedaba recortada justo por la cabeza -- acá se sube el foco a
+       la parte superior de la imagen (donde suele estar la cara) y se le
+       da más alto a la tarjeta para que el recorte sea menos agresivo */
+    min-height: 280px; background-position: center 15%;
+    flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 26px;
   }
   .destacados-grid-banner .destacado-stat strong { font-size: 44px; }
   .destacados-grid-banner .destacado-info strong { font-size: 26px; }
