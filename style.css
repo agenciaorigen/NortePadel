@@ -1,19 +1,19 @@
 :root {
-  /* Paleta "club deportivo premium": fondo casi negro, superficies apenas más
-     claras, cards con un salto de contraste sutil — nada de negro puro
-     azulado ni bordes duros. Un solo acento fuerte (verde lima de la marca),
-     el resto son estados (ok/warn/danger) que nunca compiten con él. */
-  --bg: #0B0D0D;
-  --bg-elev: #151818;
-  --card: #202424;
-  --accent: #b4ff39;       /* verde pelota de pádel — marca */
-  --accent-ink: #0e1400;   /* texto sobre el verde */
-  --accent-2: #ff2d95;     /* uso puntual: EN VIVO */
-  --accent-3: #6a3dff;     /* uso puntual: ganador en la llave */
-  --accent-teal: #10b3a3;  /* uso puntual: fila de partido "order of play" */
-  --text: #F5F5F5;
-  --muted: #9B9F9F;
-  --border: rgba(245,245,245,.09);
+  /* Paleta "Cancha Nocturna": verde profesional sobre fondo casi negro —
+     menos neón, más "tour profesional" — con un acento cálido puntual
+     para EN VIVO y highlights, y el resto como estados (ok/warn/danger)
+     que nunca compiten con el verde. */
+  --bg: #0A0E10;
+  --bg-elev: #12181B;
+  --card: #182024;
+  --accent: #4F8F6E;       /* verde cancha nocturna — marca */
+  --accent-ink: #06120C;   /* texto sobre el verde */
+  --accent-2: #E2A25A;     /* uso puntual: EN VIVO / highlights cálidos */
+  --accent-3: #8A6FE0;     /* uso puntual: ganador en la llave */
+  --accent-teal: #4F8F6E;  /* uso puntual: fila de partido "order of play" (mismo verde de marca) */
+  --text: #EAF1EE;
+  --muted: #8CA39A;
+  --border: rgba(230,238,235,.08);
   --state-ok: #6fe08a;
   --state-warn: #ffc24d;
   --danger: #ff5c6c;
@@ -34,7 +34,7 @@ body {
   position: relative;
   background: var(--bg);
   color: var(--text);
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   /* + el alto real de la barra inferior en celulares con "isla"/línea de inicio
      (ver nav.tabbar) — si no, el contenido queda tapado detrás de esa franja */
   padding-bottom: calc(78px + env(safe-area-inset-bottom));
@@ -56,7 +56,7 @@ body::after {
   z-index: -1;
 }
 
-h1, h2, h3, button { font-family: "Poppins", "Inter", -apple-system, sans-serif; }
+h1, h2, h3, button { font-family: "Big Shoulders Display", "Manrope", -apple-system, sans-serif; font-weight: 700; }
 
 header.topbar {
   display: flex;
@@ -303,7 +303,7 @@ tr:first-child td { font-weight: 700; }
   min-height: 190px;
   margin-bottom: 16px;
   background:
-    linear-gradient(0deg, rgba(11,13,13,.96), rgba(11,13,13,.3) 70%),
+    linear-gradient(0deg, rgba(10,14,16,.96), rgba(10,14,16,.3) 70%),
     url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
   box-shadow: var(--shadow);
   display: flex; align-items: flex-end;
@@ -312,6 +312,17 @@ tr:first-child td { font-weight: 700; }
 .torneo-hero-overlay { position: relative; z-index: 1; }
 .torneo-hero-overlay .badge { margin-bottom: 10px; }
 .torneo-hero-overlay h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+/* ícono chico para "Administrar este torneo" (solo admin) — reemplaza el
+   botón grande de antes para no ocupar lugar en la pantalla que ahora ve
+   todo el mundo apenas entra al torneo. */
+.hero-icon-btn {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--border); background: rgba(10,14,16,.55);
+  color: var(--text); font-size: 16px; line-height: 1;
+  align-items: center; justify-content: center; cursor: pointer;
+}
+body.is-admin .hero-icon-btn.admin-only { display: flex; }
 @media (min-width: 960px) {
   .torneo-hero { min-height: 260px; padding: 38px; }
   .torneo-hero-overlay h2 { font-size: 34px; }
@@ -325,7 +336,7 @@ tr:first-child td { font-weight: 700; }
   padding: 30px 22px 28px;
   margin-bottom: 20px;
   background:
-    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.4) 60%),
+    linear-gradient(0deg, rgba(10,14,16,.94), rgba(10,14,16,.4) 60%),
     url('hero-cancha.jpg') center/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
@@ -433,7 +444,7 @@ tr:first-child td { font-weight: 700; }
 .energia-banda::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(11,13,13,.5), rgba(11,13,13,.9));
+  background: linear-gradient(180deg, rgba(10,14,16,.5), rgba(10,14,16,.9));
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
@@ -451,7 +462,7 @@ tr:first-child td { font-weight: 700; }
   margin-bottom: 20px;
   box-shadow: var(--shadow);
   background:
-    linear-gradient(0deg, rgba(11,13,13,.8), rgba(11,13,13,.5)),
+    linear-gradient(0deg, rgba(10,14,16,.8), rgba(10,14,16,.5)),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
 .destacados-overline {
@@ -626,68 +637,20 @@ tr:first-child td { font-weight: 700; }
 .calendario-agenda-item .calendario-partido,
 .calendario-agenda-item .calendario-bloqueada { min-height: 0; }
 
-/* ---------- Orden de juego (Calendario público/jugador): un póster por
-   cancha, con la misma foto de cancha y el mismo degradé rosa→violeta que ya
-   usa el anillo del logo — pensado para que sirva tal cual como imagen para
-   compartir en redes. La grilla/agenda editable de más arriba
-   (.calendario-grid/.calendario-agenda-*) sigue siendo exclusiva de
-   Administración; esto es lo único que ve el público. ---------- */
-.orden-grid { display: grid; gap: 16px; }
-.orden-poster {
-  position: relative; border-radius: var(--radius-lg); overflow: hidden;
-  padding: 22px 18px 18px;
-  background:
-    linear-gradient(165deg, rgba(255,45,149,.88), rgba(106,61,255,.94)),
-    url('hero-cancha.jpg') center/cover no-repeat, #1a0d2e;
-  box-shadow: var(--shadow);
-}
-.orden-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 4px; }
-.orden-cancha { font-family: "Poppins"; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #fff; line-height: 1.1; }
-.orden-sep {
-  text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
-  color: #fff; margin: 16px 0 10px; position: relative;
-}
-.orden-sep::before, .orden-sep::after { content: ""; position: absolute; top: 50%; width: 26%; height: 1px; background: rgba(255,255,255,.25); }
-.orden-sep::before { left: 0; } .orden-sep::after { right: 0; }
-.orden-match {
-  display: flex; align-items: center; gap: 8px; background: rgba(11,13,13,.32);
-  border: 1px solid rgba(255,255,255,.14); border-radius: var(--radius); padding: 12px 10px; cursor: pointer;
-}
-.orden-match.jugado { background: rgba(11,13,13,.5); }
-.orden-lado { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
-/* foto grande arriba, nombre chico en dos líneas debajo — lo que importa a
-   simple vista es la cara, el nombre es apoyo, no protagonista */
-.orden-jugador { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
-.orden-jugador .avatar { border-color: rgba(255,255,255,.7); }
-.orden-nombre { min-width: 0; line-height: 1.2; text-align: center; max-width: 74px; }
-.orden-nombre strong, .orden-nombre span {
-  display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .03em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.orden-nombre strong { font-weight: 800; color: #fff; }
-.orden-nombre span { font-weight: 600; color: rgba(255,255,255,.7); }
-.orden-lado.ganador .orden-nombre strong { color: #e3d9ff; }
-.orden-lado.perdedor { opacity: .6; }
-.orden-vs {
-  flex-shrink: 0; font-family: "Poppins"; font-weight: 900; font-size: 13px; color: #fff;
-  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
-  width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-}
-@media (min-width: 700px) { .orden-grid { grid-template-columns: 1fr 1fr; } }
-
-/* ---------- Vista llave (Zona + Ronda, estilo cuadro de torneo) ---------- */
-/* En mobile, la llave es un cuadro ancho y alto: hay que deslizar para el
-   costado Y bajar al mismo tiempo, y es fácil perderse pensando que no hay
-   más partidos cuando en realidad hay que scrollear. Estos botones (uno por
-   ronda/zona) saltan directo con scrollIntoView — mueve la página en las dos
-   direcciones que hagan falta de una sola vez. En desktop no hace falta,
-   ahí ya se ve toda la llave de un vistazo. */
-.llave-rondas-nav { display: none; }
+/* ---------- Vista llave (Categoría → Etapa → partidos) ---------- */
+/* Una pestaña por etapa (Zonas/Cuartos/Semis/Final) — Z1/Z2/Z3 ya no compiten
+   por lugar arriba: quedan agrupadas bajo "Zonas", una columna por zona
+   adentro de ese panel. Solo la etapa activa está en el DOM visible; cambiar
+   de etapa muestra/oculta paneles enteros, no hace scroll. Siempre visibles
+   (mobile y desktop) — antes esto era mobile-only porque en desktop se veía
+   toda la llave de una: ahora hay que poder cambiar de etapa en cualquier
+   tamaño de pantalla. */
+.llave-etapas-nav { display: flex; margin-bottom: 10px; flex-wrap: wrap; }
 @media (max-width: 699px) {
-  .llave-rondas-nav { display: flex; margin-bottom: 10px; }
-  /* en mobile cada columna ocupa casi toda la pantalla y el scroll "engancha"
-     columna por columna (scroll-snap nativo, sin JS) -- así cada zona/ronda
-     se ve como una pantalla propia en vez de un scroll continuo confuso */
+  /* dentro de una etapa con más de una columna (Zonas), cada columna ocupa
+     casi toda la pantalla y el scroll "engancha" columna por columna
+     (scroll-snap nativo, sin JS) -- así cada zona se ve como una pantalla
+     propia en vez de un scroll continuo confuso */
   .llave-scroll { scroll-snap-type: x mandatory; }
   .llave-columna { min-width: calc(100vw - 32px); scroll-snap-align: start; }
 }
@@ -702,7 +665,6 @@ tr:first-child td { font-weight: 700; }
    mismo violeta que ya se usaba para "ganador" -- de un vistazo se nota en
    qué fase estás parado, sin agregar íconos ni elementos nuevos */
 .llave-columna:not(.llave-zona) h3 { color: var(--accent-3); }
-.llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
 .llave-partido {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
   box-shadow: var(--shadow-sm);
@@ -832,22 +794,22 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .match-pair.jugado { background: var(--bg-elev); border: 1px solid var(--border); }
 /* ganador en violeta — antes acá quedaba en lima, distinto del violeta que ya
    se usa en la Llave y en la grilla de sets para lo mismo; unificado */
-.match-pair-lado.ganador .match-pair-nombre { color: #cabdff; }
+.match-pair-lado.ganador .match-pair-nombre { color: #d6cbf5; }
 .match-pair-lado.perdedor { opacity: .55; }
 
 .badge.live {
-  background: rgba(255,45,149,.16);
-  color: #ff6fb8;
-  border: 1px solid rgba(255,45,149,.4);
+  background: rgba(226,162,90,.16);
+  color: #f0c495;
+  border: 1px solid rgba(226,162,90,.4);
 }
 .live-dot {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: #ff2d95; margin-right: 6px;
+  background: var(--accent-2); margin-right: 6px;
   animation: pulse-live 1.4s infinite;
 }
 @keyframes pulse-live {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,45,149,.5); }
-  50% { opacity: .6; box-shadow: 0 0 0 5px rgba(255,45,149,0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(226,162,90,.5); }
+  50% { opacity: .6; box-shadow: 0 0 0 5px rgba(226,162,90,0); }
 }
 nav.tabbar .icon { position: relative; }
 
@@ -912,13 +874,13 @@ nav.tabbar .icon { position: relative; }
 }
 .games-bar-track { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--bg-elev); }
 .games-bar-fill { height: 100%; }
-.games-bar-fill.gana { background: #6a3dff; }
+.games-bar-fill.gana { background: var(--accent-3); }
 .games-bar-fill.pierde { background: rgba(245,245,245,.22); }
 .games-bar-nums {
   display: flex; justify-content: space-between; font-size: 15px; font-weight: 800;
   margin-top: 6px; font-variant-numeric: tabular-nums;
 }
-.games-bar-nums span.gana { color: #cabdff; }
+.games-bar-nums span.gana { color: #d6cbf5; }
 
 /* resultado por sets, para CARGAR: mismas casillas pero editables — el Set 3 queda
    oculto hasta que hace falta (mejor de 3: si 1 a 1 en los dos primeros, se revela) */
@@ -956,7 +918,7 @@ nav.tabbar .icon { position: relative; }
   position: relative;
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(180deg, rgba(11,13,13,.88), rgba(11,13,13,.96) 45%),
+    linear-gradient(180deg, rgba(10,14,16,.88), rgba(10,14,16,.96) 45%),
     url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
 }
 
@@ -975,7 +937,7 @@ nav.tabbar .icon { position: relative; }
   position: relative;
   padding: 22px 18px 26px;
   background:
-    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.5) 65%),
+    linear-gradient(0deg, rgba(10,14,16,.94), rgba(10,14,16,.5) 65%),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
 .torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
@@ -1056,21 +1018,18 @@ nav.tabbar button.tab-cta .icon {
 nav.tabbar button.tab-cta.active .icon { background: var(--accent-2); color: #fff; }
 nav.tabbar button.tab-cta span:last-child { color: var(--text); font-weight: 700; }
 
-/* En mobile la barra inferior queda con lo esencial (Inicio/Torneos + "Más"),
-   como una app nativa; Perfil vive en el ícono de arriba (no se repite acá) y
-   Ranking/Administración pasan a vivir en el menú de "Más" para no amontonar
-   la barra. En PC hay lugar de sobra: se muestran todos los accesos juntos y
-   "Más" no hace falta. */
-nav.tabbar button.tab-desktop-only { display: none; }
-nav.tabbar button.tab-mobile-only { display: flex; }
-/* Administración: además de desktop-only, solo se muestra si sos admin — se resuelve
-   con esta regla (más específica por ID) más el body.is-admin que ya se togglea en
-   manejarCambioSesion, sin tocar el estilo desde JS. */
+/* En mobile la barra inferior queda con lo esencial (Inicio/Torneos/Ranking),
+   como una app nativa; Perfil vive en el ícono de arriba (no se repite acá).
+   Administración solo se muestra si sos admin — igual en mobile que en
+   desktop, se resuelve con esta regla (más específica por ID) más el
+   body.is-admin que ya se togglea en manejarCambioSesion, sin tocar el
+   estilo desde JS. */
 #btnAdminPanel { display: none; }
+body.is-admin #btnAdminPanel { display: flex; }
 
 .overlay-bloqueante {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(11,13,13,.92);
+  background: rgba(10,14,16,.92);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
 }
@@ -1169,9 +1128,6 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   }
   nav.tabbar button { flex: none; padding: 10px 4px; }
   nav.tabbar .icon svg { width: 20px; height: 20px; }
-  nav.tabbar button.tab-desktop-only { display: flex; }
-  nav.tabbar button.tab-mobile-only { display: none; }
-  body.is-admin #btnAdminPanel { display: flex; }
 
   .app-body {
     max-width: 1440px;

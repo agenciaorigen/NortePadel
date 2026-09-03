@@ -60,14 +60,15 @@ let syncingDesdeHash = false; // evita el loop cambiarVista → navegarA → has
 
 // Pantallas Público/Jugador de UN torneo (todas viven bajo la misma barra de
 // contexto — ver #torneoContextBar en index.html). Es la única tabla que
-// mapea ruta -> vista para estas 8 pantallas, así abrirTorneo y el mini-nav
+// mapea ruta -> vista para estas pantallas, así abrirTorneo y el mini-nav
 // del torneo nunca se desincronizan entre sí.
+// "" (Torneo) es la pantalla que ve la gente apenas entra: hero + inscripción
+// (si está abierta) + categoría/etapa + partidos, todo junto — antes eran 3
+// pestañas (Inicio/Calendario/Resultados) que mostraban casi lo mismo.
+// "info" junta lo que antes eran Categorías + Jugadores + datos de sede.
 const PANTALLAS_TORNEO = {
-  "": { view: "torneo-inicio", label: "Inicio" },
-  categorias: { view: "torneo-categorias", label: "Categorías" },
-  jugadores: { view: "torneo-jugadores", label: "Jugadores" },
-  calendario: { view: "torneo-calendario", label: "Calendario" },
-  resultados: { view: "torneo-resultados", label: "Resultados" }
+  "": { view: "torneo-resultados", label: "Torneo" },
+  info: { view: "torneo-info", label: "Info" }
 };
 // estas no van en el mini-nav (se llega a ellas desde un botón puntual, no
 // como una pestaña más) pero también son "pantallas de torneo" a los
@@ -165,7 +166,7 @@ window.addEventListener("hashchange", despacharRuta);
 // antes de saber si el usuario es admin o no.
 
 document.querySelectorAll(".tab").forEach((btn) => {
-  if (!btn.dataset.view) return; // "Más" navega a algo dinámico, tiene su propio listener (más abajo)
+  if (!btn.dataset.view) return;
   btn.addEventListener("click", () => cambiarVista(btn.dataset.view));
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
@@ -174,15 +175,6 @@ document.getElementById("marqueeBanda").addEventListener("click", () => {
   if (torneoDestacadoId) abrirTorneo(torneoDestacadoId);
   else cambiarVista("torneos");
 });
-
-// "Más": en mobile la tabbar solo trae Inicio/Torneos + esto — Ranking/
-// Administración viven acá, un toque más adentro (ver style.css .tab-mobile-only)
-document.getElementById("tabMas").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "flex"; });
-document.getElementById("btnCerrarMas").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; });
-document.getElementById("masOverlay").addEventListener("click", (e) => {
-  if (e.target.id === "masOverlay") document.getElementById("masOverlay").style.display = "none";
-});
-document.getElementById("masBtnAdmin").addEventListener("click", () => { document.getElementById("masOverlay").style.display = "none"; cambiarVista("admin"); });
 
 // agrupa categorías tipo "6ta Damas" / "6ta Caballeros" por género; lo que no matchea
 // (categorías genéricas viejas, sin género) cae en "Otras" para no perderlas de vista
@@ -554,8 +546,8 @@ async function manejarCambioSesion(session) {
   document.getElementById("cambiarClaveOverlay").style.display = miJugador?.debe_cambiar_clave ? "flex" : "none";
 
   // body.is-admin (más abajo en style.css) es lo único que decide si #btnAdminPanel
-  // se muestra — así nunca compite en especificidad con las reglas responsive que
-  // lo esconden en mobile (ver comentario junto a #btnAdminPanel en style.css)
+  // se muestra — igual en mobile y en desktop (ver comentario junto a #btnAdminPanel
+  // en style.css).
   document.body.classList.toggle("is-admin", isAdmin);
   document.getElementById("perfilNombreCorto").textContent = miJugador ? miJugador.nombre : "";
   // foto de perfil real en el header (en vez del ícono genérico) apenas está disponible —
@@ -908,8 +900,10 @@ async function cargarUltimosProximos() {
   const proximos = partidos.filter((p) => p.horario && p.estado !== "jugado" && new Date(p.horario) >= ahora)
     .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 3);
 
-  renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, "resultados"));
-  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos, () => abrirTorneo(idTorneo, "calendario"));
+  // "resultados" y "calendario" ya no son pantallas separadas — las dos tarjetas
+  // llevan a la misma pantalla única de Torneo ("").
+  renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, ""));
+  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos, () => abrirTorneo(idTorneo, ""));
 }
 
 function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
@@ -1788,19 +1782,13 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
 let tokenNavegacionTorneo = 0;
 async function abrirTorneo(id, pantalla) {
   const miToken = ++tokenNavegacionTorneo;
-  if (id !== torneoActualId) calFiltroFechaAutoAplicada = false; // torneo distinto: elegir la fecha del calendario de nuevo sola
   torneoActualId = id;
   await refrescarDetalleTorneo();
   if (miToken !== tokenNavegacionTorneo) return; // ya hay una navegación más nueva en curso
-  // sin pantalla explícita (entrar desde la lista de torneos, o un link
-  // directo a /torneo/:id): mientras se puede anotar gente se sigue mostrando
-  // Inicio primero, pero una vez que el torneo pasó a "en curso" (o ya
-  // terminó) hay que ir directo a Calendario — no tiene sentido aterrizar en
-  // inscriptos/categorías cuando lo que se está jugando es lo que importa. Se
-  // mira torneo.estado (no hayCalendarioTorneoActual) porque ese es a nivel
-  // de TODO el torneo, no de una sola categoría que ya tenga fixture armado.
-  const torneoEnCursoOTerminado = torneoActualData && (torneoActualData.estado === "en_curso" || torneoActualData.estado === "finalizado");
-  if (!pantalla && torneoEnCursoOTerminado && hayCalendarioTorneoActual) pantalla = "calendario";
+  // sin pantalla explícita (entrar desde la lista de torneos, o un link directo
+  // a /torneo/:id) siempre se aterriza en "" — la pantalla única de Torneo, que ya
+  // se encarga de mostrarse vacía/con la inscripción abierta si todavía no hay
+  // partidos armados (ver renderPartidosLlave).
   mostrarPantallaTorneo(pantalla);
 }
 document.getElementById("btnVolverTorneos").addEventListener("click", () => cambiarVista("torneos"));
@@ -1811,7 +1799,9 @@ function mostrarPantallaTorneo(pantalla) {
   if (pantalla === "inscripcion" && yaInscriptoEnTorneoActual) pantalla = "mi-inscripcion";
   const clave = pantalla || "";
   const info = PANTALLAS_TORNEO[clave];
-  const view = info ? info.view : (PANTALLAS_TORNEO_EXTRA[clave] || "torneo-inicio");
+  // clave desconocida (ej. un link viejo a /calendario o /resultados, de
+  // antes de unificarlas) cae en la pantalla única de Torneo, no en blanco.
+  const view = info ? info.view : (PANTALLAS_TORNEO_EXTRA[clave] || "torneo-resultados");
   cambiarVista(view, `/torneo/${torneoActualId}${clave ? "/" + clave : ""}`);
   renderTorneoSubnav(clave);
   if (clave === "inscripcion") prepararFormularioInscripcion();
@@ -1819,17 +1809,14 @@ function mostrarPantallaTorneo(pantalla) {
   if (clave === "mi-disponibilidad") cargarYMostrarDispTorneo();
 }
 
-// mini-nav del torneo (Inicio/Categorías/Jugadores/Calendario/Resultados) —
-// un solo lugar que arma los pills, así nunca queda desalineado con
-// PANTALLAS_TORNEO ni con la pantalla realmente activa. Mientras se está
-// anotando gente (todavía no hay partidos armados) Calendario y Resultados
-// ni siquiera aparecen como pestaña — recién se muestran una vez que se
-// cerró la inscripción y el fixture está armado, tal cual se pidió desde el
-// arranque: en etapa de inscripción, solo la información del torneo.
+// mini-nav del torneo (Torneo/Info) — un solo lugar que arma los pills, así
+// nunca queda desalineado con PANTALLAS_TORNEO ni con la pantalla realmente
+// activa. Las dos pestañas están siempre visibles: "Torneo" ya se encarga de
+// mostrarse vacía o con la inscripción abierta si todavía no hay partidos
+// armados (ver renderPartidosLlave).
 function renderTorneoSubnav(claveActiva) {
   const cont = document.getElementById("torneoSubnav");
   cont.innerHTML = Object.entries(PANTALLAS_TORNEO)
-    .filter(([key]) => hayCalendarioTorneoActual || (key !== "calendario" && key !== "resultados"))
     .map(([key, info]) =>
       `<button type="button" class="pill ${key === claveActiva ? "active" : ""}" data-pantalla="${key}">${info.label}</button>`
     ).join("");
@@ -2006,7 +1993,7 @@ async function cargarMiInscripcion() {
   }
 }
 document.getElementById("miInscBtnDisponibilidad").addEventListener("click", () => mostrarPantallaTorneo("mi-disponibilidad"));
-document.getElementById("miInscBtnMisPartidos").addEventListener("click", () => mostrarPantallaTorneo("calendario"));
+document.getElementById("miInscBtnMisPartidos").addEventListener("click", () => mostrarPantallaTorneo(""));
 document.getElementById("miInscBtnCancelar").addEventListener("click", async () => {
   if (!miJugador || !torneoActualId) return;
   // si ya tiene pareja confirmada, no se puede cancelar solo/a desde acá (dejaría a
@@ -2372,20 +2359,16 @@ async function refrescarDetalleTorneo() {
   // día -- esa columna es la única fuente de verdad de "¿ya se puede
   // mostrar?".
 
-  // Calendario/Resultados (pestañas de torneoSubnav) solo aparecen una vez que
+  // Torneo (pestaña unificada de torneoSubnav) solo muestra la llave una vez que
   // alguna categoría tiene calendario confirmado — mientras se está anotando
-  // gente, o mientras solo existe el fixture (cruces sin horario todavía), Inicio
-  // muestra solo información, sin mezclar partidos que el público todavía no
-  // puede ubicar en el tiempo (ver también renderTorneoSubnav).
-  document.getElementById("dtProximosPartidosCard").style.display = hayCalendarioTorneoActual ? "block" : "none";
+  // gente, o mientras solo existe el fixture (cruces sin horario todavía), esa
+  // pantalla no tiene partidos que mostrar todavía (ver también renderTorneoSubnav).
 
   renderParejasEn("dtParejas", "dtSinPareja", insc || [], parejas || [], false);
   cargarCategoriasTorneo(parejas || []);
-  renderProximosPartidos(ultimosPartidos);
   renderStatsInicioTorneo(parejas || [], tc || [], ultimosPartidos);
 
   await cargarBloqueosCancha();
-  renderCalendarioPublico();
   renderResultadosPublico();
 }
 
@@ -2408,22 +2391,6 @@ function cargarCategoriasTorneo(parejas) {
     : categoriasTorneoActual.map((c) => {
       const n = conteo[c] || 0;
       return `<div class="pareja-row"><span>${c}</span><span class="badge">${n} pareja${n === 1 ? "" : "s"}</span></div>`;
-    }).join("");
-}
-
-// ---------- Próximos partidos (Inicio del torneo) ----------
-function renderProximosPartidos(partidos) {
-  const cont = document.getElementById("dtProximosPartidos");
-  if (!cont) return;
-  const ahora = new Date();
-  const proximos = (partidos || [])
-    .filter((p) => p.horario && new Date(p.horario) >= ahora && p.estado !== "jugado")
-    .sort((a, b) => new Date(a.horario) - new Date(b.horario))
-    .slice(0, 3);
-  cont.innerHTML = proximos.length === 0 ? '<p class="empty">Todavía no hay partidos programados.</p>' :
-    proximos.map((p) => {
-      const horario = new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
-      return `<div class="match-card">${matchVsRowHtml(p, null)}<div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario}${p.categoria ? ` · <span class="badge">${p.categoria}</span>` : ""}</div></div>`;
     }).join("");
 }
 
@@ -3485,7 +3452,7 @@ window.matchMedia("(max-width:767px)").addEventListener("change", () => {
 // partido se puede arrastrar a otra celda (drag-and-drop nativo, solo
 // desktop — en mobile cada partido ya tiene sus propios inputs de
 // cancha/horario en la vista Lista, ver renderPartidosLista). El público/
-// jugador ya no ve esta grilla — ve el "orden de juego" (renderOrdenDeJuego).
+// jugador ya no ve esta grilla — ve la llave de Torneo (renderPartidosLlave).
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable) {
   const cont = document.getElementById(containerId);
   const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean);
@@ -3621,10 +3588,113 @@ function wirePlanillaDragAndDrop(containerId) {
   });
 }
 
+// ---------- Carga de resultado (sets) — compartida entre Administración
+// (renderPartidosLista) y la tarjeta pública cuando el que mira es admin
+// (llavePartidoCardHtml/renderPartidosLlave), para que cargar un resultado
+// sea siempre el mismo formulario y el mismo guardado, en un solo lugar. ----
+function cargaResultadoPanelHtml(p, oculto) {
+  return `
+    <div class="match-admin-panel" data-carga-resultado="${p.id}" ${oculto ? 'style="display:none"' : ""}>
+      <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
+      <div class="sets-entry" data-p="${p.id}">
+        <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="display:none">Set 3</span></div>
+        <div class="sets-entry-row">
+          <span class="sets-entry-label" title="${p.pareja1_nombre}">${p.pareja1_nombre}</span>
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="1" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="2" />
+          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="1" data-set="3" style="display:none" />
+        </div>
+        <div class="sets-entry-row">
+          <span class="sets-entry-label" title="${p.pareja2_nombre}">${p.pareja2_nombre}</span>
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="1" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="2" />
+          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="2" data-set="3" style="display:none" />
+        </div>
+      </div>
+      <div class="match-actions">
+        <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">Cargar resultado</button>
+      </div>
+    </div>`;
+}
+// engancha el comportamiento del formulario de arriba dentro de `cont`
+// (Set 3 que aparece solo si hace falta, guardado a Supabase, y — cuando
+// existe — el ícono ✏️ que muestra/oculta el panel sin abrir el detalle del
+// partido). Se llama tanto desde Administración como desde la tarjeta
+// pública: si `cont` no tiene ninguno de estos elementos, no hace nada.
+function wireCargaResultado(cont) {
+  function actualizarVisibilidadSet3(partidoId) {
+    const celda = (lado, set) => cont.querySelector(`.setCell[data-p="${partidoId}"][data-lado="${lado}"][data-set="${set}"]`);
+    const val = (lado, set) => { const v = celda(lado, set).value.trim(); return v === "" ? null : Number(v); };
+    const s1p1 = val(1, 1), s1p2 = val(2, 1), s2p1 = val(1, 2), s2p2 = val(2, 2);
+    const set1Ganador = (s1p1 !== null && s1p2 !== null && s1p1 !== s1p2) ? (s1p1 > s1p2 ? 1 : 2) : null;
+    const set2Ganador = (s2p1 !== null && s2p2 !== null && s2p1 !== s2p2) ? (s2p1 > s2p2 ? 1 : 2) : null;
+    const haceFaltaTercero = set1Ganador !== null && set2Ganador !== null && set1Ganador !== set2Ganador;
+    const entry = cont.querySelector(`.sets-entry[data-p="${partidoId}"]`);
+    entry.querySelector(".setHead3").style.display = haceFaltaTercero ? "" : "none";
+    entry.querySelectorAll(".setCell3").forEach((c) => {
+      c.style.display = haceFaltaTercero ? "" : "none";
+      if (!haceFaltaTercero) c.value = "";
+    });
+  }
+  cont.querySelectorAll(".setCell").forEach((input) => {
+    input.addEventListener("input", () => actualizarVisibilidadSet3(input.dataset.p));
+  });
+
+  cont.querySelectorAll(".btnCargarResultado").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const partidoId = btn.dataset.p;
+      const celda = (lado, set) => cont.querySelector(`.setCell[data-p="${partidoId}"][data-lado="${lado}"][data-set="${set}"]`);
+      const sets = [];
+      for (let set = 1; set <= 3; set++) {
+        const v1 = celda(1, set).value.trim(), v2 = celda(2, set).value.trim();
+        if (v1 === "" && v2 === "") continue; // set no jugado (p.ej. el tercero cuando no hizo falta)
+        if (v1 === "" || v2 === "") { toast(`Completá los dos games del Set ${set}`); return; }
+        const p1 = Number(v1), p2 = Number(v2);
+        if (p1 === p2) { toast(`El Set ${set} no puede terminar empatado`); return; }
+        sets.push({ p1, p2 });
+      }
+      if (sets.length < 2) { toast("Cargá al menos 2 sets"); return; }
+      const setsGanadosP1 = sets.filter((s) => s.p1 > s.p2).length;
+      const setsGanadosP2 = sets.filter((s) => s.p2 > s.p1).length;
+      if (setsGanadosP1 === setsGanadosP2) {
+        toast("El resultado tiene que tener un ganador — completá el Set 3 para desempatar"); return;
+      }
+      const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
+
+      const { error } = await sb.from("partidos").update({
+        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
+      }).eq("id", partidoId);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Resultado cargado, ranking actualizado ✅");
+      avisarActualizacionEnVivo();
+      refrescarTrasAccionGestion();
+      cargarRanking();
+      if (btn.dataset.ronda === "Final") cargarCampeones();
+    });
+  });
+
+  // clicks adentro del panel de carga no deben burbujear — en la tarjeta
+  // pública, ese panel vive dentro de una card que abre el detalle del
+  // partido al tocarla en cualquier otro lado.
+  cont.querySelectorAll(".match-admin-panel").forEach((panel) => {
+    panel.addEventListener("click", (e) => e.stopPropagation());
+  });
+  // ✏️ solo existe en la tarjeta pública (admin) — muestra/oculta el panel.
+  cont.querySelectorAll(".btnTogglePartidoAdmin").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const panel = cont.querySelector(`[data-carga-resultado="${btn.dataset.p}"]`);
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
+  });
+}
+
 // tarjeta compacta de un partido para la vista Llave: nombre de cada pareja en una
 // sola línea (ya viene armado desde partidos_publicos como "Nombre Apellido / Nombre
 // Apellido") + puntaje por set alineado a la derecha, fecha/hora y cancha — el
-// ganador se resalta en el verde de marca.
+// ganador se resalta en el verde de marca. Si el que mira es admin y el partido
+// todavía no tiene resultado, el ícono ✏️ despliega el mismo formulario de carga
+// que antes solo existía en Administración (ver cargaResultadoPanelHtml).
 function llavePartidoCardHtml(p) {
   const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
   const sets = p.sets || [];
@@ -3635,9 +3705,16 @@ function llavePartidoCardHtml(p) {
     ? new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : "horario a definir";
   const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "a definir");
+  const puedeCargarResultado = isAdmin && p.estado !== "jugado";
   return `
     <div class="llave-partido" data-abrir-partido="${p.id}" style="cursor:pointer">
-      <div class="llave-fecha"><span>${iconoReloj()} ${horario}</span>${p.slot_cuadro ? `<span>${p.slot_cuadro}</span>` : ""}</div>
+      <div class="llave-fecha">
+        <span>${iconoReloj()} ${horario}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          ${p.slot_cuadro ? `<span>${p.slot_cuadro}</span>` : ""}
+          ${puedeCargarResultado ? `<button type="button" class="btnTogglePartidoAdmin" data-p="${p.id}" title="Cargar resultado" aria-label="Cargar resultado">✏️</button>` : ""}
+        </span>
+      </div>
       <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
         <span class="llave-pareja">${p.pareja1_nombre}</span>
         <span class="llave-sets">${setsHtml(1)}</span>
@@ -3647,6 +3724,7 @@ function llavePartidoCardHtml(p) {
         <span class="llave-sets">${setsHtml(2)}</span>
       </div>
       <div class="match-meta llave-meta">${iconoPin()} Local: ${local}</div>
+      ${puedeCargarResultado ? cargaResultadoPanelHtml(p, true) : ""}
     </div>`;
 }
 
@@ -3688,208 +3766,59 @@ function renderPartidosLlave(containerId, partidos) {
     partidos: eliminacion.filter((p) => p.ronda === r)
   }));
 
-  const columnas = [...columnasZona, ...columnasZonaCuadro, ...columnasRonda];
+  // Etapas: "Zonas" agrupa TODAS las columnas de zona bajo una sola pestaña —
+  // así Z1/Z2/Z3 dejan de competir con Cuartos/Semis/Final por lugar arriba;
+  // la zona se sigue viendo, pero como encabezado de columna DENTRO de la
+  // etapa "Zonas", no como una pestaña propia más. Cada ronda de eliminación
+  // ya es una etapa de por sí (una columna == una etapa).
+  const columnasZonas = [...columnasZona, ...columnasZonaCuadro];
+  const etapas = [
+    ...(columnasZonas.length ? [{ titulo: "Zonas", columnas: columnasZonas }] : []),
+    ...columnasRonda.map((col) => ({ titulo: col.titulo, columnas: [col] }))
+  ];
 
-  if (columnas.length === 0) {
+  if (etapas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
     return;
   }
 
-  // botones "Octavos / Cuartos / Semis / Final" (o "Zona 1 / Zona 2 / ...")
-  // para saltar de ronda en un toque en mobile — ver comentario en style.css.
-  // Con una sola columna no aportan nada, así que no se muestran.
-  const navRondas = columnas.length > 1
-    ? '<div class="pill-row llave-rondas-nav">' +
-      columnas.map((col, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
+  // pestañas "Zonas / Cuartos / Semis / Final" — con una sola etapa no aportan
+  // nada, así que no se muestran.
+  const navEtapas = etapas.length > 1
+    ? '<div class="pill-row llave-etapas-nav">' +
+      etapas.map((et, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-etapa="${i}">${et.titulo}</button>`).join("") +
       "</div>"
     : "";
 
-  cont.innerHTML = navRondas + '<div class="llave-scroll"><div class="llave">' +
-    columnas.map((col, i) => {
-      // separador visual entre el bloque de zonas y el de eliminación directa
-      const esPrimeraDeEliminacion = !col.zona && columnasZona.length > 0 && i === columnasZona.length;
-      const clases = ["llave-columna"];
-      if (col.zona) clases.push("llave-zona");
-      if (esPrimeraDeEliminacion) clases.push("llave-separador");
-      return `
-      <div class="${clases.join(" ")}" data-col-index="${i}">
+  const columnaHtml = (col) => `
+      <div class="llave-columna ${col.zona ? "llave-zona" : ""}">
         <h3>${col.titulo}</h3>
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
-    }).join("") + "</div></div>";
+
+  cont.innerHTML = navEtapas + etapas.map((et, i) => `
+    <div class="llave-etapa-panel" data-etapa-index="${i}" ${i === 0 ? "" : 'style="display:none"'}>
+      <div class="llave-scroll"><div class="llave">${et.columnas.map(columnaHtml).join("")}</div></div>
+    </div>`).join("");
 
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
-  cont.querySelectorAll("[data-llave-col]").forEach((btn) => {
+  cont.querySelectorAll("[data-llave-etapa]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      cont.querySelectorAll("[data-llave-col]").forEach((b) => b.classList.toggle("active", b === btn));
-      const columna = cont.querySelector(`[data-col-index="${btn.dataset.llaveCol}"]`);
-      // scrollIntoView mueve tanto el scroll horizontal de .llave-scroll como
-      // el scroll vertical de la página, en un solo llamado nativo — soluciona
-      // de una vez el "hay que bajar Y deslizar" que confundía en mobile.
-      if (columna) columna.scrollIntoView({ behavior: "smooth", inline: "start", block: "start" });
+      cont.querySelectorAll("[data-llave-etapa]").forEach((b) => b.classList.toggle("active", b === btn));
+      cont.querySelectorAll(".llave-etapa-panel").forEach((panel) => {
+        panel.style.display = panel.dataset.etapaIndex === btn.dataset.llaveEtapa ? "" : "none";
+      });
     });
   });
+  wireCargaResultado(cont);
 }
 
-// ---------- Calendario público/jugador: "orden de juego" ----------
-// Un póster por cancha (foto + degradé), pensado para que sirva tal cual
-// como imagen para compartir en redes — no solo para mirar en la app. Usa
-// los mismos partidos ya filtrados por renderCalendarioPublico (categoría/
-// cancha/fecha); reutiliza avatarHtml para las fotos (o el ícono de pelota
-// si el jugador no cargó una) y matchVsRowHtml/llavePartidoCardHtml ya
-// resolvían este mismo patrón de "2 jugadores por lado", solo que acá con
-// estilo de póster en vez de tarjeta de app.
-// número de zona a partir de "Z3" -> 3 (para ordenar); lo que no tiene
-// slot_cuadro numérico (octavos, cuartos, semis, final) queda al final,
-// en el orden en que ya viene (por horario).
-function numeroZona(slotCuadro) {
-  const m = /^Z(\d+)$/.exec(slotCuadro || "");
-  return m ? Number(m[1]) : Infinity;
-}
-
-// fecha (YYYY-MM-DD) de un horario, en el huso del club (Argentina/Paraguay,
-// UTC-3 todo el año) -- NUNCA con .slice(0,10) sobre el ISO en UTC: un
-// partido de las 21-23hs local ya cae en el día siguiente en UTC, y quedaba
-// agrupado/filtrado bajo la fecha equivocada.
-function fechaLocalAR(fechaOISO) {
-  const d = fechaOISO instanceof Date ? fechaOISO : new Date(fechaOISO);
-  return d.toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
-}
-
-function renderOrdenDeJuego(containerId, partidos) {
-  const cont = document.getElementById(containerId);
-  const conHorario = [...partidos].filter((p) => p.horario).sort((a, b) => new Date(a.horario) - new Date(b.horario));
-  const sinHorario = partidos.filter((p) => !p.horario);
-
-  if (conHorario.length === 0) {
-    cont.innerHTML = '<p class="empty">Todavía no hay partidos con cancha y horario asignados.</p>';
-    return;
-  }
-
-  const jugadorHtml = (nombre, apellido, foto) => `
-    <div class="orden-jugador">
-      ${avatarHtml(foto, 56)}
-      <div class="orden-nombre"><strong>${nombre || "?"}</strong>${apellido ? `<span>${apellido}</span>` : ""}</div>
-    </div>`;
-
-  // un "poster" por categoría, con sus partidos ordenados por zona (Z1, Z2, Z3...)
-  // -- así se encuentra un cruce puntual por categoría/zona en vez de tener que
-  // buscarlo cancha por cancha.
-  const posterHtml = (categoria, partidosCategoria) => {
-    if (partidosCategoria.length === 0) return "";
-    const ordenados = [...partidosCategoria].sort((a, b) => numeroZona(a.slot_cuadro) - numeroZona(b.slot_cuadro) || new Date(a.horario) - new Date(b.horario));
-    const interior = ordenados.map((p) => {
-      const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
-      const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
-      const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
-      const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-      const fechaCorta = new Date(p.horario).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-      const zonaLabel = p.slot_cuadro || p.ronda || "";
-      return `<div class="orden-sep">${zonaLabel ? `${zonaLabel} · ` : ""}${p.complejo_nombre || "predio a definir"} · ${fechaCorta} ${hora}</div>
-        <div class="orden-match ${p.estado === "jugado" ? "jugado" : ""}" data-abrir-partido="${p.id}">
-          <div class="orden-lado ${cls1}">${jugadorHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}${jugadorHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}</div>
-          <span class="orden-vs">VS</span>
-          <div class="orden-lado der ${cls2}">${jugadorHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}${jugadorHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}</div>
-        </div>`;
-    }).join("");
-    return `<div class="orden-poster">
-      <div class="orden-eyebrow">${torneoActualData?.nombre || ""}</div>
-      <div class="orden-cancha">Categoría ${categoria}</div>
-      ${interior}
-    </div>`;
-  };
-
-  const categorias = [...new Set(conHorario.map((p) => p.categoria))];
-  const posters = categorias.map((cat) => posterHtml(cat, conHorario.filter((p) => p.categoria === cat))).filter(Boolean).join("");
-  const notaSinHorario = sinHorario.length > 0
-    ? `<p class="match-meta" style="margin-top:12px">Sin horario asignado (${sinHorario.length}): ` +
-      sinHorario.map((p) => `${p.pareja1_nombre} vs ${p.pareja2_nombre}`).join(" · ") + "</p>"
-    : "";
-
-  cont.innerHTML = `<div class="orden-grid">${posters}</div>${notaSinHorario}`;
-  cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
-    el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
-  });
-}
-
-// ---------- Calendario y Resultados públicos (mismo componente para
-// Público y Jugador — el jugador ve exactamente lo mismo) ----------
-// true una vez que se eligió sola la fecha del calendario (o el usuario tocó
-// el selector a mano) para ESTE torneo — evita que cada re-render en vivo
-// vuelva a pisar la elección. Se resetea al entrar a otro torneo (abrirTorneo).
-let calFiltroFechaAutoAplicada = false;
-function renderCalendarioPublico() {
-  const selCat = document.getElementById("calFiltroCategoria");
-  if (!categoriasTorneoActual.includes(selCat.value)) selCat.value = "";
-  selCat.innerHTML = `<option value="">Todas las categorías</option>` +
-    categoriasTorneoActual.map((c) => `<option value="${c}" ${c === selCat.value ? "selected" : ""}>${c}</option>`).join("");
-
-  // solo se pueden elegir las fechas en las que el torneo realmente juega (las de
-  // sus partidos ya programados) — antes era un <input type="date"> libre, que
-  // dejaba elegir cualquier día del calendario y mostraba la pantalla vacía.
-  const selFecha = document.getElementById("calFiltroFecha");
-  const fechasConPartidos = [...new Set(ultimosPartidos.filter((p) => p.horario).map((p) => fechaLocalAR(p.horario)))].sort();
-  // ojo con el orden acá: el <select> todavía tiene las <option> de la vuelta
-  // anterior en este punto, así que asignarle selFecha.value ahora (antes de
-  // reconstruir el innerHTML de abajo) no sirve de nada si la fecha elegida
-  // todavía no existe como opción — por eso se arma en una variable aparte
-  // (fechaFiltro) y recién se vuelca como "selected" al armar las <option>.
-  let fechaFiltro = fechasConPartidos.includes(selFecha.value) ? selFecha.value : "";
-  // a medida que el torneo avanza no tiene sentido arrancar viendo TODOS los
-  // partidos desde el primer día — se elige sola la fecha más relevante: la
-  // de hoy si hoy se juega, si no la próxima que viene, y si el torneo ya
-  // terminó, la última jugada. Solo pasa la primera vez que se ve el
-  // calendario de este torneo — tocar el selector a mano (aunque sea para
-  // volver a "Todas las fechas") lo deja fijo en lo que se haya elegido.
-  if (!calFiltroFechaAutoAplicada && !fechaFiltro && fechasConPartidos.length) {
-    const hoy = fechaLocalAR(new Date());
-    fechaFiltro = fechasConPartidos.find((f) => f === hoy) || fechasConPartidos.find((f) => f > hoy) || fechasConPartidos[fechasConPartidos.length - 1];
-    calFiltroFechaAutoAplicada = true;
-  }
-  selFecha.innerHTML = `<option value="">Todas las fechas</option>` +
-    fechasConPartidos.map((f) => {
-      const label = new Date(f + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
-      return `<option value="${f}" ${f === fechaFiltro ? "selected" : ""}>${label}</option>`;
-    }).join("");
-
-  // se filtra por PREDIO (complejo), no por cancha individual -- con varias
-  // canchas iguales ("Cancha 1") repetidas en distintos complejos, elegir
-  // cancha por cancha era confuso; el predio es lo que de verdad le importa
-  // al jugador para saber adónde ir.
-  const predios = [...new Map(
-    ultimasCanchasTorneo.map((c) => c.canchas).filter(Boolean)
-      .map((c) => [c.complejo_id, c.complejos?.nombre || "?"])
-  ).entries()];
-  const pills = document.getElementById("calFiltroCanchaPills");
-  const predioPrevio = pills.querySelector(".pill.active")?.dataset.predio || "";
-  pills.innerHTML = `<button type="button" class="pill ${!predioPrevio ? "active" : ""}" data-predio="">TODAS</button>` +
-    predios.map(([id, nombre]) => `<button type="button" class="pill ${id === predioPrevio ? "active" : ""}" data-predio="${id}">${nombre}</button>`).join("");
-  pills.querySelectorAll(".pill").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pills.querySelectorAll(".pill").forEach((b) => b.classList.toggle("active", b === btn));
-      renderCalendarioPublico();
-    });
-  });
-
-  let visibles = ultimosPartidos;
-  if (selCat.value) visibles = visibles.filter((p) => p.categoria === selCat.value);
-  const fecha = document.getElementById("calFiltroFecha").value;
-  if (fecha) visibles = visibles.filter((p) => p.horario && fechaLocalAR(p.horario) === fecha);
-  const predioSel = pills.querySelector(".pill.active")?.dataset.predio || "";
-  if (predioSel) {
-    const canchaIdsPredio = new Set(
-      ultimasCanchasTorneo.filter((c) => c.canchas?.complejo_id === predioSel).map((c) => c.canchas?.id)
-    );
-    visibles = visibles.filter((p) => canchaIdsPredio.has(p.cancha_id));
-  }
-  renderOrdenDeJuego("pubCalendario", visibles);
-}
-document.getElementById("calFiltroCategoria").addEventListener("change", renderCalendarioPublico);
-document.getElementById("calFiltroFecha").addEventListener("change", () => { calFiltroFechaAutoAplicada = true; renderCalendarioPublico(); });
-// los accesos directos a Calendario/Resultados desde Inicio del torneo se sacaron:
-// duplicaban las mismas dos pestañas que ya están arriba, en torneoSubnav.
+// ---------- Torneo (pantalla única: Categoría → Etapa → partidos) ----------
+// Calendario y Resultados eran dos pantallas separadas que mostraban casi lo
+// mismo (renderPartidosLlave ya incluye partidos jugados y pendientes por
+// igual) — se unificaron en una sola, ver renderResultadosPublico más abajo.
 
 // Entra a Administración ya con ESTE torneo en gestión (reemplaza el selector
 // suelto #admSelectTorneoGestion como único punto de entrada: ahora también se
@@ -4051,26 +3980,8 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
       ${editable && p.estado !== "jugado" ? `
+      ${cargaResultadoPanelHtml(p)}
       <div class="match-admin-panel">
-        <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
-        <div class="sets-entry" data-p="${p.id}">
-          <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="display:none">Set 3</span></div>
-          <div class="sets-entry-row">
-            <span class="sets-entry-label" title="${p.pareja1_nombre}">${p.pareja1_nombre}</span>
-            <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="1" />
-            <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="2" />
-            <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="1" data-set="3" style="display:none" />
-          </div>
-          <div class="sets-entry-row">
-            <span class="sets-entry-label" title="${p.pareja2_nombre}">${p.pareja2_nombre}</span>
-            <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="1" />
-            <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="2" />
-            <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="2" data-set="3" style="display:none" />
-          </div>
-        </div>
-        <div class="match-actions">
-          <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">Cargar resultado</button>
-        </div>
         <div class="match-actions">
           <select class="selectReasignar" data-p="${p.id}">
             ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
@@ -4103,58 +4014,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
     return;
   }
 
-  // Set 3 solo aparece si hace falta: mejor de 3 — si una pareja ya ganó los dos
-  // primeros sets no hay tercero; si quedó 1 a 1, se revela para completarlo.
-  function actualizarVisibilidadSet3(partidoId) {
-    const celda = (lado, set) => cont.querySelector(`.setCell[data-p="${partidoId}"][data-lado="${lado}"][data-set="${set}"]`);
-    const val = (lado, set) => { const v = celda(lado, set).value.trim(); return v === "" ? null : Number(v); };
-    const s1p1 = val(1, 1), s1p2 = val(2, 1), s2p1 = val(1, 2), s2p2 = val(2, 2);
-    const set1Ganador = (s1p1 !== null && s1p2 !== null && s1p1 !== s1p2) ? (s1p1 > s1p2 ? 1 : 2) : null;
-    const set2Ganador = (s2p1 !== null && s2p2 !== null && s2p1 !== s2p2) ? (s2p1 > s2p2 ? 1 : 2) : null;
-    const haceFaltaTercero = set1Ganador !== null && set2Ganador !== null && set1Ganador !== set2Ganador;
-    const entry = cont.querySelector(`.sets-entry[data-p="${partidoId}"]`);
-    entry.querySelector(".setHead3").style.display = haceFaltaTercero ? "" : "none";
-    entry.querySelectorAll(".setCell3").forEach((c) => {
-      c.style.display = haceFaltaTercero ? "" : "none";
-      if (!haceFaltaTercero) c.value = "";
-    });
-  }
-  cont.querySelectorAll(".setCell").forEach((input) => {
-    input.addEventListener("input", () => actualizarVisibilidadSet3(input.dataset.p));
-  });
-
-  cont.querySelectorAll(".btnCargarResultado").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const partidoId = btn.dataset.p;
-      const celda = (lado, set) => cont.querySelector(`.setCell[data-p="${partidoId}"][data-lado="${lado}"][data-set="${set}"]`);
-      const sets = [];
-      for (let set = 1; set <= 3; set++) {
-        const v1 = celda(1, set).value.trim(), v2 = celda(2, set).value.trim();
-        if (v1 === "" && v2 === "") continue; // set no jugado (p.ej. el tercero cuando no hizo falta)
-        if (v1 === "" || v2 === "") { toast(`Completá los dos games del Set ${set}`); return; }
-        const p1 = Number(v1), p2 = Number(v2);
-        if (p1 === p2) { toast(`El Set ${set} no puede terminar empatado`); return; }
-        sets.push({ p1, p2 });
-      }
-      if (sets.length < 2) { toast("Cargá al menos 2 sets"); return; }
-      const setsGanadosP1 = sets.filter((s) => s.p1 > s.p2).length;
-      const setsGanadosP2 = sets.filter((s) => s.p2 > s.p1).length;
-      if (setsGanadosP1 === setsGanadosP2) {
-        toast("El resultado tiene que tener un ganador — completá el Set 3 para desempatar"); return;
-      }
-      const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
-
-      const { error } = await sb.from("partidos").update({
-        sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
-      }).eq("id", partidoId);
-      if (error) { toast("Error: " + error.message); return; }
-      toast("Resultado cargado, ranking actualizado ✅");
-      avisarActualizacionEnVivo();
-      refrescarTrasAccionGestion();
-      cargarRanking();
-      if (btn.dataset.ronda === "Final") cargarCampeones();
-    });
-  });
+  // sets-entry (Set 3 condicional) + guardado de resultado: lógica compartida
+  // con la tarjeta pública de la vista Llave, ver wireCargaResultado.
+  wireCargaResultado(cont);
 
   cont.querySelectorAll(".btnReasignarCancha").forEach((btn) => {
     btn.addEventListener("click", async () => {

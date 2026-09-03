@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
-<meta name="theme-color" content="#0B0D0D" />
+<meta name="theme-color" content="#0A0E10" />
 <!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
      abre como acceso directo al navegador, no como app a pantalla completa -->
 <meta name="mobile-web-app-capable" content="yes" />
@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -47,21 +47,6 @@
 <div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none">
   <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">✕ Cerrar</button>
   <img id="fotoGrandeImg" src="" alt="Foto ampliada del jugador" />
-</div>
-
-<!-- "Más": en mobile la tabbar trae Inicio/Torneos/Ranking/Más (Perfil vive en el
-     ícono de arriba, no acá) — Administración (si sos admin) vive un toque más
-     adentro, para no amontonar la barra de abajo. Torneos y Ranking ya son tabs
-     siempre visibles, así que no se repiten acá. En PC no hace falta este menú:
-     esos accesos ya están siempre visibles en la barra lateral. -->
-<div id="masOverlay" class="overlay-bloqueante" style="display:none">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <h2 style="margin:0">Más</h2>
-      <button type="button" class="secondary small" id="btnCerrarMas">Cerrar</button>
-    </div>
-    <button type="button" class="secondary admin-only" id="masBtnAdmin" style="margin-top:14px;width:100%">⚙️ Administración</button>
-  </div>
 </div>
 
 <!-- Detalle de un partido puntual (se abre al tocar una tarjeta en Calendario o
@@ -285,10 +270,10 @@
     </div>
   </section>
 
-  <!-- Barra de contexto de un torneo: persiste arriba de las 8 pantallas de abajo
+  <!-- Barra de contexto de un torneo: persiste arriba de las pantallas de abajo
        (Público/Jugador) mientras se está "dentro" de un torneo — nombre, estado y
-       el mini-nav para moverse entre Inicio/Categorías/Jugadores/Calendario/
-       Resultados/Mi inscripción/Mi disponibilidad sin volver atrás cada vez. -->
+       el mini-nav para moverse entre Torneo/Info/Mi inscripción/Mi disponibilidad
+       sin volver atrás cada vez. -->
   <div id="torneoContextBar" style="display:none">
     <div class="torneo-context-top">
       <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
@@ -298,73 +283,51 @@
     <div class="pill-row" id="torneoSubnav"></div>
   </div>
 
-  <!-- INICIO DEL TORNEO: resumen sin formularios embebidos — de acá se accede a
-       todo lo demás (anotarme, calendario, resultados, categorías, jugadores) -->
-  <section id="view-torneo-inicio" class="view">
+  <!-- TORNEO: pantalla única — es lo primero que se ve al entrar a un torneo.
+       Hero + inscripción (si está abierta) + los partidos, organizados por
+       Categoría y por Etapa (Zonas/Cuartos/Semis/Final); la zona (Z1/Z2/Z3)
+       se ve como encabezado/etiqueta adentro de cada etapa, no como pestaña
+       propia. Antes eran 3 pestañas (Inicio/Calendario/Resultados) que
+       mostraban casi lo mismo — ver renderResultadosPublico en app.js. -->
+  <section id="view-torneo-resultados" class="view">
     <div class="torneo-hero">
+      <button type="button" class="hero-icon-btn admin-only" id="btnAdministrarEsteTorneo" title="Administrar este torneo" aria-label="Administrar este torneo">🔧</button>
       <div class="torneo-hero-overlay">
         <p id="dtEstadoHero"></p>
         <h2 id="dtNombreHero"></h2>
       </div>
     </div>
-    <button type="button" class="secondary admin-only" id="btnAdministrarEsteTorneo" style="width:100%;margin-bottom:12px">⚙️ Administrar este torneo</button>
+    <div class="card" id="dtInscripcionCard">
+      <p class="match-meta" id="inscripcionEstado"></p>
+      <p style="margin-top:10px;display:none" id="dtCosto"></p>
+      <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
+    </div>
+    <div class="card">
+      <label>Categoría</label>
+      <select id="resFiltroCategoria"><option value="">Todas</option></select>
+      <div id="pubResultadosLlave" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- INFO: categorías, jugadores/parejas y datos de sede — todo lo que antes
+       eran 3 pantallas separadas (Categorías/Jugadores + parte de Inicio). -->
+  <section id="view-torneo-info" class="view">
     <div class="card">
       <p class="match-meta" id="dtInfo"></p>
-      <p style="margin-top:10px;display:none" id="dtCosto"></p>
       <div class="sponsor-strip" id="dtSponsors" style="margin-top:12px;display:none"></div>
       <div id="dtCanchas" style="margin-top:10px"></div>
     </div>
     <div class="card">
       <div class="pj-stats" id="dtInicioStats"></div>
     </div>
-    <div class="card" id="dtInscripcionCard">
-      <p class="match-meta" id="inscripcionEstado"></p>
-      <button class="primary" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
-    </div>
-    <div class="card" id="dtProximosPartidosCard">
-      <h3>Próximos partidos</h3>
-      <div id="dtProximosPartidos"></div>
-    </div>
-  </section>
-
-  <!-- CATEGORÍAS -->
-  <section id="view-torneo-categorias" class="view">
     <div class="card">
       <h3>Categorías</h3>
       <div id="dtCategorias"></div>
     </div>
-  </section>
-
-  <!-- JUGADORES / PAREJAS (solo lectura — la gestión de inscripciones vive en Administración) -->
-  <section id="view-torneo-jugadores" class="view">
     <div class="card">
       <h3>Jugadores / Parejas</h3>
       <div id="dtParejas"></div>
       <div id="dtSinPareja"></div>
-    </div>
-  </section>
-
-  <!-- CALENDARIO: mismo componente para Público y Jugador — SLOT = fecha + hora +
-       cancha, grilla en PC (nunca se corta) y agenda vertical en mobile -->
-  <section id="view-torneo-calendario" class="view">
-    <div class="card">
-      <h3>Calendario</h3>
-      <div class="row">
-        <select id="calFiltroCategoria"><option value="">Todas las categorías</option></select>
-        <select id="calFiltroFecha"><option value="">Todas las fechas</option></select>
-      </div>
-      <div class="pill-row" id="calFiltroCanchaPills" style="margin-top:10px"></div>
-      <div id="pubCalendario" style="margin-top:10px"></div>
-    </div>
-  </section>
-
-  <!-- RESULTADOS: cuadro/llave, filtrable por categoría -->
-  <section id="view-torneo-resultados" class="view">
-    <div class="card">
-      <h3>Resultados</h3>
-      <label>Categoría</label>
-      <select id="resFiltroCategoria"><option value="">Todas</option></select>
-      <div id="pubResultadosLlave" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -726,7 +689,7 @@
       <div class="pill-row" id="listaEtiquetasAdmin"></div>
       <div class="row">
         <input id="etqNueva" placeholder="Ej: Veterano" />
-        <input id="etqColorNueva" type="color" value="#6a3dff" aria-label="Color de la etiqueta" />
+        <input id="etqColorNueva" type="color" value="#8A6FE0" aria-label="Color de la etiqueta" />
         <button class="secondary small" id="btnAgregarEtiqueta">Agregar</button>
       </div>
     </div>
@@ -861,14 +824,13 @@
     Ranking
   </button>
   <!-- Perfil ya no se repite acá: el ícono de arriba (#btnPerfil) es el único
-       acceso, así no hay dos caminos al mismo lugar. -->
-  <button id="btnAdminPanel" data-view="admin" class="tab tab-desktop-only" title="Panel de administrador" aria-label="Administración">
+       acceso, así no hay dos caminos al mismo lugar. Admin/Config se muestra acá
+       en mobile Y desktop, pero solo para admins (ver body.is-admin en style.css)
+       — antes en mobile vivía escondido adentro de "Más", que se sacó por no
+       tener nada más adentro para el resto de la gente. -->
+  <button id="btnAdminPanel" data-view="admin" class="tab" title="Panel de administrador" aria-label="Administración">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.6a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.1.68.3.94.56"/></svg></span>
     Config
-  </button>
-  <button id="tabMas" class="tab tab-mobile-only">
-    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span>
-    Más
   </button>
 </nav>
 
