@@ -81,3 +81,12 @@ end $$;
 -- resumen: cuántos jugadores quedaron y cuántas filas de ranking_categoria
 select count(*) as jugadores_totales from jugadores;
 select count(*) as filas_ranking_categoria from ranking_categoria;
+
+-- lista final para repartir usuario/clave: UN solo usuario por persona (el
+-- que sobrevivió después de juntar sus categorías) — la clave sigue siendo
+-- la misma provisoria que ya repartiste (Padel2026), esto es solo para que
+-- sepas cuál de los emails de cada persona es el que sigue existiendo.
+select nombre, apellido, email as usuario, categoria as categoria_principal
+from jugadores
+where email like '%@circuito.nortepadel'
+order by nombre, apellido;

@@ -1,32 +1,13 @@
 -- ============================================================
--- IMPORTACIÓN: Ranking El Norte Padel 2026 (RANKING EL NORTE PADEL 2026 SIN ASCENSO.xlsx)
+-- IMPORTACIÓN DEL RANKING — PASO 1 de 2
 -- ============================================================
--- Qué hace este script:
---   1. Carga los 606 jugadores/puntaje de las 11 categorías del Excel en una tabla
---      temporal (_import_ranking_stage).
---   2. Para cada fila intenta encontrar al jugador ya registrado en la app comparando
---      nombre+apellido (sin importar mayúsculas, acentos ni el orden "Nombre Apellido"
---      vs "Apellido Nombre" — el Excel dice una cosa en el título de columna y hace otra
---      en los datos, así que se prueban los dos órdenes).
---   3. Si lo encuentra UNA sola vez: le carga/actualiza el puntaje en esa categoría en
---      ranking_categoria (la tabla nueva que permite estar en más de una categoría a la
---      vez — no toca su categoría principal ni pisa puntos que ya tuviera en otra).
---   4. Si NO lo encuentra: crea un jugador nuevo (sin cuenta/login todavía — se vincula
---      solo cuando esa persona se registre con su email) con esa categoría como principal.
---   5. Si encuentra MÁS DE UNO con nombre parecido: no adivina — lo deja anotado como
---      "ambiguo" en _import_ranking_log para que el admin lo resuelva a mano (con el
---      buscador de "Jugadores registrados" en Administración, ya tiene ahí mismo un
---      bloque para asignarle categorías de ranking).
+-- Corré esto primero, en una consulta nueva y vacía. Prepara la tabla de
+-- trabajo (_import_ranking_stage) con los 606 jugadores/puntaje del Excel.
+-- No toca todavía ningún dato real de la app.
 --
--- Después de correrlo, revisá con:
---   select * from _import_ranking_log where accion in ('creado','ambiguo') order by accion, nombre_completo;
---
--- Es seguro re-correrlo: si lo volvés a pegar, actualiza los mismos puntos en vez de
--- duplicar filas (upsert por jugador_id+categoria), y a los jugadores ya encontrados no
--- los vuelve a crear.
+-- Cuando termine sin error, andá al PASO 2 (otro archivo) y corrélo en OTRA
+-- consulta nueva — no hace falta que sea la misma pestaña.
 -- ============================================================
-
-begin;
 
 create extension if not exists unaccent;
 
@@ -644,78 +625,3 @@ insert into _import_ranking_stage (nombre_completo, categoria, puntos) values
   ('GABI MONTERO', '8va Damas', 125),
   ('ANTO AGUIRRE', '8va Damas', 125),
   ('CAMILA CORONEL', '8va Damas', 125);
-
--- log persistente (no se borra al terminar la transacción) para poder revisar después
-create table if not exists _import_ranking_log (
-  id bigserial primary key,
-  nombre_completo text,
-  categoria text,
-  puntos numeric(10,1),
-  accion text, -- 'creado' | 'actualizado' | 'ambiguo'
-  jugador_id uuid,
-  creado_at timestamptz not null default now()
-);
-
-do $$
-declare
-  fila record;
-  candidatos uuid[];
-  nombre_split text[];
-  v_nombre text;
-  v_apellido text;
-  v_jugador_id uuid;
-begin
-  for fila in select * from _import_ranking_stage loop
-    -- busca por "Nombre Apellido" (primera palabra = nombre) o por "Apellido Nombre"
-    -- (última palabra = nombre), sin mayúsculas ni acentos, para no depender de en qué
-    -- orden esté cargado el jugador ya en la app
-    select array_agg(id) into candidatos
-    from jugadores
-    where unaccent(upper(trim(nombre || ' ' || apellido))) = unaccent(upper(trim(fila.nombre_completo)))
-       or unaccent(upper(trim(apellido || ' ' || nombre))) = unaccent(upper(trim(fila.nombre_completo)));
-
-    if candidatos is null or array_length(candidatos, 1) is null then
-      -- no existe: lo creamos con la categoría del Excel como principal.
-      -- Partido heurístico nombre/apellido: primera palabra = nombre, el resto = apellido
-      -- (funciona bien para nombres de una sola palabra + apellido de una o más palabras;
-      -- si el jugador real usa el orden inverso, el admin lo corrige a mano una vez).
-      nombre_split := regexp_split_to_array(trim(fila.nombre_completo), '\s+');
-      v_nombre := nombre_split[1];
-      v_apellido := array_to_string(nombre_split[2:array_length(nombre_split,1)], ' ');
-      if v_apellido is null or v_apellido = '' then v_apellido := v_nombre; end if;
-
-      insert into jugadores (nombre, apellido, categoria, puntos_ranking, activo)
-      values (initcap(v_nombre), initcap(v_apellido), fila.categoria, fila.puntos, true)
-      returning id into v_jugador_id;
-
-      insert into ranking_categoria (jugador_id, categoria, puntos_ranking)
-      values (v_jugador_id, fila.categoria, fila.puntos)
-      on conflict (jugador_id, categoria) do update set puntos_ranking = excluded.puntos_ranking, updated_at = now();
-
-      insert into _import_ranking_log (nombre_completo, categoria, puntos, accion, jugador_id)
-      values (fila.nombre_completo, fila.categoria, fila.puntos, 'creado', v_jugador_id);
-
-    elsif array_length(candidatos, 1) = 1 then
-      v_jugador_id := candidatos[1];
-
-      insert into ranking_categoria (jugador_id, categoria, puntos_ranking)
-      values (v_jugador_id, fila.categoria, fila.puntos)
-      on conflict (jugador_id, categoria) do update set puntos_ranking = excluded.puntos_ranking, updated_at = now();
-
-      insert into _import_ranking_log (nombre_completo, categoria, puntos, accion, jugador_id)
-      values (fila.nombre_completo, fila.categoria, fila.puntos, 'actualizado', v_jugador_id);
-
-    else
-      -- más de un jugador con ese nombre: no se toca nada, queda para revisión manual
-      insert into _import_ranking_log (nombre_completo, categoria, puntos, accion, jugador_id)
-      values (fila.nombre_completo, fila.categoria, fila.puntos, 'ambiguo', null);
-    end if;
-  end loop;
-end $$;
-
-drop table _import_ranking_stage;
-
--- resumen rápido al terminar
-select accion, count(*) from _import_ranking_log group by accion order by accion;
-
-commit;

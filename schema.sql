@@ -308,6 +308,18 @@ create table if not exists parejas (
   jugador2_id uuid not null references jugadores(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+-- La categoría vive en la pareja (no solo en "inscripciones"): un jugador
+-- puede jugar más de una categoría en el mismo torneo (con parejas distintas),
+-- y "inscripciones" solo admite UNA fila por jugador/torneo -- si la pareja
+-- no guarda su propia categoría, no hay forma de saber a cuál corresponde
+-- cada una cuando un jugador tiene más de una. Backfill: para las parejas
+-- cargadas antes de esta columna, usa la categoría de inscripciones como
+-- mejor estimación (correcta para el 99% que juega una sola categoría).
+alter table parejas add column if not exists categoria text;
+update parejas set categoria = (
+  select i.categoria from inscripciones i
+  where i.torneo_id = parejas.torneo_id and i.jugador_id = parejas.jugador1_id
+) where categoria is null;
 
 -- ---------- INSCRIPCIONES (jugador -> torneo, con disponibilidad puntual si difiere) ----------
 create table if not exists inscripciones (
@@ -880,7 +892,10 @@ create or replace function parejas_publicas(p_torneo_id uuid) returns table (
 ) language sql stable security definer set search_path = public as $$
   select p.id, p.jugador1_id, p.jugador2_id,
     j1.nombre || ' ' || j1.apellido, j2.nombre || ' ' || j2.apellido,
-    i1.categoria, coalesce(i1.estado, 'pendiente'), i1.motivo_rechazo
+    -- la categoría es la de la propia pareja (ver columna parejas.categoria) --
+    -- la de inscripciones de jugador1 queda solo de respaldo por si alguna
+    -- pareja vieja quedó sin categoría propia
+    coalesce(p.categoria, i1.categoria), coalesce(i1.estado, 'pendiente'), i1.motivo_rechazo
   from parejas p
   join jugadores j1 on j1.id = p.jugador1_id
   join jugadores j2 on j2.id = p.jugador2_id
@@ -968,13 +983,16 @@ begin
   on conflict (torneo_id, jugador_id) do update set categoria = excluded.categoria, estado = 'pendiente', motivo_rechazo = null
   where inscripciones.estado in ('cancelada', 'rechazada');
 
-  -- si ninguno de los dos tiene ya una pareja armada en este torneo, se arma
+  -- si ninguno de los dos tiene ya una pareja armada en ESTA categoría de
+  -- este torneo, se arma (un jugador puede tener pareja en otra categoría
+  -- del mismo torneo sin problema -- eso es jugar dos categorías a la vez,
+  -- no un error)
   if not exists (
     select 1 from parejas
-    where torneo_id = p_torneo_id
+    where torneo_id = p_torneo_id and categoria = p_categoria
       and (jugador1_id in (v_mi_id, p_pareja_jugador_id) or jugador2_id in (v_mi_id, p_pareja_jugador_id))
   ) then
-    insert into parejas (torneo_id, jugador1_id, jugador2_id) values (p_torneo_id, v_mi_id, p_pareja_jugador_id);
+    insert into parejas (torneo_id, jugador1_id, jugador2_id, categoria) values (p_torneo_id, v_mi_id, p_pareja_jugador_id, p_categoria);
   end if;
 
   -- tocarla lleva a "Mi inscripción" en ese torneo

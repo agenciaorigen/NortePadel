@@ -123,26 +123,7 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
 .seccion { margin: 0 0 26px; }
 .seccion > h3 { margin-bottom: 12px; }
 
-h2 {
-  font-family: "Anton", "Poppins", sans-serif; font-size: 23px; font-weight: 400;
-  text-transform: uppercase; margin: 0 0 14px; color: var(--text); letter-spacing: -.005em;
-}
-/* excepción: diálogos chicos (cambiar clave, notificaciones, detalle de
-   partido, "Más") no son una pantalla -- Anton en mayúsculas ahí se siente
-   gritado en vez de sobrio. Vuelven al Poppins de siempre. */
-.overlay-bloqueante h2 {
-  font-family: "Poppins", "Inter", sans-serif; font-size: 19px; font-weight: 800;
-  text-transform: none; letter-spacing: -.01em;
-}
-/* administración es herramienta de trabajo, no vidriera -- Anton en mayúsculas
-   en cada card de un panel denso de formularios se siente gritado, no prolijo.
-   .admin-only cubre tanto el panel dedicado (#view-admin) como cards sueltas
-   que viven en una pantalla pública pero son solo para el admin, como
-   "Crear torneo" adentro de Torneos. */
-#view-admin h2, .admin-only h2 {
-  font-family: "Poppins", "Inter", sans-serif; font-size: 19px; font-weight: 800;
-  text-transform: none; letter-spacing: -.01em;
-}
+h2 { font-size: 19px; font-weight: 800; margin: 0 0 14px; color: var(--text); letter-spacing: -.01em; }
 h3 { font-size: 12.5px; font-weight: 700; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
 
 label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 5px; }
@@ -179,7 +160,6 @@ button.primary {
   width: 100%;
   cursor: pointer;
 }
-button.primary:hover { opacity: .92; }
 button.primary:active { transform: scale(.98); }
 button.secondary {
   background: var(--bg-elev);
@@ -207,69 +187,14 @@ button.danger { border-color: var(--danger); color: var(--danger); background: t
 
 button:disabled { opacity: .5; cursor: not-allowed; }
 
-/* foco visible por teclado: los inputs ya lo tenían (ver arriba), los botones no —
-   mismo verde de marca en vez del azul por defecto del navegador, así el anillo de
-   foco queda coherente con la identidad en vez de desentonar */
-button:focus-visible,
-.pill:focus-visible,
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 tr:first-child td { font-weight: 700; }
 
-/* número tipo "scoreboard": mismo tratamiento bold + tabular que .pj-stats/.destacado-stat,
-   para puntos de ranking y cualquier otro número que deba leerse como un dato duro */
-.num-score { font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-
 .pos-1 { color: #ffd700; }
 .pos-2 { color: #c9d3e0; }
 .pos-3 { color: #ff9d5c; }
-
-/* ---------- Podio del ranking: top 3 arriba de la tabla, mismo criterio de
-   colores que .pos-1/2/3 (oro/plata/bronce) que ya usaba solo el número de
-   posición -- ahora también el podio, nada nuevo inventado. ---------- */
-.podium {
-  /* minmax(0, 1fr), no 1fr solo -- si no, un nombre largo empuja la columna
-     más allá del ancho del card y el podio se corta en mobile */
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end;
-  margin-bottom: 18px;
-}
-.pod {
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: var(--bg-elev); border: 1px solid var(--border); border-bottom: none;
-  padding: 16px 10px 14px; text-align: center; position: relative; cursor: pointer;
-}
-.pod-rank {
-  position: absolute; top: 10px; left: 10px;
-  font-family: "Anton", "Poppins", sans-serif; font-size: 12px; color: var(--muted);
-}
-.pod-ring { display: flex; justify-content: center; margin-bottom: 8px; }
-.pod-nombre {
-  font-size: 12px; font-weight: 700; margin: 0 0 2px; line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-.pod-pts {
-  font-family: "Anton", "Poppins", sans-serif; font-size: 21px; margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.pod-1 { order: 2; padding-top: 22px; }
-.pod-1 .avatar { border-color: #ffd700; }
-.pod-1 .pod-pts { color: #ffd700; }
-.pod-2 { order: 1; }
-.pod-2 .avatar { border-color: #c9d3e0; }
-.pod-2 .pod-pts { color: #c9d3e0; }
-.pod-3 { order: 3; }
-.pod-3 .avatar { border-color: #ff9d5c; }
-.pod-3 .pod-pts { color: #ff9d5c; }
-@media (min-width: 960px) {
-  .pod-nombre { font-size: 14px; }
-  .pod-pts { font-size: 26px; }
-}
 
 /* ---------- Badges: chicos, elegantes, solo metadata — nunca sobredimensionados ---------- */
 .badge {
@@ -287,10 +212,6 @@ tr:first-child td { font-weight: 700; }
 .badge.orange { background: rgba(255,194,77,.14); color: var(--state-warn); border: 1px solid rgba(255,194,77,.3); }
 .badge.danger { background: rgba(255,92,108,.14); color: var(--danger); border: 1px solid rgba(255,92,108,.3); }
 .badge.solid { background: rgba(111,224,138,.14); color: var(--state-ok); border: 1px solid rgba(111,224,138,.3); font-weight: 700; }
-/* antes esto era un style="" inline en app.js (color hardcodeado, salteando el
-   sistema de variables) — mismo dorado que ya usan avatar-master/pos-1/pj-medalla-oro
-   para "top de ranking", ahora como una variante más del componente .badge */
-.badge.master { background: rgba(255,215,0,.12); color: #ffd700; border-color: rgba(255,215,0,.4); font-weight: 700; }
 
 /* ranking público: menos "tabla" y más lista de leaderboard */
 #tablaRanking th { border-bottom: 2px solid var(--border); }
@@ -340,10 +261,7 @@ tr:first-child td { font-weight: 700; }
 
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
-/* mismo anillo degradé que ya usa el logo del header (var(--gradient)) --
-   nada nuevo, solo se reusa acá para la foto de perfil */
-#pjFoto { background: var(--gradient); padding: 3px; border-radius: 50%; width: fit-content; flex-shrink: 0; }
-.pj-header .avatar { border: 2px solid var(--bg); font-size: 34px; }
+.pj-header .avatar { border: 2px solid rgba(245,245,245,.4); font-size: 34px; }
 .pj-header h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
 .pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pj-medalla {
@@ -361,15 +279,9 @@ tr:first-child td { font-weight: 700; }
   margin-top: 6px;
 }
 .pj-stats > div { text-align: left; }
-/* mismo criterio "scoreboard" que el título del héroe: Anton para todo número
-   grande que deba leerse como un dato duro, no solo negrita sobre Poppins */
-.pj-stats strong, .destacado-stat strong, .hero-club-widget strong, .num-score {
-  font-family: "Anton", "Poppins", sans-serif;
-  font-weight: 400;
-}
 .pj-stats strong {
-  display: block; font-size: clamp(22px, 6vw, 32px); line-height: 1;
-  letter-spacing: -.01em; color: var(--text); font-variant-numeric: tabular-nums;
+  display: block; font-size: clamp(22px, 6vw, 32px); font-weight: 800; line-height: 1;
+  letter-spacing: -.02em; color: var(--text);
 }
 .pj-stats span {
   display: block; font-size: 11px; color: var(--muted); text-transform: uppercase;
@@ -399,14 +311,10 @@ tr:first-child td { font-weight: 700; }
 }
 .torneo-hero-overlay { position: relative; z-index: 1; }
 .torneo-hero-overlay .badge { margin-bottom: 10px; }
-/* mismo criterio que el héroe de Inicio: título de portada, no un h2 más */
-.torneo-hero-overlay h2 {
-  margin: 0; font-family: "Anton", "Poppins", sans-serif; font-weight: 400;
-  text-transform: uppercase; letter-spacing: -.01em;
-  font-size: clamp(28px, 7vw, 44px); line-height: .96;
-}
+.torneo-hero-overlay h2 { margin: 0; font-size: 24px; line-height: 1.15; }
 @media (min-width: 960px) {
   .torneo-hero { min-height: 260px; padding: 38px; }
+  .torneo-hero-overlay h2 { font-size: 34px; }
 }
 
 /* ---------- Hero Inicio ---------- */
@@ -414,46 +322,31 @@ tr:first-child td { font-weight: 700; }
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  padding: 40px 24px 34px;
-  min-height: 400px;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 30px 22px 28px;
   margin-bottom: 20px;
   background:
-    radial-gradient(520px 520px at var(--mx, 20%) var(--my, 20%), rgba(180,255,57,.14), transparent 60%),
-    linear-gradient(0deg, rgba(11,13,13,.96), rgba(11,13,13,.35) 65%),
+    linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.4) 60%),
     url('hero-cancha.jpg') center/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
 }
-/* estela de pelota: mismo lima de marca, se apaga sola si el usuario pidió
-   menos movimiento (ver hero-fx.js) -- puramente decorativo, aria-hidden */
-#heroTrail { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-/* título de portada de verdad -- antes quedaba casi del mismo tamaño que
-   cualquier h2 de la app, sin pesar como tal. Tipografía de impacto (Anton)
-   en vez de Poppins acá puntualmente: a este tamaño Poppins se ve "inflado"
-   en vez de contundente -- mismo criterio "scoreboard" que ya usan los
-   números grandes (pj-stats, destacado-stat), ahora también en el título.
-   clamp() lo escala fluido en vez de saltar entre dos tamaños fijos.
-   Líneas quebradas (grilla rota) en vez de bloque único: la última entra
-   corrida hacia la derecha, en el verde de marca. */
-.hero-club-titulo { position: relative; margin: 0 0 14px; }
-.hero-club-titulo-line {
-  display: block;
-  font-family: "Anton", "Poppins", sans-serif;
-  font-size: clamp(34px, 10vw, 72px);
-  line-height: .94;
-  font-weight: 400;
-  letter-spacing: -.01em;
-  text-transform: uppercase;
+.hero-club-titulo {
+  position: relative;
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 800;
+  margin: 0 0 10px;
+  letter-spacing: -.02em;
+  max-width: 85%;
 }
-.hero-club-titulo-line.accent { margin-left: 12vw; color: var(--accent); text-shadow: 0 0 46px rgba(180,255,57,.35); }
-.hero-club-sub { position: relative; color: #cfd2d2; font-size: 15.5px; margin: 0 0 22px; max-width: 36ch; }
+.hero-club-titulo span { color: inherit; }
+.hero-club-sub { position: relative; color: #cfd2d2; font-size: 14px; margin: 0 0 18px; max-width: 34ch; }
 .hero-club-cta {
   position: relative;
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--text); color: var(--bg);
   border: none; border-radius: 30px;
-  padding: 14px 24px; font-weight: 700; font-size: 15px;
+  padding: 12px 20px; font-weight: 700; font-size: 14px;
   cursor: pointer;
 }
 .hero-club-cta span { transition: transform .15s; }
@@ -469,7 +362,7 @@ tr:first-child td { font-weight: 700; }
   text-align: right;
 }
 .hero-club-widget-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.hero-club-widget strong { font-size: 20px; letter-spacing: 0; color: var(--text); line-height: 1.3; font-variant-numeric: tabular-nums; }
+.hero-club-widget strong { font-size: 18px; color: var(--text); line-height: 1.3; }
 .hero-club-widget-sub { font-size: 11px; color: var(--muted); }
 
 /* ---------- Banda con leyenda en movimiento ----------
@@ -491,8 +384,7 @@ tr:first-child td { font-weight: 700; }
 .marquee-track {
   display: flex; gap: 14px; width: max-content;
   color: var(--text);
-  font-family: "Anton", "Poppins", sans-serif;
-  font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   animation: marquee-scroll 16s linear infinite;
 }
 .marquee-dot { opacity: .5; }
@@ -534,9 +426,8 @@ tr:first-child td { font-weight: 700; }
 }
 .energia-texto { position: relative; z-index: 1; max-width: 34ch; }
 .energia-texto h3 {
-  font-family: "Anton", "Poppins", sans-serif;
-  font-size: 26px; font-weight: 400; margin: 0 0 8px;
-  color: var(--text); text-transform: uppercase; letter-spacing: -.01em; line-height: .98;
+  font-size: 22px; font-weight: 800; margin: 0 0 8px;
+  color: var(--text); text-transform: none; letter-spacing: -.01em; line-height: 1.1;
 }
 .energia-texto p { font-size: 13px; color: #d8dbdb; margin: 0; }
 
@@ -597,7 +488,7 @@ tr:first-child td { font-weight: 700; }
   font-size: 10.5px; font-weight: 700;
 }
 .destacado-stat { position: relative; z-index: 1; }
-.destacado-stat strong { display: block; font-size: 29px; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.destacado-stat strong { display: block; font-size: 27px; font-weight: 800; line-height: 1; letter-spacing: -.01em; }
 .destacado-stat span { font-size: 10.5px; color: #d8dbdb; text-transform: uppercase; letter-spacing: .04em; }
 .destacado-info { position: relative; z-index: 1; }
 .destacado-info strong {
@@ -630,9 +521,8 @@ tr:first-child td { font-weight: 700; }
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
-  display: block; font-family: "Anton", "Poppins", sans-serif;
-  font-size: 25px; font-weight: 400; text-transform: uppercase;
-  letter-spacing: -.01em; line-height: 1;
+  display: block; font-size: 22px; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1.15;
 }
 .flyer-destacado-info span { font-size: 12px; color: #d8dbdb; }
 
@@ -741,7 +631,7 @@ tr:first-child td { font-weight: 700; }
   box-shadow: var(--shadow);
 }
 .orden-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: 4px; }
-.orden-cancha { font-family: "Anton", "Poppins", sans-serif; font-size: 23px; font-weight: 400; text-transform: uppercase; letter-spacing: -.005em; color: #fff; line-height: 1; }
+.orden-cancha { font-family: "Poppins"; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #fff; line-height: 1.1; }
 .orden-sep {
   text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
   color: rgba(255,255,255,.65); margin: 16px 0 10px; position: relative;
@@ -767,16 +657,11 @@ tr:first-child td { font-weight: 700; }
 .orden-nombre span { font-weight: 600; color: rgba(255,255,255,.7); }
 .orden-lado.ganador .orden-nombre strong { color: #e3d9ff; }
 .orden-lado.perdedor { opacity: .6; }
-.orden-vs-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
 .orden-vs {
   flex-shrink: 0; font-family: "Poppins"; font-weight: 900; font-size: 13px; color: #fff;
   background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
   width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
 }
-/* resultado ya cargado: el mismo círculo pasa a mostrar el set en vez de "VS",
-   y una segunda línea suma el resto -- así el póster también sirve para
-   compartir el resultado, no solo el cruce antes de jugarse */
-.orden-score { font-size: 8.5px; font-weight: 800; color: rgba(255,255,255,.85); background: rgba(11,13,13,.4); border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 .orden-footer {
   display: flex; justify-content: space-between; align-items: center; margin-top: 16px;
   font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.6);
@@ -803,14 +688,6 @@ tr:first-child td { font-weight: 700; }
   color: var(--muted); margin-bottom: 2px;
 }
 .llave-columna.llave-separador { padding-left: 20px; border-left: 1px dashed var(--border); }
-/* la final se distingue por diseño, no solo por ser la última columna -- así
-   no hace falta llegar hasta el final del scroll para reconocerla de un vistazo */
-.llave-columna.llave-final h3 { color: var(--accent); }
-.llave-columna.llave-final .llave-partido {
-  border-color: rgba(180,255,57,.4);
-  background: linear-gradient(165deg, rgba(180,255,57,.08), var(--card) 60%);
-  box-shadow: 0 0 0 1px rgba(180,255,57,.08), 0 10px 26px -14px rgba(180,255,57,.4);
-}
 .llave-partido {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;
 }
@@ -1090,10 +967,7 @@ nav.tabbar .icon { position: relative; }
     linear-gradient(0deg, rgba(11,13,13,.94), rgba(11,13,13,.5) 65%),
     url('pelotas.jpg') center/cover no-repeat, var(--bg);
 }
-.torneo-card-poster .torneo-nombre {
-  font-family: "Anton", "Poppins", sans-serif; font-size: 20px; font-weight: 400;
-  text-transform: uppercase; letter-spacing: -.005em;
-}
+.torneo-card-poster .torneo-nombre { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
 .torneo-card-poster .torneo-lugar,
 .torneo-card-poster .match-meta { color: #d8dbdb; }
 /* torneos con flyer propio: tarjeta bien grande, el flyer se ve como un póster real
@@ -1207,30 +1081,6 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   box-shadow: var(--shadow);
 }
 
-/* ---------- Invitación a instalar: hoja propia, no bloqueante -----------
-   A diferencia de .overlay-bloqueante (que tapa todo y exige una acción),
-   esto es descartable con un toque afuera o "Ahora no" -- nunca le saca al
-   usuario lo que estaba mirando. Vive arriba de la tabbar, respeta el mismo
-   margen de seguridad que .toast. Ver hero-fx.js. */
-#installSheet {
-  position: fixed; left: 12px; right: 12px;
-  bottom: calc(86px + env(safe-area-inset-bottom));
-  z-index: 40; max-width: 420px; margin: 0 auto;
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 16px; box-shadow: var(--shadow);
-  display: flex; flex-direction: column; gap: 12px;
-  transform: translateY(0); transition: transform .25s ease, opacity .25s ease;
-}
-#installSheet[hidden] { display: none; }
-#installSheet.saliendo { transform: translateY(12px); opacity: 0; pointer-events: none; }
-.install-row { display: flex; align-items: center; gap: 12px; }
-.install-icon { width: 44px; height: 44px; border-radius: 12px; padding: 2px; background: var(--gradient); flex-shrink: 0; }
-.install-icon img { width: 100%; height: 100%; border-radius: 10px; display: block; background: var(--bg); }
-.install-row strong { display: block; font-size: 14px; margin-bottom: 2px; }
-.install-row p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
-.install-actions { display: flex; gap: 10px; }
-.install-actions button.primary { margin-top: 0; width: auto; flex: 1; }
-
 /* ---------- Sponsors / publicidad: acompañan, no dominan ----------
    Se integran como "PRESENTAN" + logos chicos — nunca como el elemento
    más grande de la pantalla. Fondo blanco solo detrás del logo en sí
@@ -1282,11 +1132,11 @@ nav.tabbar button.tab-mobile-only { display: flex; }
 
 @media (min-width: 960px) {
   /* en desktop los auspiciantes van en la columna lateral, no en la barra móvil */
-  .sponsor-marquee { display: none; }
+  .sponsor-marquee { display: none !important; }
 }
 @media (max-width: 959px) {
   /* en mobile los auspiciantes van en la barra móvil (arriba), no en el renglón chico */
-  #sponsorsInlineCard { display: none; }
+  #sponsorsInlineCard { display: none !important; }
 }
 
 @media (min-width: 960px) {
@@ -1324,6 +1174,7 @@ nav.tabbar button.tab-mobile-only { display: flex; }
   main { padding: 0; max-width: none; margin: 0; }
 
   .hero-club { padding: 44px 44px 40px; min-height: 300px; }
+  .hero-club-titulo { font-size: 46px; max-width: 60%; }
   .hero-club-sub { font-size: 15px; max-width: 40ch; }
 
   .destacados-band { padding: 24px 26px 28px; }

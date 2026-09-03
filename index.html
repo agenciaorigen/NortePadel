@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600&family=Anton&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -98,13 +98,12 @@
   <section id="view-inicio" class="view active">
 
     <div class="hero-club">
-      <canvas id="heroTrail" aria-hidden="true"></canvas>
       <div class="hero-club-widget" id="heroPosicionCard" style="display:none">
         <span class="hero-club-widget-label">Tu posición</span>
         <strong id="heroPosicionValor">—</strong>
         <span class="hero-club-widget-sub" id="heroPosicionSub"></span>
       </div>
-      <h2 class="hero-club-titulo"><span class="hero-club-titulo-line">Movimiento.</span><span class="hero-club-titulo-line">Disciplina.</span><span class="hero-club-titulo-line accent">Resultado.</span></h2>
+      <h2 class="hero-club-titulo">Movimiento.<br /><span>Disciplina.</span><br />Resultado.</h2>
       <p class="hero-club-sub">El circuito de pádel de Norte Padel: ranking en vivo, torneos todo el año.</p>
       <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
     </div>
@@ -410,7 +409,6 @@
       <p class="match-meta" style="margin-bottom:6px;color:#ffd700">Los resaltados en amarillo (primeros 20 de su categoría) clasifican al Master de fin de año — los primeros 10, además, se destacan con foto grande.</p>
       <div class="pill-row" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
-      <div class="podium" id="rankingPodio" style="display:none"></div>
       <table id="tablaRanking">
         <thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
         <tbody></tbody>
@@ -653,8 +651,10 @@
       <div class="card partidos-poster" id="admSeccionPartidos">
         <h2>Partidos</h2>
         <button class="primary" id="btnArmarPartidos">1. Generar fixture (cruces, sin horario)</button>
-        <button class="secondary" id="btnGenerarCalendario" style="margin-top:8px">2. Generar calendario (asignar cancha y horario)</button>
+        <button class="secondary" id="btnGenerarCalendario" style="margin-top:8px">2. Generar calendario de prueba (asignar cancha y horario)</button>
+        <button class="secondary" id="btnPublicarCalendario" style="margin-top:8px">3. Publicar calendario (recién ahí lo ven los jugadores)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
+        <div id="admEstadoCategorias" style="margin-top:10px"></div>
         <label style="margin-top:12px">Categoría</label>
         <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
         <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
@@ -771,7 +771,7 @@
         <label>Logo</label>
         <input id="spArchivo" type="file" accept="image/*" />
         <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
-        <div class="sponsor-strip vertical" id="listaSponsors" style="margin-top:16px"></div>
+        <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
       </div>
     </div>
 
@@ -859,24 +859,9 @@
 
 <div id="toast" class="toast" style="display:none"></div>
 
-<div id="installSheet" hidden>
-  <div class="install-row">
-    <span class="install-icon"><img src="icon-192.png" alt="" /></span>
-    <div>
-      <strong>Agregar Norte Padel a inicio</strong>
-      <p id="installSheetTexto">Sin tienda de apps — entrás directo, un ícono más al lado de las que ya usás.</p>
-    </div>
-  </div>
-  <div class="install-actions">
-    <button type="button" class="primary" id="btnInstalarApp">Instalar</button>
-    <button type="button" class="tertiary" id="btnInstalarAhoraNo">Ahora no</button>
-  </div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="matching.js"></script>
-<script src="hero-fx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

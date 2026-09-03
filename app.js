@@ -648,35 +648,6 @@ async function cargarRanking() {
     return;
   }
   document.getElementById("rankingVacio").style.display = "none";
-
-  // podio para el top 3 -- mismo dato que ya arma la tabla de abajo, solo se
-  // lee dos veces de "completa" en vez de tocar el resto del render. Si hay
-  // menos de 3 jugadores en la categoría, se oculta y queda solo la tabla.
-  const podioCont = document.getElementById("rankingPodio");
-  if (podioCont) {
-    if (completa.length >= 3) {
-      const top3 = completa.slice(0, 3);
-      const orden = [top3[1], top3[0], top3[2]]; // 2do / 1ro / 3ro, para que el 1ro quede al medio
-      podioCont.innerHTML = orden.map((j, i) => {
-        const puesto = i === 1 ? 1 : i === 0 ? 2 : 3;
-        return `<div class="pod pod-${puesto}" data-abrir-perfil="${j.id}">
-          <span class="pod-rank">${puesto}</span>
-          <div class="pod-ring">${avatarHtml(j.foto_url, puesto === 1 ? 64 : 52)}</div>
-          <p class="pod-nombre">${j.nombre} ${j.apellido}</p>
-          <p class="pod-pts">${j.puntos_ranking}</p>
-        </div>`;
-      }).join("");
-      podioCont.querySelectorAll("[data-abrir-perfil]").forEach((el) => {
-        el.style.cursor = "pointer";
-        el.addEventListener("click", () => abrirPerfilJugador(el.dataset.abrirPerfil));
-      });
-      podioCont.style.display = "grid";
-    } else {
-      podioCont.innerHTML = "";
-      podioCont.style.display = "none";
-    }
-  }
-
   completa.forEach((j, idx) => {
     const posicion = idx + 1;
     // clasifica al Master de fin de año: primeros 20. La foto grande (con borde
@@ -687,10 +658,10 @@ async function cargarRanking() {
     if (clasificaMaster) tr.className = "fila-master";
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
     const avatarClass = fotoGrande ? "avatar-master" : "";
-    const badgeMaster = clasificaMaster ? `<span class="badge master">Master</span>` : "";
+    const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido} ${badgeMaster}</span></div></td>
-      <td><strong class="num-score">${j.puntos_ranking}</strong></td>
+      <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
     tr.style.cursor = "pointer";
@@ -1404,10 +1375,6 @@ function renderListaJugadoresAdmin() {
         <select id="jaEtiqueta-${j.id}" class="jaEtiqueta">${opcionesEtiqueta}</select>
       </div>
       <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
-      <div class="ja-disponibilidad" style="margin-top:8px">
-        <div class="match-meta">Horarios en los que no puede jugar:</div>
-        <div id="dispAdmin-${j.id}"></div>
-      </div>
       <div class="ja-ranking-extra" style="margin-top:8px">
         <div class="match-meta">Categorías de ranking (puede estar en más de una a la vez):</div>
         <div class="jaRankingLista"></div>
@@ -1476,11 +1443,6 @@ function renderListaJugadoresAdmin() {
       if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
       const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking, etiqueta_id }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
-
-      await sb.from("disponibilidad").delete().eq("jugador_id", j.id).is("torneo_id", null);
-      const disponibilidades = leerRestriccionesDeForm(`dispAdmin-${j.id}`).map((r) => ({ jugador_id: j.id, torneo_id: null, ...r }));
-      if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
-
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
       cargarRanking();
@@ -1498,14 +1460,6 @@ function renderListaJugadoresAdmin() {
       cargarRanking();
     });
     cont.appendChild(div);
-    // el picker de disponibilidad necesita que su contenedor ya esté en el
-    // documento (getElementById no encuentra nodos todavía sueltos), por eso
-    // se arma recién acá, después del appendChild -- mismo componente que ya
-    // usa el jugador en su propio perfil (renderDisponibilidadForm), ahora
-    // también editable por el admin al cargar/corregir un jugador.
-    renderDisponibilidadForm(`dispAdmin-${j.id}`);
-    sb.from("disponibilidad").select("*").eq("jugador_id", j.id).is("torneo_id", null)
-      .then(({ data }) => precargarRestriccionesEnForm(`dispAdmin-${j.id}`, data));
   });
 }
 document.getElementById("buscarJugadorAdmin")?.addEventListener("input", renderListaJugadoresAdmin);
@@ -1979,11 +1933,20 @@ async function cargarMiInscripcion() {
   contEstado.innerHTML = insc.estado === "confirmada"
     ? '<span class="badge solid">🟢 Confirmada</span>'
     : '<span class="badge orange">Pendiente de confirmar</span>';
-  const miPareja = (parejas || []).find((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
-  const companero = miPareja ? (miPareja.jugador1_id === miJugador.id ? miPareja.jugador2_nombre : miPareja.jugador1_nombre) : null;
-  contResumen.textContent = companero
-    ? `Jugás con ${companero}, categoría ${insc.categoria}.`
-    : `Categoría ${insc.categoria} · todavía sin pareja confirmada.`;
+  // un jugador puede tener más de una pareja en este torneo si juega más de
+  // una categoría (cada pareja guarda su propia categoría) -- se muestran
+  // todas, no solo la primera que aparezca
+  const misParejas = (parejas || []).filter((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
+  if (misParejas.length === 0) {
+    contResumen.textContent = `Categoría ${insc.categoria} · todavía sin pareja confirmada.`;
+  } else {
+    contResumen.textContent = misParejas
+      .map((p) => {
+        const companero = p.jugador1_id === miJugador.id ? p.jugador2_nombre : p.jugador1_nombre;
+        return `Jugás con ${companero}, categoría ${p.categoria || insc.categoria}.`;
+      })
+      .join(" ");
+  }
 }
 document.getElementById("miInscBtnDisponibilidad").addEventListener("click", () => mostrarPantallaTorneo("mi-disponibilidad"));
 document.getElementById("miInscBtnMisPartidos").addEventListener("click", () => mostrarPantallaTorneo("calendario"));
@@ -2331,17 +2294,26 @@ async function refrescarDetalleTorneo() {
     sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId }),
     sb.rpc("partidos_publicos", { p_torneo_id: torneoActualId })
   ]);
-  ultimosPartidos = partidos || [];
-  // el flag de arriba se basa en torneo_categorias.estado_fase, que puede quedar
-  // desactualizado si un horario se asignó a mano partido por partido (o
-  // arrastrando en la planilla) en vez de con "Generar calendario" — bug real
-  // detectado: quedaban partidos con horario pero la pestaña de Calendario
-  // seguía oculta para todo el mundo salvo el admin. Se refuerza mirando los
-  // partidos reales: si ya hay alguno con horario o jugado, el calendario
-  // existe para el público aunque ese flag no se haya actualizado.
-  if (!hayCalendarioTorneoActual) {
-    hayCalendarioTorneoActual = ultimosPartidos.some((p) => p.horario || p.estado === "jugado");
-  }
+  // partidos_publicos() devuelve TODOS los partidos del torneo (la misma RPC
+  // la usa también Administración, que sí necesita ver los partidos de una
+  // categoría todavía en borrador para poder revisarlos) — el filtro de "solo
+  // lo publicado" se hace acá, del lado público, con torneo_categorias que ya
+  // se trajo arriba: así una categoría en calendario_borrador no le aparece a
+  // los jugadores mezclada con otra categoría del mismo torneo que sí esté
+  // publicada.
+  const categoriasPublicadas = new Set((t.torneo_categorias || [])
+    .filter((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada")
+    .map((c) => c.categoria));
+  ultimosPartidos = (partidos || []).filter((p) => categoriasPublicadas.has(p.categoria));
+  // OJO: a propósito NO hay acá un fallback que mire "¿algún partido ya tiene
+  // horario?" para forzar hayCalendarioTorneoActual -- desde que existe el
+  // calendario "de prueba" (calendario_borrador), un partido puede tener
+  // horario asignado SIN que el admin lo haya publicado todavía, y ese
+  // fallback se lo mostraría igual al público. Por eso todos los caminos que
+  // asignan horario (generarCalendarioParaCategoria, arrastrar en la
+  // planilla, "Cambiar horario") mantienen torneo_categorias.estado_fase al
+  // día -- esa columna es la única fuente de verdad de "¿ya se puede
+  // mostrar?".
 
   // Calendario/Resultados (pestañas de torneoSubnav) solo aparecen una vez que
   // alguna categoría tiene calendario confirmado — mientras se está anotando
@@ -2586,6 +2558,7 @@ async function cargarGestionTorneo(id) {
   if (!categoriasGestion.includes(partidosCategoriaFiltro)) partidosCategoriaFiltro = "";
   selCatPartidos.innerHTML = `<option value="">Todas</option>` +
     categoriasGestion.map((c) => `<option value="${c}" ${c === partidosCategoriaFiltro ? "selected" : ""}>${c}</option>`).join("");
+  renderEstadoCategorias(t.torneo_categorias || []);
 
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id)").eq("torneo_id", id);
   document.getElementById("admCanchas").innerHTML = (tc || []).map((c) =>
@@ -2704,10 +2677,11 @@ document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", a
   const categoriasActuales = new Set((t.torneo_categorias || []).map((c) => c.categoria));
   document.querySelectorAll(".chkTorneoCategoriaEdit").forEach((chk) => (chk.checked = categoriasActuales.has(chk.value)));
 
-  // una vez que alguna categoría ya tiene calendario armado, tocar fecha/horario/
-  // formato/categorías puede desincronizar los partidos ya programados con lo
-  // que el torneo dice — se bloquean esos campos (nombre/sede/costo siguen libres).
-  const hayCalendarioArmado = (t.torneo_categorias || []).some((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada");
+  // una vez que alguna categoría ya tiene calendario armado (aunque sea "de
+  // prueba", todavía sin publicar), tocar fecha/horario/formato/categorías
+  // puede desincronizar los partidos ya programados con lo que el torneo dice
+  // — se bloquean esos campos (nombre/sede/costo siguen libres).
+  const hayCalendarioArmado = (t.torneo_categorias || []).some((c) => c.estado_fase === "calendario_borrador" || c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada");
   document.getElementById("teAvisoBloqueo").style.display = hayCalendarioArmado ? "block" : "none";
   ["teFechaInicio", "teFechaFin", "teDuracion", "teHoraDesde", "teHoraHasta", "teFaseGruposFormato", "teTamanoGrupo", "teAvanzanPorGrupo"]
     .forEach((id) => { document.getElementById(id).disabled = hayCalendarioArmado; });
@@ -2807,7 +2781,7 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   const { error: e1 } = await sb.from("inscripciones").insert({ torneo_id: torneoGestionId, jugador_id: jugador1Id, categoria, estado: "confirmada" });
   const { error: e2 } = await sb.from("inscripciones").insert({ torneo_id: torneoGestionId, jugador_id: jugador2Id, categoria, estado: "confirmada" });
   if (e1 || e2) { toast("Alguno de los dos ya está inscripto u ocurrió un error"); return; }
-  const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id });
+  const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id, categoria });
   if (e3) { toast("Se inscribieron pero no se pudo armar la pareja: " + e3.message); refrescarTrasAccionGestion(); return; }
   toast("Pareja inscripta");
   in1.value = "";
@@ -2958,6 +2932,27 @@ function armarGruposDeParejas(parejasCategoria, tamanoGrupo) {
     gruposArr[gruposArr.length - 2].push(...gruposArr.pop());
   }
   return gruposArr;
+}
+
+// Un badge por categoría con su fase actual, para que el admin sepa de un
+// vistazo qué falta: si el calendario ya está armado "de prueba" pero
+// todavía no se publicó, se lo remarca en naranja para que no se olvide de
+// apretar "Publicar calendario".
+const ETIQUETA_ESTADO_FASE = {
+  sin_fixture: "sin fixture",
+  fixture_generado: "fixture armado, falta calendario",
+  calendario_borrador: "calendario de prueba — sin publicar",
+  calendario_confirmado: "calendario publicado ✅",
+  finalizada: "finalizada 🏆"
+};
+function renderEstadoCategorias(torneoCategorias) {
+  const cont = document.getElementById("admEstadoCategorias");
+  if (!cont) return;
+  cont.innerHTML = torneoCategorias.map((c) => {
+    const clase = c.estado_fase === "calendario_borrador" ? "badge orange" : "badge";
+    const etiqueta = ETIQUETA_ESTADO_FASE[c.estado_fase] || c.estado_fase;
+    return `<span class="${clase}" style="margin:0 6px 6px 0">${c.categoria}: ${etiqueta}</span>`;
+  }).join("");
 }
 
 // Arma (e inserta) el FIXTURE de UNA categoría: quién juega contra quién,
@@ -3114,7 +3109,13 @@ async function generarCalendarioParaCategoria(torneoId, categoria, torneo, canch
   }
   if (partidosGenerados.length > 0) {
     ocupacionAcumulada.push(...partidosGenerados);
-    await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoId).eq("categoria", categoria);
+    // "de prueba" primero: si esta categoría ya estaba publicada (una ronda
+    // posterior a una que el público ya venía viendo), no la escondemos de
+    // nuevo -- pero si es la primera vez que tiene calendario, queda en
+    // borrador hasta que el admin la revise y apriete "Publicar calendario".
+    const { data: catActual } = await sb.from("torneo_categorias").select("estado_fase").eq("torneo_id", torneoId).eq("categoria", categoria).maybeSingle();
+    const yaPublicada = catActual && (catActual.estado_fase === "calendario_confirmado" || catActual.estado_fase === "finalizada");
+    await sb.from("torneo_categorias").update({ estado_fase: yaPublicada ? "calendario_confirmado" : "calendario_borrador" }).eq("torneo_id", torneoId).eq("categoria", categoria);
   }
   return { generados: partidosGenerados.length, sinHorario: sinHorario.length };
 }
@@ -3265,7 +3266,30 @@ document.getElementById("btnGenerarCalendario").addEventListener("click", async 
   }
 
   await actualizarEstadoTorneoPorFases(torneoGestionId);
-  toast(`Se asignó horario a ${totalGenerados} partidos` + (totalSinHorario ? `, ${totalSinHorario} quedaron sin horario común` : ""));
+  toast(`Calendario de prueba armado: ${totalGenerados} partidos con horario` +
+    (totalSinHorario ? `, ${totalSinHorario} quedaron sin horario común` : "") +
+    `. Todavía no lo ven los jugadores — revisalo y apretá "Publicar calendario".`);
+  avisarActualizacionEnVivo();
+  refrescarTrasAccionGestion();
+});
+
+document.getElementById("btnPublicarCalendario").addEventListener("click", async () => {
+  // Pasa de "de prueba" a público SOLO las categorías que están en borrador
+  // -- no toca las que ya estaban publicadas ni las que todavía no tienen
+  // calendario armado. Es la acción de "aprobar y publicar" que pidió el
+  // club: separada a propósito de "Generar calendario" para poder revisar
+  // (y reacomodar a mano en la planilla) antes de que se vuelva visible.
+  if (!torneoGestionId) { toast("Elegí primero un torneo en gestión"); return; }
+  const { data: cats } = await sb.from("torneo_categorias").select("categoria, estado_fase").eq("torneo_id", torneoGestionId);
+  const enBorrador = (cats || []).filter((c) => c.estado_fase === "calendario_borrador");
+  if (enBorrador.length === 0) { toast("No hay ningún calendario de prueba pendiente de publicar"); return; }
+
+  const { error } = await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" })
+    .eq("torneo_id", torneoGestionId).eq("estado_fase", "calendario_borrador");
+  if (error) { toast("Error: " + error.message); return; }
+
+  await actualizarEstadoTorneoPorFases(torneoGestionId);
+  toast(`Calendario publicado ✅ (${enBorrador.map((c) => c.categoria).join(", ")}) — ya lo pueden ver los jugadores`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
 });
@@ -3522,11 +3546,16 @@ function wirePlanillaDragAndDrop(containerId) {
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
       // mismo motivo que en btnCambiarHorario: si este partido no tenía horario
-      // y ahora se le asignó arrastrándolo, esta categoría ya tiene calendario
-      // para mostrarle al público, aunque no se haya usado "Generar calendario".
+      // y ahora se le asignó arrastrándolo, esta categoría ya tiene calendario.
+      // Si esa categoría YA estaba publicada, el cambio queda visible al toque
+      // (el admin está corrigiendo algo en vivo); si todavía no se publicó
+      // nunca, entra como borrador igual que "Generar calendario" -- sigue
+      // haciendo falta "Publicar calendario" para que lo vean los jugadores.
       if (nuevoHorario && !partido?.horario && partido?.categoria) {
-        await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
-        await actualizarEstadoTorneoPorFases(torneoGestionId);
+        const { data: catActual } = await sb.from("torneo_categorias").select("estado_fase").eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria).maybeSingle();
+        const yaPublicada = catActual && (catActual.estado_fase === "calendario_confirmado" || catActual.estado_fase === "finalizada");
+        await sb.from("torneo_categorias").update({ estado_fase: yaPublicada ? "calendario_confirmado" : "calendario_borrador" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
+        if (yaPublicada) await actualizarEstadoTorneoPorFases(torneoGestionId);
       }
       toast(nuevoHorario ? "Partido reubicado ✅" : "Partido movido a \"sin horario\"");
       avisarActualizacionEnVivo();
@@ -3613,20 +3642,12 @@ function renderPartidosLlave(containerId, partidos) {
     return;
   }
 
-  // arranca mostrando la última columna generada (la ronda más avanzada, la
-  // que de verdad importa mientras el torneo está en curso) en vez de la
-  // primera -- antes había que ir tocando ronda por ronda para llegar hasta
-  // ahí. Además, esa última columna de eliminación (la Final, si el cuadro
-  // llegó hasta ahí) se destaca con su propio estilo -- ver .llave-final en
-  // style.css -- para reconocerla de un vistazo sin tener que leer el título.
-  const ultimaColumna = columnas.length - 1;
-
   // botones "Octavos / Cuartos / Semis / Final" (o "Zona 1 / Zona 2 / ...")
   // para saltar de ronda en un toque en mobile — ver comentario en style.css.
   // Con una sola columna no aportan nada, así que no se muestran.
   const navRondas = columnas.length > 1
     ? '<div class="pill-row llave-rondas-nav">' +
-      columnas.map((col, i) => `<button type="button" class="pill ${i === ultimaColumna ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
+      columnas.map((col, i) => `<button type="button" class="pill ${i === 0 ? "active" : ""}" data-llave-col="${i}">${col.titulo}</button>`).join("") +
       "</div>"
     : "";
 
@@ -3634,11 +3655,9 @@ function renderPartidosLlave(containerId, partidos) {
     columnas.map((col, i) => {
       // separador visual entre el bloque de zonas y el de eliminación directa
       const esPrimeraDeEliminacion = !col.zona && columnasZona.length > 0 && i === columnasZona.length;
-      const esFinal = !col.zona && i === ultimaColumna;
       const clases = ["llave-columna"];
       if (col.zona) clases.push("llave-zona");
       if (esPrimeraDeEliminacion) clases.push("llave-separador");
-      if (esFinal) clases.push("llave-final");
       return `
       <div class="${clases.join(" ")}" data-col-index="${i}">
         <h3>${col.titulo}</h3>
@@ -3659,10 +3678,6 @@ function renderPartidosLlave(containerId, partidos) {
       if (columna) columna.scrollIntoView({ behavior: "smooth", inline: "start", block: "start" });
     });
   });
-  if (columnas.length > 1) {
-    const inicial = cont.querySelector(`[data-col-index="${ultimaColumna}"]`);
-    if (inicial) inicial.scrollIntoView({ behavior: "auto", inline: "start", block: "nearest" });
-  }
 }
 
 // ---------- Calendario público/jugador: "orden de juego" ----------
@@ -3697,19 +3712,10 @@ function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
       const cls1 = ganador === 1 ? "ganador" : ganador === 2 ? "perdedor" : "";
       const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
       const hora = new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-      const jugado = p.estado === "jugado";
-      // el resultado ya cargado se lee ahí mismo, en el círculo VS -- el
-      // póster de calendario sirve entonces también para compartir el
-      // resultado, sin mandar a otra pantalla a buscarlo.
-      const sets = p.sets || [];
-      const scoreTxt = sets.map((s) => `${s.p1}-${s.p2}`).join(" ");
-      const vsHtml = jugado && sets.length
-        ? `<span class="orden-vs-wrap"><span class="orden-vs">${sets[sets.length - 1].p1}-${sets[sets.length - 1].p2}</span>${sets.length > 1 ? `<span class="orden-score">${scoreTxt}</span>` : ""}</span>`
-        : `<span class="orden-vs">VS</span>`;
       return `<div class="orden-sep">${i === 0 ? `Empieza a las ${hora}` : `Seguido por · ${hora}`}</div>
-        <div class="orden-match ${jugado ? "jugado" : ""}" data-abrir-partido="${p.id}">
+        <div class="orden-match ${p.estado === "jugado" ? "jugado" : ""}" data-abrir-partido="${p.id}">
           <div class="orden-lado ${cls1}">${jugadorHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}${jugadorHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}</div>
-          ${vsHtml}
+          <span class="orden-vs">VS</span>
           <div class="orden-lado der ${cls2}">${jugadorHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}${jugadorHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}</div>
         </div>`;
     }).join("");
@@ -4112,12 +4118,15 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       if (error) { toast("Error: " + error.message); return; }
       // si este partido no tenía horario todavía, es la primera vez que esta
       // categoría tiene algo calendarizado — marcarla acá también (no solo en
-      // "Generar calendario") es lo que hace que Calendario/Resultados se le
-      // muestren al público: antes, asignar el horario a mano dejaba el dato
-      // bien cargado pero la categoría seguía marcada "sin calendario".
+      // "Generar calendario") es necesario para que la categoría no quede
+      // marcada "sin calendario" para siempre. Si ya estaba publicada, el
+      // cambio se ve al toque; si no, entra como borrador (falta "Publicar
+      // calendario") igual que el resto de los caminos que asignan horario.
       if (!partido?.horario && partido?.categoria) {
-        await sb.from("torneo_categorias").update({ estado_fase: "calendario_confirmado" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
-        await actualizarEstadoTorneoPorFases(torneoGestionId);
+        const { data: catActual } = await sb.from("torneo_categorias").select("estado_fase").eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria).maybeSingle();
+        const yaPublicada = catActual && (catActual.estado_fase === "calendario_confirmado" || catActual.estado_fase === "finalizada");
+        await sb.from("torneo_categorias").update({ estado_fase: yaPublicada ? "calendario_confirmado" : "calendario_borrador" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
+        if (yaPublicada) await actualizarEstadoTorneoPorFases(torneoGestionId);
       }
       toast("Horario cambiado");
       avisarActualizacionEnVivo();
@@ -4173,14 +4182,8 @@ async function cargarSponsors() {
 
   if (admin) {
     admin.innerHTML = (data && data.length > 0)
-      ? data.map((s) => `<div class="match-card">${renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")}<button type="button" class="secondary small danger btnBorrarSponsor" data-id="${s.id}" style="margin-top:8px">Borrar</button></div>`).join("")
+      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")).join("")
       : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
-    admin.querySelectorAll(".btnBorrarSponsor").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        await sb.from("sponsors").delete().eq("id", btn.dataset.id);
-        cargarSponsors();
-      });
-    });
   }
 
   const generales = (data || []).filter((s) => !s.torneo_id);
