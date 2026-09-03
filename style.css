@@ -1189,6 +1189,13 @@ nav.tabbar button.tab-mobile-only { display: flex; }
 
   .pj-stats strong { font-size: clamp(26px, 2.4vw, 40px); }
 
+  /* en escritorio ya hay ancho de sobra: en vez de forzar todas las zonas en
+     una sola fila con scroll lateral (y una columna cortada a la mitad, que
+     es justo lo que se veía mal), se acomodan solas en filas -- el scroll
+     lateral con "snap" queda solo para mobile, donde sí hace falta. */
+  .llave-scroll { overflow-x: visible; }
+  .llave { flex-wrap: wrap; }
+
   #sidebarAds {
     display: flex;
     flex-direction: column;
