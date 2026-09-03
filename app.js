@@ -884,16 +884,19 @@ async function cargarAscendidos() {
   });
 }
 
-// Tiras de "Últimos resultados" / "Próximos partidos" en Inicio, del torneo
-// destacado (en curso o el próximo) — no dependen del orden de otras llamadas:
-// calculan su propio torneo destacado en vez de leer el global (que lo arma
+// "Últimos resultados" / "Próximos partidos" en Inicio, del torneo destacado
+// (en curso o el próximo) — no dependen del orden de otras llamadas: calculan
+// su propio torneo destacado en vez de leer el global (que lo arma
 // manejarCambioSesion() por separado, sin garantía de haber corrido antes).
+// Reutiliza la misma tarjeta de Resultados (llavePartidoCardHtml) en vez de
+// una tira que gira -- con la banda de arriba ya en movimiento, sumarle más
+// quedaba recargado.
 async function cargarUltimosProximos() {
   await calcularTorneoDestacado();
   const idTorneo = torneoDestacadoId;
   if (!idTorneo) {
-    document.getElementById("tickerResultados").style.display = "none";
-    document.getElementById("tickerProximos").style.display = "none";
+    document.getElementById("inicioResultadosWrap").style.display = "none";
+    document.getElementById("inicioProximosWrap").style.display = "none";
     return;
   }
   const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: idTorneo });
@@ -905,28 +908,20 @@ async function cargarUltimosProximos() {
   const proximos = partidos.filter((p) => p.horario && p.estado !== "jugado" && new Date(p.horario) >= ahora)
     .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 3);
 
-  renderTicker("tickerResultados", "tickerResultadosTrack", jugados, itemTickerResultadoHtml, () => abrirTorneo(idTorneo, "resultados"));
-  renderTicker("tickerProximos", "tickerProximosTrack", proximos, itemTickerProximoHtml, () => abrirTorneo(idTorneo, "calendario"));
+  renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, "resultados"));
+  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos, () => abrirTorneo(idTorneo, "calendario"));
 }
 
-function itemTickerResultadoHtml(p) {
-  const sets = (p.sets || []).map((s) => `${s.p1}-${s.p2}`).join(", ");
-  return `<span class="ticker-item">${iconoTrofeo()}<span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} <span class="ticker-set">${sets}</span></span>`;
-}
-function itemTickerProximoHtml(p) {
-  const horario = new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
-  return `<span class="ticker-item">${iconoReloj()}<span class="ticker-cat">${p.categoria}</span> ${p.pareja1_nombre} vs ${p.pareja2_nombre} · ${horario}${p.complejo_nombre ? " · " + p.complejo_nombre : ""}</span>`;
-}
-// arma el track con el contenido duplicado (igual que .ascendidos-track): eso es
-// lo que permite el loop infinito sin salto, ver @keyframes marquee-scroll
-function renderTicker(cardId, trackId, items, itemHtmlFn, onClick) {
-  const card = document.getElementById(cardId);
-  if (items.length === 0) { card.style.display = "none"; return; }
-  card.style.display = "block";
-  const dot = '<span class="marquee-dot">•</span>';
-  const set = items.map(itemHtmlFn).join(dot);
-  document.getElementById(trackId).innerHTML = set + dot + set + dot;
-  card.onclick = onClick;
+function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
+  const wrap = document.getElementById(wrapId);
+  if (items.length === 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = items.map(llavePartidoCardHtml).join("");
+  // clic en cualquier tarjeta lleva al Calendario/Resultados de ese torneo (no
+  // al detalle del partido: acá no está cargado ultimosPartidos, que es de
+  // donde abrirDetallePartido() lee)
+  grid.querySelectorAll(".llave-partido").forEach((el) => { el.onclick = onClick; });
 }
 
 async function cargarHeroPosicion() {

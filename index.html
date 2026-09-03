@@ -115,20 +115,20 @@
       </div>
     </button>
 
-    <!-- Últimos resultados / próximos partidos del torneo destacado: dos tiras
-         angostas que giran solas (mismo mecanismo que marqueeBanda de arriba),
-         una a continuación de la otra -- compacto, no exige tocar nada, y cada
-         ítem lleva al Calendario/Resultados de ese torneo. Se ocultan solas
-         (ver cargarUltimosProximos en app.js) si no hay torneo destacado o no
-         hay partidos para mostrar en ese lado. -->
-    <button type="button" class="ticker-card" id="tickerResultados" style="display:none" aria-label="Ver resultados del torneo">
-      <p class="ticker-label"><span class="live-dot" style="background:var(--accent);animation:none;box-shadow:none"></span>Últimos resultados</p>
-      <div class="ticker-scroll"><div class="marquee-track" id="tickerResultadosTrack"></div></div>
-    </button>
-    <button type="button" class="ticker-card" id="tickerProximos" style="display:none" aria-label="Ver calendario del torneo">
-      <p class="ticker-label"><span class="live-dot"></span>Próximos partidos</p>
-      <div class="ticker-scroll"><div class="marquee-track" id="tickerProximosTrack"></div></div>
-    </button>
+    <!-- Últimos resultados / próximos partidos del torneo destacado: tarjetas
+         quietas (misma tarjeta que ya usa Resultados/Llave, ver llavePartidoCardHtml
+         en app.js), no tiras que giran -- con la banda de arriba ya moviéndose,
+         sumarle más movimiento acá quedaba recargado. Cada bloque se oculta solo
+         (ver cargarUltimosProximos en app.js) si no hay torneo destacado o no hay
+         partidos para mostrar de ese lado. -->
+    <div class="seccion" id="inicioResultadosWrap" style="display:none">
+      <h3>Últimos resultados</h3>
+      <div class="inicio-partidos-grid" id="inicioResultadosGrid"></div>
+    </div>
+    <div class="seccion" id="inicioProximosWrap" style="display:none">
+      <h3>Próximos partidos</h3>
+      <div class="inicio-partidos-grid" id="inicioProximosGrid"></div>
+    </div>
 
     <!-- En mobile no hay columna lateral (ver #sidebarAds) — los auspiciantes
          pasan a una barra que se desliza sola (mismo mecanismo que la banda

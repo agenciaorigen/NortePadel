@@ -394,39 +394,18 @@ tr:first-child td { font-weight: 700; }
 }
 @media (prefers-reduced-motion: reduce) {
   .marquee-track, .ascendidos-track, .sponsor-marquee-track { animation: none; }
+  /* sin la animación, el contenido que no entra queda cortado y no hay forma de
+     leerlo -- se habilita el deslizado manual (dedo/mouse) en esos casos, así
+     nunca se pierde información por respetar la preferencia de accesibilidad */
+  .marquee-banda, .ascendidos-wrap, .sponsor-marquee { overflow-x: auto; }
 }
 
 /* ---------- Últimos resultados / Próximos partidos (Inicio) ----------
-   dos detalles que antes faltaban y hacían que se sintiera "duro": (1) el
-   texto se cortaba en seco justo en el borde de la tarjeta -- un mask-image
-   lo desvanece en vez de cortarlo (nativo del navegador, sin JS ni libería);
-   (2) el recorrido iba a la misma velocidad que la bandita de arriba pero acá
-   el contenido es mucho más largo, así que se sentía atropellado -- se lo
-   frena a un recorrido más largo y parejo. */
-.ticker-card {
-  display: block; width: 100%; text-align: left;
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 10px 0 11px; margin-bottom: 10px; cursor: pointer;
-}
-.ticker-label {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0 0 8px; padding: 0 14px;
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
-}
-.ticker-label .live-dot { margin-right: 0; }
-.ticker-scroll {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 26px, #000 calc(100% - 26px), transparent);
-}
-.ticker-scroll .marquee-track { animation-duration: 34s; padding: 0 14px; gap: 26px; }
-.ticker-card .ticker-item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--text); }
-.ticker-card .ticker-item .meta-ico { flex-shrink: 0; color: var(--muted); }
-.ticker-card .ticker-cat {
-  color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: 9.5px; letter-spacing: .03em;
-  background: var(--bg-elev); border-radius: 6px; padding: 2px 6px;
-}
-.ticker-card .ticker-set { color: var(--accent-ink); font-weight: 800; font-variant-numeric: tabular-nums; background: var(--accent); border-radius: 6px; padding: 1px 6px; }
+   tarjetas quietas, no tiras que giran -- reutilizan exactamente la misma
+   tarjeta .llave-partido de Resultados (ver llavePartidoCardHtml en app.js),
+   solo acomodadas en una grilla que se adapta a 1 columna en mobile y a 2-3
+   en desktop, según entre. */
+.inicio-partidos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 
 /* ---------- Ascendieron este mes (tira rotativa, Inicio) ---------- */
 .ascendidos-wrap { overflow: hidden; }
