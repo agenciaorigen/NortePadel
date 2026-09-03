@@ -1362,7 +1362,11 @@ function renderListaJugadoresAdmin() {
     const opcionesEtiqueta = `<option value="">Sin etiqueta</option>` +
       cacheEtiquetas.map((et) => `<option value="${et.id}" ${et.id === j.etiqueta_id ? "selected" : ""}>${et.nombre}</option>`).join("");
     div.innerHTML = `
-      <div class="row">
+      <div class="row" style="align-items:center;gap:8px">
+        <span class="jaAvatarPreview">${avatarHtml(j.foto_url, 56)}</span>
+        <input type="file" class="jaFoto" accept="image/*" style="flex:1" />
+      </div>
+      <div class="row" style="margin-top:8px">
         <input type="text" class="jaNombre" value="${j.nombre}" placeholder="Nombre" />
         <input type="text" class="jaApellido" value="${j.apellido}" placeholder="Apellido" />
       </div>
@@ -1433,6 +1437,10 @@ function renderListaJugadoresAdmin() {
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
     `);
+    div.querySelector(".jaFoto").addEventListener("change", (e) => {
+      const archivo = e.target.files[0];
+      if (archivo) div.querySelector(".jaAvatarPreview").innerHTML = avatarHtml(URL.createObjectURL(archivo), 56);
+    });
     div.querySelector(".btnGuardarJugador").addEventListener("click", async () => {
       const nombre = div.querySelector(".jaNombre").value.trim();
       const apellido = div.querySelector(".jaApellido").value.trim();
@@ -1441,7 +1449,16 @@ function renderListaJugadoresAdmin() {
       const etiqueta_id = div.querySelector(".jaEtiqueta").value || null;
       if (!nombre || !apellido) { toast("Nombre y apellido no pueden quedar vacíos"); return; }
       if (!Number.isFinite(puntos_ranking) || puntos_ranking < 0) { toast("Los puntos tienen que ser un número positivo"); return; }
-      const { error } = await sb.from("jugadores").update({ nombre, apellido, categoria, puntos_ranking, etiqueta_id }).eq("id", j.id);
+      const datos = { nombre, apellido, categoria, puntos_ranking, etiqueta_id };
+      const archivoFoto = div.querySelector(".jaFoto").files[0];
+      if (archivoFoto) {
+        const path = `admin-${j.id}-${Date.now()}-${archivoFoto.name}`;
+        const { error: upErr } = await sb.storage.from("fotos").upload(path, archivoFoto);
+        if (upErr) { toast("Error subiendo la foto: " + upErr.message); return; }
+        const { data: pub } = sb.storage.from("fotos").getPublicUrl(path);
+        datos.foto_url = pub.publicUrl;
+      }
+      const { error } = await sb.from("jugadores").update(datos).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
@@ -2283,7 +2300,7 @@ async function refrescarDetalleTorneo() {
   await actualizarAccesoInscripcion();
   await cargarSponsorsTorneo();
 
-  const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id)").eq("torneo_id", torneoActualId);
+  const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id, complejos(nombre))").eq("torneo_id", torneoActualId);
   ultimasCanchasTorneo = tc || [];
   document.getElementById("dtCanchas").innerHTML = (tc || []).map((c) =>
     `<span class="badge orange" style="margin-right:6px">${c.canchas?.nombre || "?"}</span>`
@@ -3722,11 +3739,13 @@ function renderOrdenDeJuego(containerId, partidos, canchasTorneo) {
     const fecha = new Date(partidosCancha[0].horario)
       .toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" })
       .toUpperCase();
+    const predio = cancha.complejos?.nombre || torneoActualData?.complejos?.nombre || "";
     return `<div class="orden-poster">
       <div class="orden-eyebrow">${torneoActualData?.nombre || ""}</div>
+      <div class="orden-predio">${predio}</div>
       <div class="orden-cancha">${cancha.nombre}</div>
       ${interior}
-      <div class="orden-footer"><span>${torneoActualData?.complejos?.nombre || ""}</span><b>${fecha}</b></div>
+      <div class="orden-footer"><span>${predio}</span><b>${fecha}</b></div>
     </div>`;
   };
 
@@ -3782,11 +3801,18 @@ function renderCalendarioPublico() {
       return `<option value="${f}" ${f === fechaFiltro ? "selected" : ""}>${label}</option>`;
     }).join("");
 
-  const canchas = ultimasCanchasTorneo.map((c) => c.canchas).filter(Boolean);
+  // se filtra por PREDIO (complejo), no por cancha individual -- con varias
+  // canchas iguales ("Cancha 1") repetidas en distintos complejos, elegir
+  // cancha por cancha era confuso; el predio es lo que de verdad le importa
+  // al jugador para saber adónde ir.
+  const predios = [...new Map(
+    ultimasCanchasTorneo.map((c) => c.canchas).filter(Boolean)
+      .map((c) => [c.complejo_id, c.complejos?.nombre || "?"])
+  ).entries()];
   const pills = document.getElementById("calFiltroCanchaPills");
-  const canchaPrevia = pills.querySelector(".pill.active")?.dataset.cancha || "";
-  pills.innerHTML = `<button type="button" class="pill ${!canchaPrevia ? "active" : ""}" data-cancha="">TODAS</button>` +
-    canchas.map((c) => `<button type="button" class="pill ${c.id === canchaPrevia ? "active" : ""}" data-cancha="${c.id}">${c.nombre}</button>`).join("");
+  const predioPrevio = pills.querySelector(".pill.active")?.dataset.predio || "";
+  pills.innerHTML = `<button type="button" class="pill ${!predioPrevio ? "active" : ""}" data-predio="">TODAS</button>` +
+    predios.map(([id, nombre]) => `<button type="button" class="pill ${id === predioPrevio ? "active" : ""}" data-predio="${id}">${nombre}</button>`).join("");
   pills.querySelectorAll(".pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       pills.querySelectorAll(".pill").forEach((b) => b.classList.toggle("active", b === btn));
@@ -3798,11 +3824,12 @@ function renderCalendarioPublico() {
   if (selCat.value) visibles = visibles.filter((p) => p.categoria === selCat.value);
   const fecha = document.getElementById("calFiltroFecha").value;
   if (fecha) visibles = visibles.filter((p) => p.horario && p.horario.slice(0, 10) === fecha);
-  const canchaSel = pills.querySelector(".pill.active")?.dataset.cancha || "";
+  const predioSel = pills.querySelector(".pill.active")?.dataset.predio || "";
   let canchasVisibles = ultimasCanchasTorneo;
-  if (canchaSel) {
-    canchasVisibles = ultimasCanchasTorneo.filter((c) => c.canchas?.id === canchaSel);
-    visibles = visibles.filter((p) => p.cancha_id === canchaSel);
+  if (predioSel) {
+    canchasVisibles = ultimasCanchasTorneo.filter((c) => c.canchas?.complejo_id === predioSel);
+    const canchaIdsPredio = new Set(canchasVisibles.map((c) => c.canchas?.id));
+    visibles = visibles.filter((p) => canchaIdsPredio.has(p.cancha_id));
   }
   renderOrdenDeJuego("pubCalendario", visibles, canchasVisibles);
 }
