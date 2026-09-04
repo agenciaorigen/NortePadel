@@ -3850,9 +3850,24 @@ function renderPartidosLlave(containerId, partidos) {
   // columna con todos sus partidos apilados en vertical (igual que una Zona con varios
   // partidos) — lo horizontal es solo el avance de fase (Zona -> Cuartos -> Semis -> Final).
   const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
-  const nombresOrdenados = [...new Set(
-    [...eliminacion].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).map((p) => p.ronda)
-  )];
+  // Orden de fases: primero el orden estándar del cuadro (Dieciseisavos -> Final),
+  // sin depender de created_at -- una carga masiva por SQL inserta todo en la misma
+  // transacción y ahí todas las filas quedan con el mismo created_at, así que ese
+  // criterio dejaba el orden librado al azar. Para nombres no estándar (torneos
+  // chicos con rondas genéricas tipo "Ronda de 6") se sigue usando el created_at
+  // más viejo de esa ronda como respaldo.
+  const ORDEN_FASES_ELIMINACION = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
+  const primerCreatedAtPorRonda = {};
+  eliminacion.forEach((p) => {
+    const t = new Date(p.created_at).getTime();
+    if (!(p.ronda in primerCreatedAtPorRonda) || t < primerCreatedAtPorRonda[p.ronda]) primerCreatedAtPorRonda[p.ronda] = t;
+  });
+  const nombresOrdenados = [...new Set(eliminacion.map((p) => p.ronda))].sort((a, b) => {
+    const ia = ORDEN_FASES_ELIMINACION.indexOf(a);
+    const ib = ORDEN_FASES_ELIMINACION.indexOf(b);
+    if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    return primerCreatedAtPorRonda[a] - primerCreatedAtPorRonda[b];
+  });
   nombresOrdenados.forEach((r) => {
     // sin título de columna: ya lo dice el título de la fase (h3) arriba, una
     // sola vez -- repetirlo en el h4 de la columna quedaba redundante ahora
