@@ -24,6 +24,7 @@
   --bg-rgb: 5,8,10;
   --accent-rgb: 15,122,70;
   --accent-bright-rgb: 111,224,138;
+  --accent-2-rgb: 226,162,90;
   /* radios redondeados, tipo app deportiva moderna (no revista/no formulario) */
   --radius-sm: 12px;
   --radius: 16px;
@@ -876,6 +877,10 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .match-pair-lado.der { align-items: flex-end; }
 .match-pair-lado.der .match-pair-player { flex-direction: row-reverse; }
 .match-pair-player { display: flex; align-items: center; gap: 9px; min-width: 0; }
+/* wrapper de la foto -- por defecto invisible (mismo tamaño/forma que el avatar
+   de adentro), solo se usa como gancho para el duotono grande de "Próximo
+   partido destacado" (ver más abajo, dentro de .match-pair-destacado) */
+.match-pair-foto { position: relative; display: inline-flex; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
 .match-pair-player .avatar { width: 34px; height: 34px; font-size: 15px; }
 .match-pair-nombre { font-weight: 700; font-size: 12.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match-pair-vs { font-weight: 800; color: var(--accent-ink); background: rgba(255,255,255,.85); border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
@@ -1267,19 +1272,49 @@ body.is-admin #btnAdminPanel { display: flex; }
   }
 
   /* "Próximo partido destacado": mismo .match-pair de siempre (Torneo/Llave),
-     agrandado solo en este contexto — no toca sus otros usos. Las fotos van
-     bien grandes a propósito, para que se reconozca a los jugadores de un
-     vistazo (pedido explícito, ya se habían agrandado una vez antes). */
-  .match-pair-destacado .match-pair { padding: 34px 40px; gap: 24px; }
-  .match-pair-destacado .match-pair-lado { gap: 14px; }
-  .match-pair-destacado .match-pair-player { gap: 14px; }
-  .match-pair-destacado .match-pair-player .avatar { width: 140px; height: 140px; font-size: 54px; }
-  .match-pair-destacado .match-pair-nombre { font-size: 19px; white-space: normal; }
-  .match-pair-destacado .match-pair-vs {
-    width: auto; height: auto; background: none; color: var(--accent-bright);
-    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 30px;
+     con una piel propia solo acá (pedido explícito: "que se vea épico") —
+     fondo oscuro con brillo, fotos grandes en duotono dorado (mix-blend-mode:
+     color sobre la foto en blanco y negro, así todas las fotos —sin importar
+     su color original— quedan con la misma paleta) y un VS grande en serif.
+     No toca .match-pair-foto/.match-pair-vs base, que siguen igual en Torneo/Llave. */
+  .match-pair-destacado .match-pair {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(120% 140% at 50% -10%, rgba(var(--accent-2-rgb),.22), transparent 60%),
+      linear-gradient(165deg, #123023, #05130c 70%);
+    padding: 40px 48px 26px; gap: 28px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), var(--shadow);
   }
-  .match-pair-destacado .match-meta { text-align: center; margin-top: 14px; }
+  .match-pair-destacado .match-pair-lado { gap: 16px; }
+  .match-pair-destacado .match-pair-player { gap: 16px; }
+  .match-pair-destacado .match-pair-foto {
+    width: 118px; height: 118px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(var(--accent-2-rgb),.6), 0 10px 24px -8px rgba(0,0,0,.65);
+  }
+  .match-pair-destacado .match-pair-foto .avatar {
+    /* !important: avatarHtml() fija width/height inline (34px) para su uso
+       chico de siempre en listas -- acá hace falta pisarlo para que la foto
+       llene el círculo grande de 118px del wrapper .match-pair-foto. */
+    width: 100% !important; height: 100% !important; font-size: 44px;
+    filter: grayscale(1) contrast(1.15) brightness(.85);
+  }
+  /* el tinte: la foto ya está en escala de grises, esta capa le pone UN solo
+     color encima preservando el brillo/contraste -- por eso da igual la foto
+     que sea, todas terminan con la misma paleta dorada. */
+  .match-pair-destacado .match-pair-foto::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: var(--accent-2); mix-blend-mode: color; pointer-events: none;
+  }
+  .match-pair-destacado .match-pair-nombre { font-size: 19px; white-space: normal; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
+  .match-pair-destacado .match-pair-vs {
+    width: auto; height: auto; background: none; color: var(--accent-2);
+    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 40px;
+    text-shadow: 0 0 22px rgba(var(--accent-2-rgb),.6);
+  }
+  .match-pair-destacado .match-meta {
+    text-align: center; margin-top: 18px; padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,.12);
+  }
 
   .destacados-band { padding: 24px 26px 28px; }
   /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
