@@ -1514,6 +1514,7 @@ function renderListaJugadoresAdmin() {
     div.insertAdjacentHTML("beforeend", `
       <div class="row" style="margin-top:8px;gap:8px">
         <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
+        <button type="button" class="secondary small btnBlanquearClave">🔑 Blanquear clave</button>
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
     `);
@@ -1543,6 +1544,20 @@ function renderListaJugadoresAdmin() {
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
       cargarRanking();
+    });
+    // Blanquear la clave de un jugador (ej: la olvidó, o quedó con la provisoria
+    // de una importación vieja). No se puede hacer desde el cliente con la clave
+    // "anon" de siempre -- hace falta la Edge Function admin-reset-password
+    // (server-side, con la service_role key que Supabase le inyecta sola, nunca
+    // pegada acá) que valida que quien llama es admin y recién ahí resetea.
+    div.querySelector(".btnBlanquearClave").addEventListener("click", async () => {
+      if (!j.email) { toast("Este jugador no tiene usuario/email cargado"); return; }
+      const nuevaClave = prompt(`Nueva clave para ${j.nombre} ${j.apellido} (usuario: ${j.email}):`, "padel2026");
+      if (!nuevaClave) return;
+      if (nuevaClave.length < 6) { toast("La clave debe tener al menos 6 caracteres"); return; }
+      const { data, error } = await sb.functions.invoke("admin-reset-password", { body: { email: j.email, nuevaClave } });
+      if (error || data?.error) { toast("Error: " + (data?.error || error.message)); return; }
+      toast(`Clave de ${j.nombre} ${j.apellido} blanqueada — se la pide cambiar al entrar`);
     });
     div.querySelector(".btnEliminarJugador").addEventListener("click", async () => {
       const tieneHistorial = j.partidos_jugados > 0;
@@ -3647,6 +3662,16 @@ function wirePlanillaDragAndDrop(containerId) {
 // (llavePartidoCardHtml/renderPartidosLlave), para que cargar un resultado
 // sea siempre el mismo formulario y el mismo guardado, en un solo lugar. ----
 function cargaResultadoPanelHtml(p, oculto) {
+  // cruce del cuadro de zonas todavía sin las dos parejas definidas (p.ej.
+  // "Ganador Z5" esperando su resultado) — no hay a quién asignarle el
+  // ganador todavía, así que no se muestra el formulario de carga.
+  if (!p.pareja1_id || !p.pareja2_id) {
+    return `
+    <div class="match-admin-panel" data-carga-resultado="${p.id}" draggable="false" ${oculto ? 'style="display:none"' : ""}>
+      <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
+      <p class="empty">Todavía falta definir alguna de las dos parejas de este cruce.</p>
+    </div>`;
+  }
   return `
     <div class="match-admin-panel" data-carga-resultado="${p.id}" draggable="false" ${oculto ? 'style="display:none"' : ""}>
       <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
@@ -3846,10 +3871,14 @@ function renderPartidosLlave(containerId, partidos) {
         ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
         ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
+  // Zona: sus columnas (una por zona) van apiladas en VERTICAL, una debajo de
+  // la otra -- no una al lado de la otra como las fases (pedido explícito: los
+  // partidos de una categoría van en vertical, lo horizontal es el avance de
+  // fase Zona -> Cuartos -> Semis -> Final).
   const faseHtml = (fase) => `
       <div class="llave-fase ${fase.zona ? "llave-fase-zona" : ""}">
         <h3 class="llave-fase-titulo">${fase.titulo}</h3>
-        <div class="llave-fase-columnas">${fase.columnas.map(columnaHtml).join("")}</div>
+        <div class="llave-fase-columnas" ${fase.zona ? 'style="flex-direction:column"' : ""}>${fase.columnas.map(columnaHtml).join("")}</div>
       </div>`;
 
   cont.innerHTML = `<div class="llave-scroll"><div class="llave">${fases.map(faseHtml).join("")}</div></div>`;
