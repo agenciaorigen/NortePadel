@@ -891,6 +891,53 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .match-pair-lado.ganador .match-pair-nombre { color: var(--accent-bright); }
 .match-pair-lado.perdedor { opacity: .55; }
 
+/* "Próximo partido destacado" (Inicio, carrusel que rota solo -- ver
+   renderProximosCarrusel en app.js): piel propia sobre el mismo .match-pair
+   de siempre, en TODOS los anchos (no solo escritorio, que solo agranda un
+   poco más -- ver el bloque dentro de @media min-width:960px). Fondo oscuro
+   con brillo, fotos grandes en duotono dorado (mix-blend-mode: color sobre
+   la foto en blanco y negro, así todas las fotos -sin importar su color
+   original- quedan con la misma paleta) y un VS grande en serif. No toca
+   .match-pair-foto/.match-pair-vs base, que siguen igual en Torneo/Llave/Admin. */
+.match-pair-destacado .match-pair {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 50% -10%, rgba(var(--accent-2-rgb),.22), transparent 60%),
+    linear-gradient(165deg, #123023, #05130c 70%);
+  padding: 22px 20px 18px; gap: 14px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), var(--shadow);
+}
+.match-pair-destacado .match-pair-lado { gap: 10px; }
+.match-pair-destacado .match-pair-player { gap: 10px; }
+.match-pair-destacado .match-pair-foto {
+  width: 62px; height: 62px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(var(--accent-2-rgb),.6), 0 10px 24px -8px rgba(0,0,0,.65);
+}
+.match-pair-destacado .match-pair-foto .avatar {
+  /* !important: avatarHtml() fija width/height inline (34px) para su uso
+     chico de siempre en listas -- acá hace falta pisarlo para que la foto
+     llene el círculo grande del wrapper .match-pair-foto. */
+  width: 100% !important; height: 100% !important; font-size: 24px;
+  filter: grayscale(1) contrast(1.15) brightness(.85);
+}
+/* el tinte: la foto ya está en escala de grises, esta capa le pone UN solo
+   color encima preservando el brillo/contraste -- por eso da igual la foto
+   que sea, todas terminan con la misma paleta dorada. */
+.match-pair-destacado .match-pair-foto::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--accent-2); mix-blend-mode: color; pointer-events: none;
+}
+.match-pair-destacado .match-pair-nombre { font-size: 13.5px; white-space: normal; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
+.match-pair-destacado .match-pair-vs {
+  width: auto; height: auto; background: none; color: var(--accent-2);
+  font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 22px;
+  text-shadow: 0 0 22px rgba(var(--accent-2-rgb),.6);
+}
+.match-pair-destacado .match-meta {
+  text-align: center; margin-top: 12px; padding-top: 12px; font-size: 12.5px;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+
 .badge.live {
   background: rgba(226,162,90,.16);
   color: #f0c495;
@@ -1271,66 +1318,16 @@ body.is-admin #btnAdminPanel { display: flex; }
       url('hero-ranking.jpg') center/cover no-repeat, var(--bg);
   }
 
-  /* "Próximo partido destacado": mismo .match-pair de siempre (Torneo/Llave),
-     con una piel propia solo acá (pedido explícito: "que se vea épico") —
-     fondo oscuro con brillo, fotos grandes en duotono dorado (mix-blend-mode:
-     color sobre la foto en blanco y negro, así todas las fotos —sin importar
-     su color original— quedan con la misma paleta) y un VS grande en serif.
-     No toca .match-pair-foto/.match-pair-vs base, que siguen igual en Torneo/Llave. */
-  .match-pair-destacado .match-pair {
-    position: relative; overflow: hidden;
-    background:
-      radial-gradient(120% 140% at 50% -10%, rgba(var(--accent-2-rgb),.22), transparent 60%),
-      linear-gradient(165deg, #123023, #05130c 70%);
-    padding: 40px 48px 26px; gap: 28px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), var(--shadow);
-  }
+  /* "Próximo partido destacado" en escritorio: mismo carrusel de siempre
+     (ver base más abajo, junto a .match-pair), agrandado solo acá. */
+  .match-pair-destacado .match-pair { padding: 40px 48px 26px; gap: 28px; }
   .match-pair-destacado .match-pair-lado { gap: 16px; }
   .match-pair-destacado .match-pair-player { gap: 16px; }
-  .match-pair-destacado .match-pair-foto {
-    width: 118px; height: 118px; border-radius: 50%; flex-shrink: 0;
-    box-shadow: 0 0 0 3px rgba(var(--accent-2-rgb),.6), 0 10px 24px -8px rgba(0,0,0,.65);
-  }
-  .match-pair-destacado .match-pair-foto .avatar {
-    /* !important: avatarHtml() fija width/height inline (34px) para su uso
-       chico de siempre en listas -- acá hace falta pisarlo para que la foto
-       llene el círculo grande de 118px del wrapper .match-pair-foto. */
-    width: 100% !important; height: 100% !important; font-size: 44px;
-    filter: grayscale(1) contrast(1.15) brightness(.85);
-  }
-  /* el tinte: la foto ya está en escala de grises, esta capa le pone UN solo
-     color encima preservando el brillo/contraste -- por eso da igual la foto
-     que sea, todas terminan con la misma paleta dorada. */
-  .match-pair-destacado .match-pair-foto::after {
-    content: ""; position: absolute; inset: 0; border-radius: 50%;
-    background: var(--accent-2); mix-blend-mode: color; pointer-events: none;
-  }
-  .match-pair-destacado .match-pair-nombre { font-size: 19px; white-space: normal; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
-  .match-pair-destacado .match-pair-vs {
-    width: auto; height: auto; background: none; color: var(--accent-2);
-    font-family: "Playfair Display", Georgia, serif; font-style: italic; font-size: 40px;
-    text-shadow: 0 0 22px rgba(var(--accent-2-rgb),.6);
-  }
-  .match-pair-destacado .match-meta {
-    text-align: center; margin-top: 18px; padding-top: 16px;
-    border-top: 1px solid rgba(255,255,255,.12);
-  }
-
-  /* "Próximos partidos" en escritorio pasa a ser este carrusel (con fotos y
-     los datos del partido más grandes) en vez de la grilla de tarjetas de
-     texto de siempre -- esa grilla (#inicioProximosWrap) se sigue usando tal
-     cual en mobile, así que acá solo se oculta, no se borra. */
-  #inicioProximosWrap { display: none !important; }
-  #proximosCarouselTrack .match-pair { padding: 24px 30px; gap: 20px; }
-  #proximosCarouselTrack .match-pair-lado { gap: 12px; }
-  #proximosCarouselTrack .match-pair-player { gap: 12px; }
-  #proximosCarouselTrack .match-pair-foto { width: 64px; height: 64px; }
-  #proximosCarouselTrack .match-pair-foto .avatar { width: 100% !important; height: 100% !important; font-size: 26px; }
-  #proximosCarouselTrack .match-pair-nombre { font-size: 15px; white-space: normal; }
-  #proximosCarouselTrack .match-pair-vs { font-size: 18px; }
-  #proximosCarouselTrack .match-meta {
-    text-align: center; margin-top: 12px; font-size: 15px; color: var(--text);
-  }
+  .match-pair-destacado .match-pair-foto { width: 118px; height: 118px; }
+  .match-pair-destacado .match-pair-foto .avatar { font-size: 44px; }
+  .match-pair-destacado .match-pair-nombre { font-size: 19px; }
+  .match-pair-destacado .match-pair-vs { font-size: 40px; }
+  .match-pair-destacado .match-meta { margin-top: 18px; padding-top: 16px; }
 
   .destacados-band { padding: 24px 26px 28px; }
   /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
