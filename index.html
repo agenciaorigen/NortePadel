@@ -124,6 +124,19 @@
       <div id="inicioProximoDestacadoContenido"></div>
     </div>
 
+    <!-- Carrusel de "Próximos partidos" (solo escritorio, ver renderProximosCarrusel
+         en app.js): reemplaza acá arriba a la grilla de siempre para no repetir el
+         partido que ya se ve en "Próximo partido destacado". En mobile sigue
+         existiendo la grilla de toda la vida más abajo (#inicioProximosWrap), sin
+         cambios -- esta la oculta el CSS de escritorio (ver style.css). -->
+    <div class="seccion" id="inicioProximosCarruselWrap" style="display:none">
+      <h3>Próximos partidos</h3>
+      <div class="hero-carousel" id="proximosCarousel">
+        <div class="hero-carousel-track" id="proximosCarouselTrack"></div>
+        <div class="hero-carousel-dots visible" id="proximosCarouselDots"></div>
+      </div>
+    </div>
+
     <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
       <div class="marquee-track" aria-hidden="true">
         <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
