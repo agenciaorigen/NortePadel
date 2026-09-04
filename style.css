@@ -1316,6 +1316,22 @@ body.is-admin #btnAdminPanel { display: flex; }
     border-top: 1px solid rgba(255,255,255,.12);
   }
 
+  /* "Próximos partidos" en escritorio pasa a ser este carrusel (con fotos y
+     los datos del partido más grandes) en vez de la grilla de tarjetas de
+     texto de siempre -- esa grilla (#inicioProximosWrap) se sigue usando tal
+     cual en mobile, así que acá solo se oculta, no se borra. */
+  #inicioProximosWrap { display: none !important; }
+  #proximosCarouselTrack .match-pair { padding: 24px 30px; gap: 20px; }
+  #proximosCarouselTrack .match-pair-lado { gap: 12px; }
+  #proximosCarouselTrack .match-pair-player { gap: 12px; }
+  #proximosCarouselTrack .match-pair-foto { width: 64px; height: 64px; }
+  #proximosCarouselTrack .match-pair-foto .avatar { width: 100% !important; height: 100% !important; font-size: 26px; }
+  #proximosCarouselTrack .match-pair-nombre { font-size: 15px; white-space: normal; }
+  #proximosCarouselTrack .match-pair-vs { font-size: 18px; }
+  #proximosCarouselTrack .match-meta {
+    text-align: center; margin-top: 12px; font-size: 15px; color: var(--text);
+  }
+
   .destacados-band { padding: 24px 26px 28px; }
   /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
      foto de fondo (background-size:cover) termina agrandada/recortada de más
