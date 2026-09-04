@@ -3672,26 +3672,32 @@ function cargaResultadoPanelHtml(p, oculto) {
       <p class="empty">Todavía falta definir alguna de las dos parejas de este cruce.</p>
     </div>`;
   }
+  // si ya tiene resultado cargado, precarga los valores existentes para
+  // poder corregirlos en vez de tener que volver a escribir todo de cero
+  const sets = p.sets || [];
+  const hayTercero = sets.length === 3;
+  const val = (lado, set) => { const s = sets[set - 1]; if (!s) return ""; return lado === 1 ? s.p1 : s.p2; };
+  const esCorreccion = p.estado === "jugado";
   return `
     <div class="match-admin-panel" data-carga-resultado="${p.id}" draggable="false" ${oculto ? 'style="display:none"' : ""}>
-      <p class="match-admin-label">Cargar resultado — ${p.ronda || "Fase de grupos"}</p>
+      <p class="match-admin-label">${esCorreccion ? "Corregir resultado" : "Cargar resultado"} — ${p.ronda || "Fase de grupos"}</p>
       <div class="sets-entry" data-p="${p.id}">
-        <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="display:none">Set 3</span></div>
+        <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="${hayTercero ? "" : "display:none"}">Set 3</span></div>
         <div class="sets-entry-row">
           <span class="sets-entry-label" title="${p.pareja1_nombre}">${p.pareja1_nombre}</span>
-          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="1" />
-          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="2" />
-          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="1" data-set="3" style="display:none" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="1" value="${val(1, 1)}" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="2" value="${val(1, 2)}" />
+          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="1" data-set="3" value="${val(1, 3)}" style="${hayTercero ? "" : "display:none"}" />
         </div>
         <div class="sets-entry-row">
           <span class="sets-entry-label" title="${p.pareja2_nombre}">${p.pareja2_nombre}</span>
-          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="1" />
-          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="2" />
-          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="2" data-set="3" style="display:none" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="1" value="${val(2, 1)}" />
+          <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="2" value="${val(2, 2)}" />
+          <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="2" data-set="3" value="${val(2, 3)}" style="${hayTercero ? "" : "display:none"}" />
         </div>
       </div>
       <div class="match-actions">
-        <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">Cargar resultado</button>
+        <button class="secondary small btnCargarResultado" data-p="${p.id}" data-p1="${p.pareja1_id}" data-p2="${p.pareja2_id}" data-ronda="${p.ronda || "Fase de grupos"}">${esCorreccion ? "Guardar corrección" : "Cargar resultado"}</button>
       </div>
     </div>`;
 }
@@ -4076,6 +4082,11 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       ${matchVsRowHtml(p, ganador)}
       <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
+      ${editable && p.estado === "jugado" ? `
+      <div class="match-actions">
+        <button type="button" class="secondary small btnTogglePartidoAdmin" data-p="${p.id}">✏️ Corregir resultado</button>
+      </div>
+      ${cargaResultadoPanelHtml(p, true)}` : ""}
       ${editable && p.estado !== "jugado" ? `
       ${cargaResultadoPanelHtml(p)}
       <div class="match-admin-panel">
