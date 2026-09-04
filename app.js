@@ -911,26 +911,36 @@ async function cargarUltimosProximos() {
   if (!idTorneo) {
     document.getElementById("inicioResultadosWrap").style.display = "none";
     document.getElementById("inicioProximosWrap").style.display = "none";
+    document.getElementById("inicioProximosCarruselWrap").style.display = "none";
     return;
   }
   const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: idTorneo });
   const partidos = data || [];
   const ahora = new Date();
+  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
 
   const jugados = partidos.filter((p) => p.estado === "jugado" && p.horario)
     .sort((a, b) => new Date(b.horario) - new Date(a.horario)).slice(0, 3);
+  // en escritorio se pide 1 de más: el primero se muestra aparte en "Próximo
+  // partido destacado" y el carrusel de acá muestra los siguientes 3, para no
+  // repetir el mismo partido dos veces en la misma pantalla.
   const proximos = partidos.filter((p) => p.horario && p.estado !== "jugado" && new Date(p.horario) >= ahora)
-    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 3);
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, esDesktop ? 4 : 3);
 
   // "resultados" y "calendario" ya no son pantallas separadas — las dos tarjetas
   // llevan a la misma pantalla única de Torneo ("").
   renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, ""));
-  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos, () => abrirTorneo(idTorneo, ""));
+  // grilla de siempre (mobile): en escritorio queda oculta por CSS (ver
+  // style.css), pero igual se puebla acá sin drama por si el ancho cambia.
+  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos.slice(esDesktop ? 1 : 0), () => abrirTorneo(idTorneo, ""));
 
   // "Próximo partido destacado" (solo escritorio): el partido más próximo de
   // este mismo array, reusando matchVsRowHtml (ya arma el VS con la foto de
   // cada jugador) en vez de un componente nuevo.
   renderProximoDestacado(proximos[0], idTorneo);
+  // el resto de los próximos, en un carrusel con fotos (solo escritorio) —
+  // reemplaza ahí arriba a la grilla de texto para no duplicar el destacado.
+  renderProximosCarrusel(esDesktop ? proximos.slice(1) : [], idTorneo);
 }
 
 function renderProximoDestacado(p, idTorneo) {
@@ -951,6 +961,33 @@ function renderProximoDestacado(p, idTorneo) {
   wrap.style.display = "block";
 }
 window.matchMedia("(min-width: 960px)").addEventListener("change", () => cargarUltimosProximos());
+
+// "Próximos partidos" en escritorio (ver estilos en style.css, #proximosCarouselTrack):
+// carrusel de a un partido por vez, con fotos (matchVsRowHtml) y los datos del
+// partido más grandes -- mismo mecanismo de scroll-snap + puntos que el hero,
+// reutilizado (ver actualizarPuntosCarrusel/reiniciarAutoplayCarrusel).
+function renderProximosCarrusel(items, idTorneo) {
+  const wrap = document.getElementById("inicioProximosCarruselWrap");
+  const track = document.getElementById("proximosCarouselTrack");
+  if (items.length === 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  track.innerHTML = items.map((p) => {
+    const horario = p.horario
+      ? new Date(p.horario).toLocaleString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "Horario a definir";
+    const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "A definir");
+    return `
+      <div class="hero-carousel-slide">
+        <div class="match-pair-proximo" style="cursor:pointer" data-p="${p.id}">
+          ${matchVsRowHtml(p)}
+          <p class="match-meta">${p.categoria ? `${p.categoria} · ` : ""}${iconoCalendarioChico()} ${horario} · ${iconoPin()} ${local}</p>
+        </div>
+      </div>`;
+  }).join("");
+  track.querySelectorAll(".match-pair-proximo").forEach((el) => { el.onclick = () => abrirTorneo(idTorneo, ""); });
+  actualizarPuntosCarrusel("proximosCarouselTrack", "proximosCarouselDots", true);
+  reiniciarAutoplayCarrusel("proximosCarouselTrack");
+}
 
 function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
   const wrap = document.getElementById(wrapId);
@@ -4298,38 +4335,44 @@ function moverFlyerDestacadoSegunAncho() {
   slotTorneo.hidden = !esDesktop;
   if (slotRanking) slotRanking.hidden = !esDesktop;
   dotsWrap.classList.toggle("visible", esDesktop);
-  actualizarPuntosCarrusel();
-  reiniciarAutoplayCarrusel();
+  actualizarPuntosCarrusel("heroCarouselTrack", "heroCarouselDots");
+  reiniciarAutoplayCarrusel("heroCarouselTrack");
 }
 window.matchMedia("(min-width: 960px)").addEventListener("change", moverFlyerDestacadoSegunAncho);
 
-// Autoplay del hero: pasa a la slide siguiente cada 6s, en loop. Se reinicia
-// (en vez de seguir corriendo) cada vez que el usuario interactúa a mano
-// (clic en un punto o touch/drag sobre el track) para no pelearle el gesto,
-// y respeta prefers-reduced-motion (no forzar animación a quien la desactivó).
-let heroCarouselAutoTimer = null;
-function avanzarCarruselAuto() {
-  const track = document.getElementById("heroCarouselTrack");
+// Autoplay genérico de carrusel (lo usan el hero de Inicio y el de "Próximos
+// partidos" en escritorio): pasa a la slide siguiente cada 6s, en loop. Se
+// reinicia (en vez de seguir corriendo) cada vez que el usuario interactúa a
+// mano (clic en un punto o touch/drag sobre el track) para no pelearle el
+// gesto, y respeta prefers-reduced-motion (no forzar animación a quien la
+// desactivó). El timer se guarda en el propio elemento del track para que
+// cada carrusel tenga el suyo, sin pisarse entre sí.
+function avanzarCarrusel(trackId) {
+  const track = document.getElementById(trackId);
   if (!track) return;
   const visibles = Array.from(track.children).filter((el) => !el.hidden);
   if (visibles.length < 2) return;
   const actual = Math.round(track.scrollLeft / (track.clientWidth || 1));
   track.scrollTo({ left: track.clientWidth * ((actual + 1) % visibles.length), behavior: "smooth" });
 }
-function reiniciarAutoplayCarrusel() {
-  clearInterval(heroCarouselAutoTimer);
+function reiniciarAutoplayCarrusel(trackId) {
+  const track = document.getElementById(trackId);
+  if (!track) return;
+  clearInterval(track._autoplayTimer);
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  heroCarouselAutoTimer = setInterval(avanzarCarruselAuto, 6000);
+  track._autoplayTimer = setInterval(() => avanzarCarrusel(trackId), 6000);
 }
-document.getElementById("heroCarouselTrack")?.addEventListener("pointerdown", reiniciarAutoplayCarrusel);
 
-// arma (una sola vez por cambio de cantidad) los puntos del carrusel y resalta
-// el que corresponde a la slide visible según el scroll del track
-function actualizarPuntosCarrusel() {
-  const track = document.getElementById("heroCarouselTrack");
-  const dotsWrap = document.getElementById("heroCarouselDots");
+// arma (una sola vez por cambio de cantidad) los puntos del carrusel indicado
+// y resalta el que corresponde a la slide visible según el scroll del track.
+// dotsSiempreVisibles=true es para carruseles que no tienen la lógica de
+// mostrar/ocultar puntos según ancho (como el hero) -- simplemente cuentan
+// las slides que haya en ese momento.
+function actualizarPuntosCarrusel(trackId, dotsId, dotsSiempreVisibles) {
+  const track = document.getElementById(trackId);
+  const dotsWrap = document.getElementById(dotsId);
   if (!track || !dotsWrap) return;
-  const cantidad = dotsWrap.classList.contains("visible")
+  const cantidad = (dotsSiempreVisibles || dotsWrap.classList.contains("visible"))
     ? Array.from(track.children).filter((el) => !el.hidden).length
     : 0;
   if (dotsWrap.dataset.cantidad !== String(cantidad)) {
@@ -4340,14 +4383,17 @@ function actualizarPuntosCarrusel() {
     dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot) => {
       dot.addEventListener("click", () => {
         track.scrollTo({ left: track.clientWidth * Number(dot.dataset.slide), behavior: "smooth" });
-        reiniciarAutoplayCarrusel();
+        reiniciarAutoplayCarrusel(trackId);
       });
     });
   }
   const activo = cantidad ? Math.round(track.scrollLeft / (track.clientWidth || 1)) : -1;
   dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot, i) => dot.classList.toggle("active", i === activo));
 }
-document.getElementById("heroCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(actualizarPuntosCarrusel));
+document.getElementById("heroCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("heroCarouselTrack"));
+document.getElementById("heroCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("heroCarouselTrack", "heroCarouselDots")));
+document.getElementById("proximosCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("proximosCarouselTrack"));
+document.getElementById("proximosCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("proximosCarouselTrack", "proximosCarouselDots", true)));
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");
