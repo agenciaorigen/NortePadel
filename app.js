@@ -1014,7 +1014,7 @@ function matchVsRowHtml(p, ganador) {
   const cls2 = ganador === 2 ? "ganador" : ganador === 1 ? "perdedor" : "";
   const jugadorHtml = (nombre, apellido, foto) => `
     <div class="match-pair-player">
-      ${avatarHtml(foto, 34)}
+      <span class="match-pair-foto">${avatarHtml(foto, 34)}</span>
       <span class="match-pair-nombre">${[nombre, apellido].filter(Boolean).join(" ") || "?"}</span>
     </div>`;
   return `<div class="match-pair ${ganador ? "jugado" : ""}">
@@ -1022,7 +1022,7 @@ function matchVsRowHtml(p, ganador) {
       ${jugadorHtml(p.j1a_nombre, p.j1a_apellido, p.j1a_foto)}
       ${jugadorHtml(p.j1b_nombre, p.j1b_apellido, p.j1b_foto)}
     </div>
-    <span class="match-pair-vs">V</span>
+    <span class="match-pair-vs">VS</span>
     <div class="match-pair-lado der ${cls2}">
       ${jugadorHtml(p.j2a_nombre, p.j2a_apellido, p.j2a_foto)}
       ${jugadorHtml(p.j2b_nombre, p.j2b_apellido, p.j2b_foto)}
@@ -4299,8 +4299,29 @@ function moverFlyerDestacadoSegunAncho() {
   if (slotRanking) slotRanking.hidden = !esDesktop;
   dotsWrap.classList.toggle("visible", esDesktop);
   actualizarPuntosCarrusel();
+  reiniciarAutoplayCarrusel();
 }
 window.matchMedia("(min-width: 960px)").addEventListener("change", moverFlyerDestacadoSegunAncho);
+
+// Autoplay del hero: pasa a la slide siguiente cada 6s, en loop. Se reinicia
+// (en vez de seguir corriendo) cada vez que el usuario interactúa a mano
+// (clic en un punto o touch/drag sobre el track) para no pelearle el gesto,
+// y respeta prefers-reduced-motion (no forzar animación a quien la desactivó).
+let heroCarouselAutoTimer = null;
+function avanzarCarruselAuto() {
+  const track = document.getElementById("heroCarouselTrack");
+  if (!track) return;
+  const visibles = Array.from(track.children).filter((el) => !el.hidden);
+  if (visibles.length < 2) return;
+  const actual = Math.round(track.scrollLeft / (track.clientWidth || 1));
+  track.scrollTo({ left: track.clientWidth * ((actual + 1) % visibles.length), behavior: "smooth" });
+}
+function reiniciarAutoplayCarrusel() {
+  clearInterval(heroCarouselAutoTimer);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  heroCarouselAutoTimer = setInterval(avanzarCarruselAuto, 6000);
+}
+document.getElementById("heroCarouselTrack")?.addEventListener("pointerdown", reiniciarAutoplayCarrusel);
 
 // arma (una sola vez por cambio de cantidad) los puntos del carrusel y resalta
 // el que corresponde a la slide visible según el scroll del track
@@ -4319,6 +4340,7 @@ function actualizarPuntosCarrusel() {
     dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot) => {
       dot.addEventListener("click", () => {
         track.scrollTo({ left: track.clientWidth * Number(dot.dataset.slide), behavior: "smooth" });
+        reiniciarAutoplayCarrusel();
       });
     });
   }
