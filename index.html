@@ -119,21 +119,16 @@
       <div class="hero-carousel-dots" id="heroCarouselDots"></div>
     </div>
 
+    <!-- "Próximo partido destacado": UN solo banner (en todos los anchos, no solo
+         escritorio) que rota solo entre los próximos partidos del torneo destacado
+         (ver renderProximosCarrusel en app.js) -- antes había un banner fijo con el
+         primero + una lista aparte con el resto, que además se duplicaban; ahora es
+         un único carrusel con fotos grandes en duotono. -->
     <div class="seccion" id="inicioProximoDestacadoWrap" style="display:none">
       <h3>Próximo partido destacado</h3>
-      <div id="inicioProximoDestacadoContenido"></div>
-    </div>
-
-    <!-- Carrusel de "Próximos partidos" (solo escritorio, ver renderProximosCarrusel
-         en app.js): reemplaza acá arriba a la grilla de siempre para no repetir el
-         partido que ya se ve en "Próximo partido destacado". En mobile sigue
-         existiendo la grilla de toda la vida más abajo (#inicioProximosWrap), sin
-         cambios -- esta la oculta el CSS de escritorio (ver style.css). -->
-    <div class="seccion" id="inicioProximosCarruselWrap" style="display:none">
-      <h3>Próximos partidos</h3>
-      <div class="hero-carousel" id="proximosCarousel">
-        <div class="hero-carousel-track" id="proximosCarouselTrack"></div>
-        <div class="hero-carousel-dots visible" id="proximosCarouselDots"></div>
+      <div class="hero-carousel" id="destacadoCarousel">
+        <div class="hero-carousel-track" id="destacadoCarouselTrack"></div>
+        <div class="hero-carousel-dots visible" id="destacadoCarouselDots"></div>
       </div>
     </div>
 
@@ -144,19 +139,13 @@
       </div>
     </button>
 
-    <!-- Últimos resultados / próximos partidos del torneo destacado: tarjetas
-         quietas (misma tarjeta que ya usa Resultados/Llave, ver llavePartidoCardHtml
-         en app.js), no tiras que giran -- con la banda de arriba ya moviéndose,
-         sumarle más movimiento acá quedaba recargado. Cada bloque se oculta solo
-         (ver cargarUltimosProximos en app.js) si no hay torneo destacado o no hay
-         partidos para mostrar de ese lado. -->
+    <!-- Últimos resultados del torneo destacado: tarjetas quietas (misma tarjeta
+         que ya usa Resultados/Llave, ver llavePartidoCardHtml en app.js). Los
+         próximos partidos ya se ven arriba, en el carrusel de "Próximo partido
+         destacado" -- no se repiten acá abajo. -->
     <div class="seccion" id="inicioResultadosWrap" style="display:none">
       <h3>Últimos resultados</h3>
       <div class="inicio-partidos-grid" id="inicioResultadosGrid"></div>
-    </div>
-    <div class="seccion" id="inicioProximosWrap" style="display:none">
-      <h3>Próximos partidos</h3>
-      <div class="inicio-partidos-grid" id="inicioProximosGrid"></div>
     </div>
 
     <!-- En mobile los auspiciantes pasan a una barra que se desliza sola
