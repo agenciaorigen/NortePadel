@@ -4107,7 +4107,18 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       <div class="match-admin-panel">
         <div class="match-actions">
           <select class="selectReasignar" data-p="${p.id}">
-            ${canchasTorneo.map((c) => `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${c.canchas?.nombre}</option>`).join("")}
+            ${[...canchasTorneo].sort((a, b) => {
+              const ca = cacheComplejos.find((x) => x.id === a.canchas?.complejo_id)?.nombre || "";
+              const cb = cacheComplejos.find((x) => x.id === b.canchas?.complejo_id)?.nombre || "";
+              return ca.localeCompare(cb) || (a.canchas?.nombre || "").localeCompare(b.canchas?.nombre || "");
+            }).map((c) => {
+              // se antepone el predio (mismo formato "Predio · Cancha" que ya se usa
+              // en el resto de la app) porque con varios predios usando nombres tipo
+              // "Cancha 1" repetidos, mostrar solo el nombre de la cancha no alcanza
+              // para saber cuál es cuál.
+              const complejo = cacheComplejos.find((x) => x.id === c.canchas?.complejo_id);
+              return `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${complejo ? complejo.nombre + " · " : ""}${c.canchas?.nombre}</option>`;
+            }).join("")}
           </select>
           <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
         </div>
