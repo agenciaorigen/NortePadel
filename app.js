@@ -910,65 +910,34 @@ async function cargarUltimosProximos() {
   const idTorneo = torneoDestacadoId;
   if (!idTorneo) {
     document.getElementById("inicioResultadosWrap").style.display = "none";
-    document.getElementById("inicioProximosWrap").style.display = "none";
-    document.getElementById("inicioProximosCarruselWrap").style.display = "none";
+    document.getElementById("inicioProximoDestacadoWrap").style.display = "none";
     return;
   }
   const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: idTorneo });
   const partidos = data || [];
   const ahora = new Date();
-  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
 
   const jugados = partidos.filter((p) => p.estado === "jugado" && p.horario)
     .sort((a, b) => new Date(b.horario) - new Date(a.horario)).slice(0, 3);
-  // en escritorio se pide 1 de más: el primero se muestra aparte en "Próximo
-  // partido destacado" y el carrusel de acá muestra los siguientes 3, para no
-  // repetir el mismo partido dos veces en la misma pantalla.
   const proximos = partidos.filter((p) => p.horario && p.estado !== "jugado" && new Date(p.horario) >= ahora)
-    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, esDesktop ? 4 : 3);
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 3);
 
   // "resultados" y "calendario" ya no son pantallas separadas — las dos tarjetas
   // llevan a la misma pantalla única de Torneo ("").
   renderInicioPartidosGrid("inicioResultadosWrap", "inicioResultadosGrid", jugados, () => abrirTorneo(idTorneo, ""));
-  // grilla de siempre (mobile): en escritorio queda oculta por CSS (ver
-  // style.css), pero igual se puebla acá sin drama por si el ancho cambia.
-  renderInicioPartidosGrid("inicioProximosWrap", "inicioProximosGrid", proximos.slice(esDesktop ? 1 : 0), () => abrirTorneo(idTorneo, ""));
-
-  // "Próximo partido destacado" (solo escritorio): el partido más próximo de
-  // este mismo array, reusando matchVsRowHtml (ya arma el VS con la foto de
-  // cada jugador) en vez de un componente nuevo.
-  renderProximoDestacado(proximos[0], idTorneo);
-  // el resto de los próximos, en un carrusel con fotos (solo escritorio) —
-  // reemplaza ahí arriba a la grilla de texto para no duplicar el destacado.
-  renderProximosCarrusel(esDesktop ? proximos.slice(1) : [], idTorneo);
+  // "Próximo partido destacado": un solo carrusel (en todos los anchos) con
+  // hasta 3 próximos partidos, en vez de un banner fijo + una lista aparte
+  // (quedaban duplicados). Rota solo, como el carrusel del hero.
+  renderProximosCarrusel(proximos, idTorneo);
 }
 
-function renderProximoDestacado(p, idTorneo) {
-  const wrap = document.getElementById("inicioProximoDestacadoWrap");
-  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
-  if (!esDesktop || !p) { wrap.style.display = "none"; return; }
-  const horario = p.horario
-    ? new Date(p.horario).toLocaleString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-    : "Horario a definir";
-  const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "A definir");
-  const contenido = document.getElementById("inicioProximoDestacadoContenido");
-  contenido.innerHTML = `
-    <div class="match-pair-destacado" style="cursor:pointer">
-      ${matchVsRowHtml(p)}
-      <p class="match-meta">${p.categoria ? `${p.categoria} · ` : ""}${iconoCalendarioChico()} ${horario} · ${iconoPin()} ${local}</p>
-    </div>`;
-  contenido.querySelector(".match-pair-destacado").addEventListener("click", () => abrirTorneo(idTorneo, ""));
-  wrap.style.display = "block";
-}
-window.matchMedia("(min-width: 960px)").addEventListener("change", () => cargarUltimosProximos());
-
-// "Próximos partidos" en escritorio (ver estilos en style.css, #proximosCarouselTrack):
-// carrusel de a un partido por vez, con fotos (matchVsRowHtml) y los datos del
-// partido más grandes -- mismo mecanismo de scroll-snap + puntos que el hero,
-// reutilizado (ver actualizarPuntosCarrusel/reiniciarAutoplayCarrusel).
+// Carrusel de "Próximo partido destacado": una slide .match-pair-destacado por
+// partido (fotos grandes en duotono, ver matchVsRowHtml + estilos en
+// style.css), con scroll-snap + puntos + autoplay -- mismo mecanismo que el
+// carrusel del hero, reutilizado (ver actualizarPuntosCarrusel/reiniciarAutoplayCarrusel).
 function renderProximosCarrusel(items, idTorneo) {
-  const wrap = document.getElementById("inicioProximosCarruselWrap");
-  const track = document.getElementById("proximosCarouselTrack");
+  const wrap = document.getElementById("inicioProximoDestacadoWrap");
+  const track = document.getElementById("destacadoCarouselTrack");
   if (items.length === 0) { wrap.style.display = "none"; return; }
   wrap.style.display = "block";
   track.innerHTML = items.map((p) => {
@@ -978,15 +947,15 @@ function renderProximosCarrusel(items, idTorneo) {
     const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "A definir");
     return `
       <div class="hero-carousel-slide">
-        <div class="match-pair-proximo" style="cursor:pointer" data-p="${p.id}">
+        <div class="match-pair-destacado" style="cursor:pointer" data-p="${p.id}">
           ${matchVsRowHtml(p)}
           <p class="match-meta">${p.categoria ? `${p.categoria} · ` : ""}${iconoCalendarioChico()} ${horario} · ${iconoPin()} ${local}</p>
         </div>
       </div>`;
   }).join("");
-  track.querySelectorAll(".match-pair-proximo").forEach((el) => { el.onclick = () => abrirTorneo(idTorneo, ""); });
-  actualizarPuntosCarrusel("proximosCarouselTrack", "proximosCarouselDots", true);
-  reiniciarAutoplayCarrusel("proximosCarouselTrack");
+  track.querySelectorAll(".match-pair-destacado").forEach((el) => { el.onclick = () => abrirTorneo(idTorneo, ""); });
+  actualizarPuntosCarrusel("destacadoCarouselTrack", "destacadoCarouselDots", true);
+  reiniciarAutoplayCarrusel("destacadoCarouselTrack");
 }
 
 function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
@@ -4392,8 +4361,8 @@ function actualizarPuntosCarrusel(trackId, dotsId, dotsSiempreVisibles) {
 }
 document.getElementById("heroCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("heroCarouselTrack"));
 document.getElementById("heroCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("heroCarouselTrack", "heroCarouselDots")));
-document.getElementById("proximosCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("proximosCarouselTrack"));
-document.getElementById("proximosCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("proximosCarouselTrack", "proximosCarouselDots", true)));
+document.getElementById("destacadoCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("destacadoCarouselTrack"));
+document.getElementById("destacadoCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("destacadoCarouselTrack", "destacadoCarouselDots", true)));
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");
