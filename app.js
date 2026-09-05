@@ -3706,7 +3706,14 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   } else {
     // grilla de escritorio: auto-fit/minmax se reacomoda al ancho disponible, nunca se corta
     html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""}" style="--calendario-cols:${canchas.length}">`;
-    html += `<div></div>` + canchas.map((c) => `<div class="calendario-grid-cabecera">${c.nombre}</div>`).join("");
+    // con varios predios que repiten nombre de cancha ("Cancha 1" en cada
+    // uno) el nombre solo no alcanza para distinguirlas -- se antepone el
+    // predio, mismo formato "Predio · Cancha" que ya se usa en el selector
+    // de "Cambiar cancha" de la vista Lista.
+    html += `<div></div>` + canchas.map((c) => {
+      const complejo = cacheComplejos.find((x) => x.id === c.complejo_id);
+      return `<div class="calendario-grid-cabecera">${complejo ? `<span class="calendario-grid-predio">${complejo.nombre}</span>` : ""}${c.nombre}</div>`;
+    }).join("");
     filas.forEach((fila) => {
       const fecha = new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       html += `<div class="calendario-hora">${fecha}</div>`;
