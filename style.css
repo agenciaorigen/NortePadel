@@ -691,6 +691,22 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   padding: 9px 4px; text-align: center; display: flex; align-items: center; justify-content: center;
 }
 
+/* Planilla (Administración): grilla compacta tipo "planilla de cancha en
+   papel" — un cuadradito por partido, coloreado por categoría, con el
+   detalle completo en el title (tooltip nativo, sin armar UI de tooltip).
+   Reemplaza acá a la tarjeta grande de arriba, que sigue igual para el
+   Calendario público (de lectura, sin editar). */
+.calendario-grid.compacta {
+  grid-template-columns: 56px repeat(var(--calendario-cols, 1), minmax(64px, 1fr));
+  gap: 4px;
+}
+.calendario-compacta {
+  padding: 6px 4px; font-size: 10.5px; text-align: center; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; min-height: 34px;
+  line-height: 1.2; text-shadow: 0 1px 1px rgba(0,0,0,.35);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* ---------- Calendario en mobile: agenda vertical fecha → hora → cancha ---------- */
 .calendario-agenda-fecha {
   font-weight: 800; letter-spacing: -.005em; font-size: 14px;

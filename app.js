@@ -3607,6 +3607,25 @@ function compararCanchas(a, b) {
   return (a?.nombre || "").localeCompare(b?.nombre || "");
 }
 
+// Color determinístico por categoría (mismo texto de categoría = siempre el
+// mismo color, sin mantener ninguna paleta a mano) — sirve para distinguir
+// de un vistazo, en la planilla compacta, a qué categoría pertenece cada
+// partido con solo mirar el color del cuadradito.
+function colorCategoria(categoria) {
+  const str = categoria || "";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) % 360;
+  return `hsl(${hash}, 55%, 36%)`;
+}
+// "3ra Caballeros" -> "3RA CAB", "8va Damas" -> "8VA DAM" — para que el
+// cuadradito compacto de la planilla entre en una sola línea corta.
+function abreviarCategoria(categoria) {
+  if (!categoria) return "";
+  return categoria.trim().split(/\s+/)
+    .map((p) => (p.length <= 4 ? p.toUpperCase() : p.slice(0, 3).toUpperCase()))
+    .join(" ");
+}
+
 // Planilla de Administración (editable=true siempre, ver más abajo la vista
 // pública): grilla en PC que se reacomoda al ancho disponible (nunca se corta
 // con scroll horizontal, tenga 2 canchas o 8) y agenda vertical
@@ -3631,22 +3650,32 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     return;
   }
 
-  // Antes, para cargar un resultado desde la Planilla había que dejarla e ir
-  // a la vista Lista aparte (arrastrar y soltar era lo único que se podía
-  // hacer acá) -- mismo ícono ✏️ y mismo formulario que ya existe en Lista y
-  // en la tarjeta pública (cargaResultadoPanelHtml/wireCargaResultado), para
-  // no duplicar el guardado ni el confirmar en un tercer lugar.
-  const puedeCargarResultado = (p) => editable && p.estado !== "jugado";
-  const tarjetaHtml = (p, extraClase = "") => `
-    <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" ${editable ? `draggable="true" data-partido="${p.id}"` : `data-abrir-partido="${p.id}"`}>
+  // La Planilla (editable) es para reorganizar horarios/canchas rápido, no
+  // para cargar resultados -- eso quedó solo en la vista Lista/tarjeta
+  // pública (cargaResultadoPanelHtml/wireCargaResultado siguen ahí sin
+  // cambios). Acá cada partido es un cuadradito compacto coloreado por
+  // categoría (mismo estilo que la planilla en papel del club), con el
+  // detalle completo en el title (tooltip nativo) en vez de una tarjeta
+  // grande -- así entran muchos partidos por pantalla y se sigue viendo de
+  // un vistazo qué zona/categoría es cada uno.
+  const tarjetaDetalladaHtml = (p, extraClase = "") => `
+    <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" data-abrir-partido="${p.id}">
       <div class="calendario-equipo">${p.pareja1_nombre}</div>
       <div class="calendario-vs">V</div>
       <div class="calendario-equipo">${p.pareja2_nombre}</div>
       ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
       ${p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
-      ${puedeCargarResultado(p) ? `<button type="button" class="btnTogglePartidoAdmin secondary small" draggable="false" data-p="${p.id}" style="margin-top:6px;width:100%" title="Cargar resultado" aria-label="Cargar resultado">✏️ Cargar resultado</button>` : ""}
-      ${puedeCargarResultado(p) ? cargaResultadoPanelHtml(p, true) : ""}
     </div>`;
+  const tarjetaCompactaHtml = (p, extraClase = "") => {
+    const horarioTxt = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
+    const detalle = `${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`.replace(/"/g, "&quot;");
+    const etiqueta = `${p.slot_cuadro || (p.grupo ? "G" + p.grupo : "")} ${abreviarCategoria(p.categoria)}`.trim();
+    return `<div class="calendario-partido calendario-compacta ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}"
+        style="background:${colorCategoria(p.categoria)}" title="${detalle}" draggable="true" data-partido="${p.id}">
+      ${etiqueta}
+    </div>`;
+  };
+  const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
   const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${celda.bloqueo.motivo || "Cancha bloqueada"}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${celda.bloqueo.motivo}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
 
@@ -3676,7 +3705,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     });
   } else {
     // grilla de escritorio: auto-fit/minmax se reacomoda al ancho disponible, nunca se corta
-    html += `<div class="calendario-grid-scroll"><div class="calendario-grid" style="--calendario-cols:${canchas.length}">`;
+    html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""}" style="--calendario-cols:${canchas.length}">`;
     html += `<div></div>` + canchas.map((c) => `<div class="calendario-grid-cabecera">${c.nombre}</div>`).join("");
     filas.forEach((fila) => {
       const fecha = new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
@@ -3696,7 +3725,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   }
   cont.innerHTML = html;
 
-  if (editable) { wirePlanillaDragAndDrop(containerId); wireCargaResultado(cont); }
+  if (editable) { wirePlanillaDragAndDrop(containerId); }
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
