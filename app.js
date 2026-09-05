@@ -3634,6 +3634,7 @@ function abreviarCategoria(categoria) {
 // desktop — en mobile cada partido ya tiene sus propios inputs de
 // cancha/horario en la vista Lista, ver renderPartidosLista). El público/
 // jugador ya no ve esta grilla — ve la llave de Torneo (renderPartidosLlave).
+let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (Administración) — se mantiene entre re-renders (drag&drop, cambio de categoría)
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable) {
   const cont = document.getElementById(containerId);
   const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean).sort(compararCanchas);
@@ -3649,6 +3650,25 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       : '<p class="empty">Todavía no hay partidos con cancha y horario asignados.</p>';
     return;
   }
+
+  // Planilla (editable): un día por vez, con pestañas arriba (mismo patrón
+  // .pill/.pill-row que ya se usa en otros filtros de la app) -- pedido
+  // explícito para que la grilla no quede larguísima mostrando todos los
+  // días del torneo apilados. El público/Calendario sigue mostrando todos
+  // los días juntos (ahí no hace falta arrastrar nada, es solo consulta).
+  let dias = [];
+  if (editable) {
+    const vistos = new Set();
+    filas.forEach((fila) => {
+      const key = new Date(fila.horarioISO).toDateString();
+      if (!vistos.has(key)) { vistos.add(key); dias.push(key); }
+    });
+    if (!dias.includes(planillaDiaFiltro)) {
+      const hoy = new Date().toDateString();
+      planillaDiaFiltro = dias.includes(hoy) ? hoy : (dias[0] || null);
+    }
+  }
+  const filasVisibles = (editable && planillaDiaFiltro) ? filas.filter((f) => new Date(f.horarioISO).toDateString() === planillaDiaFiltro) : filas;
 
   // La Planilla (editable) es para reorganizar horarios/canchas rápido, no
   // para cargar resultados -- eso quedó solo en la vista Lista/tarjeta
@@ -3684,12 +3704,18 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario a un hueco libre (en el celular, asignalo desde su tarjeta en la vista Lista):</p>
       <div class="planilla-bandeja" id="planillaBandeja">${sinHorario.map((p) => tarjetaHtml(p, "pendiente")).join("")}</div>`;
   }
+  if (editable && dias.length > 1) {
+    html += `<div class="pill-row" id="planillaDiasPills">${dias.map((key) => {
+      const label = new Date(key).toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" });
+      return `<button type="button" class="pill ${key === planillaDiaFiltro ? "active" : ""}" data-dia="${key}">${label}</button>`;
+    }).join("")}</div>`;
+  }
 
   const esMobile = window.matchMedia("(max-width:767px)").matches;
   if (esMobile) {
     // agenda vertical: fecha -> hora -> cancha — nunca scroll horizontal como solución
     let fechaAnterior = null;
-    filas.forEach((fila) => {
+    filasVisibles.forEach((fila) => {
       const d = new Date(fila.horarioISO);
       const fechaTxt = d.toLocaleDateString("es-AR", { weekday: "long", day: "2-digit", month: "2-digit" });
       if (fechaTxt !== fechaAnterior) { html += `<div class="calendario-agenda-fecha">${fechaTxt}</div>`; fechaAnterior = fechaTxt; }
@@ -3714,7 +3740,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       const complejo = cacheComplejos.find((x) => x.id === c.complejo_id);
       return `<div class="calendario-grid-cabecera">${complejo ? `<span class="calendario-grid-predio">${complejo.nombre}</span>` : ""}${c.nombre}</div>`;
     }).join("");
-    filas.forEach((fila) => {
+    filasVisibles.forEach((fila) => {
       const fecha = new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       html += `<div class="calendario-hora">${fecha}</div>`;
       fila.celdas.forEach((celda) => {
@@ -3732,7 +3758,15 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   }
   cont.innerHTML = html;
 
-  if (editable) { wirePlanillaDragAndDrop(containerId); }
+  if (editable) {
+    wirePlanillaDragAndDrop(containerId);
+    cont.querySelectorAll("#planillaDiasPills .pill").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        planillaDiaFiltro = btn.dataset.dia;
+        renderPartidosCalendario(containerId, partidos, canchasTorneo, editable);
+      });
+    });
+  }
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
