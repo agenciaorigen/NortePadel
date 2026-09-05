@@ -1627,6 +1627,25 @@ function renderListaJugadoresAdmin() {
       toast(`Clave de ${j.nombre} ${j.apellido} blanqueada — se la pide cambiar al entrar`);
     });
     div.querySelector(".btnEliminarJugador").addEventListener("click", async () => {
+      // "partidos_jugados" solo cuenta partidos con resultado cargado — un jugador
+      // placeholder recién armado (0 partidos_jugados) puede igual estar anotado en
+      // un partido de zona TODAVÍA NO jugado. Borrar el jugador borra en cascada su
+      // pareja, y borrar la pareja borra esos partidos del cuadro (bug real que ya
+      // pasó). Por eso acá se revisa cualquier partido asociado, jugado o no, y si
+      // hay alguno se bloquea el borrado del todo — para reemplazar a alguien por el
+      // jugador real sin perder el partido, está el ✏️ en "Inscripciones y parejas".
+      const { data: parejasDelJugador } = await sb.from("parejas").select("id").or(`jugador1_id.eq.${j.id},jugador2_id.eq.${j.id}`);
+      const idsParejas = (parejasDelJugador || []).map((p) => p.id);
+      let partidosAfectados = 0;
+      if (idsParejas.length) {
+        const { count } = await sb.from("partidos").select("id", { count: "exact", head: true })
+          .or(idsParejas.map((id) => `pareja1_id.eq.${id},pareja2_id.eq.${id}`).join(","));
+        partidosAfectados = count || 0;
+      }
+      if (partidosAfectados > 0) {
+        toast(`${j.nombre} ${j.apellido} tiene ${partidosAfectados} partido(s) armado(s) en el cuadro (jugados o no) — borrarlo se los lleva puestos. Si es un placeholder que hay que reemplazar por el jugador real, usá el ✏️ en "Inscripciones y parejas" en vez de borrar.`);
+        return;
+      }
       const tieneHistorial = j.partidos_jugados > 0;
       const aviso = tieneHistorial
         ? `${j.nombre} ${j.apellido} ya jugó ${j.partidos_jugados} partido(s). Eliminarlo borra también esos partidos y sus parejas del historial, y no se puede deshacer. ¿Eliminar de todas formas?`
