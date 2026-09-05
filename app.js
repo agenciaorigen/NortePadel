@@ -226,6 +226,11 @@ function idDesdeDatalist(inputId) {
   const input = document.getElementById(inputId);
   return input?._mapaDatalist?.get(input.value.trim()) || "";
 }
+// Etiqueta compartida para buscar un jugador por nombre en cualquier datalist
+// (alta de pareja nueva, reemplazo de un jugador en una pareja existente...).
+function labelJugadorBuscable(j) {
+  return `${j.apellido}, ${j.nombre} — ${j.categoria || "sin categoría"}`;
+}
 
 function llenarSelect(select, items, labelFn, valueFn) {
   if (!select) return;
@@ -1301,13 +1306,30 @@ function parejaRowHtml(p, editable) {
     : `<span class="badge orange">Pendiente de confirmar</span>`;
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
   const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
-  return `<div class="pareja-row">
-    <span>${etiquetas}🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
-    <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-      ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
-      ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
-      ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
-    </span>
+  return `<div class="pareja-row-wrap">
+    <div class="pareja-row">
+      <span>${etiquetas}🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
+      <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
+        ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
+        ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">✏️</button>` : ""}
+        ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
+      </span>
+    </div>
+    ${editable ? `
+    <div class="match-admin-panel" data-editar-pareja="${p.id}" style="display:none">
+      <p class="match-meta" style="margin-bottom:6px">Reemplazá al jugador que anotaste sin saber quién iba a jugar de verdad — se corrige en esta pareja y en TODOS los partidos que ya jugó o le falten (zona, octavos, cuartos...), no hace falta tocar cada partido. Si ya hay resultados cargados con el jugador viejo, los puntos de ranking que ya sumó quedan a su nombre hasta que se migren con un script aparte.</p>
+      <div class="match-actions">
+        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_1" list="dtListaCambiarJugador_${p.id}_1" placeholder="Buscar reemplazo de ${p.jugador1_nombre}..." autocomplete="off" style="flex:1" />
+        <datalist id="dtListaCambiarJugador_${p.id}_1"></datalist>
+        <button type="button" class="secondary small btnCambiarJugadorPareja" data-p="${p.id}" data-slot="1" data-otro="${p.jugador2_id}">Cambiar</button>
+      </div>
+      <div class="match-actions" style="margin-top:6px">
+        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_2" list="dtListaCambiarJugador_${p.id}_2" placeholder="Buscar reemplazo de ${p.jugador2_nombre}..." autocomplete="off" style="flex:1" />
+        <datalist id="dtListaCambiarJugador_${p.id}_2"></datalist>
+        <button type="button" class="secondary small btnCambiarJugadorPareja" data-p="${p.id}" data-slot="2" data-otro="${p.jugador1_id}">Cambiar</button>
+      </div>
+    </div>` : ""}
   </div>`;
 }
 function sinParejaChipHtml(i, editable) {
@@ -1333,6 +1355,46 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
     });
     contParejas.querySelectorAll(".btnRechazarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => await rechazarPareja(btn.dataset.j1, btn.dataset.j2));
+    });
+
+    // ✏️ reemplazar un jugador de la pareja: se corrige en la pareja misma
+    // (parejas.jugador1_id/jugador2_id), así que se propaga sola a todos los
+    // partidos que la referencian, sin tocarlos uno por uno.
+    parejasBase.forEach((p) => {
+      llenarDatalist(`dtCambiarJugador_${p.id}_1`, `dtListaCambiarJugador_${p.id}_1`, cacheJugadoresAdmin.filter((j) => j.id !== p.jugador2_id), labelJugadorBuscable);
+      llenarDatalist(`dtCambiarJugador_${p.id}_2`, `dtListaCambiarJugador_${p.id}_2`, cacheJugadoresAdmin.filter((j) => j.id !== p.jugador1_id), labelJugadorBuscable);
+    });
+    contParejas.querySelectorAll(".btnTogglePareja").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = contParejas.querySelector(`[data-editar-pareja="${btn.dataset.p}"]`);
+        if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+      });
+    });
+    contParejas.querySelectorAll(".btnCambiarJugadorPareja").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const parejaId = btn.dataset.p;
+        const slot = btn.dataset.slot;
+        const inputId = `dtCambiarJugador_${parejaId}_${slot}`;
+        const input = document.getElementById(inputId);
+        const nuevoId = idDesdeDatalist(inputId);
+        if (input.value.trim() && !nuevoId) { toast("Elegí un jugador de la lista que aparece al escribir (no quedó seleccionado ninguno)"); return; }
+        if (!nuevoId) { toast("Buscá y elegí el jugador que reemplaza"); return; }
+        if (nuevoId === btn.dataset.otro) { toast("Ya está en esta pareja — elegí otro jugador"); return; }
+        const pareja = parejasBase.find((x) => x.id === parejaId);
+        const campo = slot === "1" ? "jugador1_id" : "jugador2_id";
+        const { error } = await sb.from("parejas").update({ [campo]: nuevoId }).eq("id", parejaId);
+        if (error) { toast("Error: " + error.message); return; }
+        // así el jugador nuevo queda inscripto en este torneo (si ya lo estaba, no cambia nada)
+        if (pareja?.categoria) {
+          await sb.from("inscripciones").upsert(
+            { torneo_id: torneoGestionId, jugador_id: nuevoId, categoria: pareja.categoria, estado: "confirmada" },
+            { onConflict: "torneo_id,jugador_id", ignoreDuplicates: true }
+          );
+        }
+        toast("Jugador reemplazado en la pareja");
+        avisarActualizacionEnVivo();
+        refrescarTrasAccionGestion();
+      });
     });
   }
 
@@ -1416,7 +1478,6 @@ async function cargarJugadoresAdmin() {
     (cacheRankingCategoriaAdmin[r.jugador_id] ||= []).push(r);
   });
   renderListaJugadoresAdmin();
-  const labelJugadorBuscable = (j) => `${j.apellido}, ${j.nombre} — ${j.categoria || "sin categoría"}`;
   llenarDatalist("dtSelectJugador1", "dtListaJugadores1", cacheJugadoresAdmin, labelJugadorBuscable);
   llenarDatalist("dtSelectJugador2", "dtListaJugadores2", cacheJugadoresAdmin, labelJugadorBuscable);
   llenarSelect(document.getElementById("jdmSelect"), cacheJugadoresAdmin, (j) => `${j.nombre} ${j.apellido} (${j.categoria})`);
@@ -3512,6 +3573,21 @@ window.matchMedia("(max-width:767px)").addEventListener("change", () => {
   _calendariosResponsive.forEach((cb) => cb());
 });
 
+// Orden natural de canchas: primero por predio, y dentro de cada predio por
+// el número que tenga el nombre — así "Cancha 2" va antes que "Cancha 10"
+// (un orden alfabético puro los pondría al revés) y todo lo que liste
+// canchas (planilla, dropdown de "Cambiar cancha") va siempre de menor a
+// mayor en vez del orden en que hayan quedado guardadas en la base.
+function compararCanchas(a, b) {
+  const complejoA = cacheComplejos.find((x) => x.id === a?.complejo_id)?.nombre || "";
+  const complejoB = cacheComplejos.find((x) => x.id === b?.complejo_id)?.nombre || "";
+  if (complejoA !== complejoB) return complejoA.localeCompare(complejoB);
+  const numA = parseInt((a?.nombre || "").match(/\d+/)?.[0], 10);
+  const numB = parseInt((b?.nombre || "").match(/\d+/)?.[0], 10);
+  if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) return numA - numB;
+  return (a?.nombre || "").localeCompare(b?.nombre || "");
+}
+
 // Planilla de Administración (editable=true siempre, ver más abajo la vista
 // pública): grilla en PC que se reacomoda al ancho disponible (nunca se corta
 // con scroll horizontal, tenga 2 canchas o 8) y agenda vertical
@@ -3522,7 +3598,7 @@ window.matchMedia("(max-width:767px)").addEventListener("change", () => {
 // jugador ya no ve esta grilla — ve la llave de Torneo (renderPartidosLlave).
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable) {
   const cont = document.getElementById(containerId);
-  const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean);
+  const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean).sort(compararCanchas);
   if (canchas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay canchas asignadas a este torneo.</p>';
     return;
@@ -4113,11 +4189,7 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       <div class="match-admin-panel">
         <div class="match-actions">
           <select class="selectReasignar" data-p="${p.id}">
-            ${[...canchasTorneo].sort((a, b) => {
-              const ca = cacheComplejos.find((x) => x.id === a.canchas?.complejo_id)?.nombre || "";
-              const cb = cacheComplejos.find((x) => x.id === b.canchas?.complejo_id)?.nombre || "";
-              return ca.localeCompare(cb) || (a.canchas?.nombre || "").localeCompare(b.canchas?.nombre || "");
-            }).map((c) => {
+            ${[...canchasTorneo].sort((a, b) => compararCanchas(a.canchas, b.canchas)).map((c) => {
               // se antepone el predio (mismo formato "Predio · Cancha" que ya se usa
               // en el resto de la app) porque con varios predios usando nombres tipo
               // "Cancha 1" repetidos, mostrar solo el nombre de la cancha no alcanza

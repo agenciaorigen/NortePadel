@@ -823,11 +823,12 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 }
 
 /* ---------- Parejas anotadas en un torneo ---------- */
+.pareja-row-wrap { border-bottom: 1px solid var(--border); }
+.pareja-row-wrap:last-child { border-bottom: none; }
 .pareja-row {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  padding: 9px 0; font-size: 13px;
 }
-.pareja-row:last-child { border-bottom: none; }
 .pareja-row .btnBorrarPareja {
   background: none; border: none; cursor: pointer;
   font-size: 17px; line-height: 1; padding: 0 2px; flex-shrink: 0;
