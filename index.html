@@ -557,7 +557,10 @@
         <button type="button" class="link-btn" id="admBtnVolverConfigGeneral" style="display:none;margin-top:4px">← Volver a Administración general</button>
         <p id="admGestionEstado"></p>
         <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
-        <h3 style="margin-top:16px">Dashboard</h3>
+      </div>
+
+      <div class="card card-accent" id="admSeccionResumen">
+        <h3 style="margin-top:0">Dashboard</h3>
         <div class="pj-stats" id="admDashboardStats"></div>
         <h3 style="margin-top:16px">Diagnóstico</h3>
         <p class="match-meta" style="margin-bottom:6px">Chequeo rápido para saber si el torneo quedó bien armado antes de avisarle a la gente.</p>
@@ -642,6 +645,7 @@
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
 
+      <div id="admSeccionConfiguracion">
       <div class="card card-accent" id="admSeccionCanchas">
         <h2>Canchas del torneo</h2>
         <div id="admCanchas"></div>
@@ -681,6 +685,7 @@
         <input id="admBloqueoMotivo" placeholder="Ej: lluvia, mantenimiento" />
         <button class="secondary small" id="admBtnBloquearCancha" style="margin-top:8px">Bloquear horario</button>
       </div>
+      </div>
 
       <div class="card partidos-poster" id="admSeccionPartidos">
         <h2>Partidos</h2>
@@ -689,13 +694,17 @@
         <button class="secondary" id="btnPublicarCalendario" style="margin-top:8px">3. Publicar calendario (recién ahí lo ven los jugadores)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
         <div id="admEstadoCategorias" style="margin-top:10px"></div>
-        <label style="margin-top:12px" for="partidosCategoriaFiltro">Categoría</label>
+        <label style="margin-top:12px" for="partidosBusqueda">Buscar partido (por jugador o pareja)</label>
+        <input type="text" id="partidosBusqueda" placeholder="Ej: Rodríguez, o Gómez / Pérez" autocomplete="off" />
+        <label style="margin-top:8px" for="partidosCategoriaFiltro">Categoría</label>
         <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
         <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
           <button class="pill active" data-vista="lista">Lista</button>
           <button class="pill" data-vista="planilla">Planilla (arrastrar y soltar — solo PC)</button>
+          <button class="pill" data-vista="llave">Llave</button>
         </div>
         <div id="admPartidosLista"></div>
+        <div id="admPartidosLlave" style="display:none"></div>
       </div>
     </div>
 

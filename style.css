@@ -868,6 +868,9 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   background: none; border: none; cursor: pointer;
   font-size: 17px; line-height: 1; padding: 0 2px; flex-shrink: 0;
 }
+/* fila de pago (💰 por jugador + atajo "marcar los 2"), debajo de la fila
+   principal de la pareja -- ver parejaRowHtml() */
+.pareja-pago-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
 
 /* ---------- Admin / roles ---------- */
 .admin-only { display: none; }

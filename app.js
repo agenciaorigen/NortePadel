@@ -32,6 +32,7 @@ let ultimosPartidos = [];
 let hayCalendarioTorneoActual = false;
 let ultimasCanchasTorneo = [];
 let partidosCategoriaFiltro = ""; // "" = todas las categorías del torneo
+let partidosBusquedaFiltro = ""; // texto libre, busca por nombre de jugador o pareja (ver renderPartidosAdmin)
 let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instagram_url)
 
 // "Jugar" (reservar cancha) está armado pero pausado hasta cerrar el acuerdo con el club
@@ -1383,6 +1384,20 @@ function parejaRowHtml(p, editable) {
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
   const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
   const nombrePareja = `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`;
+  // Pago (ver inscripciones.pago): independiente de "estado", que solo habla
+  // de la categoría/confirmación. Un admin puede tocar cada 💰 para marcar/
+  // desmarcar el pago de ESE jugador, o el atajo de "los 2" cuando falta alguno.
+  // El pago es información solo para el admin (no tiene sentido exponer
+  // públicamente quién pagó y quién no) -- pagoHtml queda vacío si !editable.
+  const ambosPagaron = p.jugador1_pago && p.jugador2_pago;
+  const pagoHtml = editable
+    ? `<div class="pareja-pago-row">
+        <span class="match-meta meta-caption">Pago:</span>
+        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador1_id}" data-pago="${p.jugador1_pago ? "1" : "0"}">${p.jugador1_pago ? "✅" : "⬜"} ${escapeHtml((p.jugador1_nombre || "").split(" ")[0])}</button>
+        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador2_id}" data-pago="${p.jugador2_pago ? "1" : "0"}">${p.jugador2_pago ? "✅" : "⬜"} ${escapeHtml((p.jugador2_nombre || "").split(" ")[0])}</button>
+        ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">✅ Marcar pago de los 2</button>` : ""}
+      </div>`
+    : "";
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
       <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}</span>
@@ -1393,6 +1408,7 @@ function parejaRowHtml(p, editable) {
         ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${escapeHtml(nombrePareja)}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${nombrePareja}">×</button>` : ""}
       </span>
     </div>
+    ${editable ? pagoHtml : ""}
     ${editable ? `
     <div class="match-admin-panel" data-editar-pareja="${p.id}" style="display:none">
       <p class="match-meta" style="margin-bottom:6px">Reemplazá al jugador que anotaste sin saber quién iba a jugar de verdad — se corrige en esta pareja y en TODOS los partidos que ya jugó o le falten (zona, octavos, cuartos...), no hace falta tocar cada partido. Si ya hay resultados cargados con el jugador viejo, los puntos de ranking que ya sumó quedan a su nombre hasta que se migren con un script aparte.</p>
@@ -1412,7 +1428,44 @@ function parejaRowHtml(p, editable) {
 function sinParejaChipHtml(i, editable) {
   const sufijoEstado = i.estado && i.estado !== "confirmada" ? ` · ${i.estado === "pendiente" ? "pendiente" : i.estado}` : "";
   const nombreCompleto = `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`;
-  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
+  // Igual que en parejaRowHtml: el pago es información solo para el admin.
+  const pagoHtml = editable
+    ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${i.pago ? "✅" : "⬜"}</button>`
+    : "";
+  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
+}
+// Cablea los toggles de pago (💰 por jugador + "marcar pago de los 2") de un
+// contenedor -- se usa igual en la lista de parejas y en la de "sin pareja",
+// así que queda en una sola función en vez de repetir el mismo listener dos veces.
+function wireTogglesPago(cont) {
+  cont.querySelectorAll(".btnTogglePago").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const nuevoPago = btn.dataset.pago !== "1";
+        const { error } = await sb.from("inscripciones").update({ pago: nuevoPago }).eq("torneo_id", torneoGestionId).eq("jugador_id", btn.dataset.jugador);
+        if (error) { toast("Error: " + error.message); return; }
+        refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  cont.querySelectorAll(".btnMarcarPagoAmbos").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const { error } = await sb.from("inscripciones").update({ pago: true }).eq("torneo_id", torneoGestionId).in("jugador_id", [btn.dataset.j1, btn.dataset.j2]);
+        if (error) { toast("Error: " + error.message); return; }
+        toast("Pago marcado para los dos");
+        refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
 }
 function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable) {
   // al público no se le muestran parejas rechazadas ni inscripciones
@@ -1504,6 +1557,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         }
       });
     });
+    wireTogglesPago(contParejas);
   }
 
   const contSinPareja = document.getElementById(contSinParejaId);
@@ -1522,6 +1576,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         }
       });
     });
+    wireTogglesPago(contSinPareja);
   }
 }
 
@@ -2925,12 +2980,12 @@ document.getElementById("admSelectTorneoGestion").addEventListener("change", asy
 // muestra una sección por vez, así "Partidos" queda a un toque en vez de un
 // scroll largo. seccionGestionActiva se mantiene entre refrescos de la
 // pantalla (no vuelve a "Inscripciones" cada vez que se recarga algo).
-let seccionGestionActiva = "inscripciones";
+let seccionGestionActiva = "resumen";
 const SECCIONES_GESTION = {
-  inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones" },
-  canchas: { id: "admSeccionCanchas", label: "Canchas" },
-  bloqueos: { id: "admSeccionBloqueos", label: "Bloqueos" },
-  partidos: { id: "admSeccionPartidos", label: "Partidos" }
+  resumen: { id: "admSeccionResumen", label: "Resumen" },
+  partidos: { id: "admSeccionPartidos", label: "Partidos" },
+  inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones y pagos" },
+  configuracion: { id: "admSeccionConfiguracion", label: "Configuración" }
 };
 function renderAdminGestionSubnav() {
   const cont = document.getElementById("admGestionSubnav");
@@ -4610,9 +4665,27 @@ function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
     vistaPartidosAdmin = "lista";
     document.querySelectorAll("#partidosVistaPills .pill").forEach((b) => b.classList.toggle("active", b.dataset.vista === "lista"));
   }
-  const visibles = partidosCategoriaFiltro ? partidos.filter((p) => p.categoria === partidosCategoriaFiltro) : partidos;
-  if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", visibles, canchasTorneo, true);
-  else renderPartidosLista("admPartidosLista", visibles, canchasTorneo, true, ultimasParejasGestion);
+  const q = partidosBusquedaFiltro.trim().toLowerCase();
+  let visibles = partidosCategoriaFiltro ? partidos.filter((p) => p.categoria === partidosCategoriaFiltro) : partidos;
+  if (q) visibles = visibles.filter((p) => `${p.pareja1_nombre || ""} ${p.pareja2_nombre || ""}`.toLowerCase().includes(q));
+
+  const contLista = document.getElementById("admPartidosLista");
+  const contLlave = document.getElementById("admPartidosLlave");
+  if (vistaPartidosAdmin === "llave") {
+    contLista.style.display = "none";
+    contLlave.style.display = "block";
+    // la llave agrupa por fase/zona -- mezclar categorías distintas en un
+    // mismo cuadro no tiene sentido, así que acá sí hace falta elegir una.
+    contLlave.innerHTML = partidosCategoriaFiltro
+      ? ""
+      : '<p class="empty">Elegí una categoría arriba para ver su llave.</p>';
+    if (partidosCategoriaFiltro) renderPartidosLlave("admPartidosLlave", visibles);
+  } else {
+    contLista.style.display = "block";
+    contLlave.style.display = "none";
+    if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", visibles, canchasTorneo, true);
+    else renderPartidosLista("admPartidosLista", visibles, canchasTorneo, true, ultimasParejasGestion);
+  }
 }
 document.querySelectorAll("#partidosVistaPills .pill").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -4623,6 +4696,10 @@ document.querySelectorAll("#partidosVistaPills .pill").forEach((btn) => {
 });
 document.getElementById("partidosCategoriaFiltro").addEventListener("change", (e) => {
   partidosCategoriaFiltro = e.target.value;
+  renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion);
+});
+document.getElementById("partidosBusqueda").addEventListener("input", (e) => {
+  partidosBusquedaFiltro = e.target.value;
   renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion);
 });
 
