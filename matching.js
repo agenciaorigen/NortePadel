@@ -69,7 +69,9 @@ const FRANJA_DEFAULT_DIA = { desde: horaAMinutos("08:00"), hasta: horaAMinutos("
 //    de este torneo ya combinados por quien llama. Un jugador sin filas para un día
 //    se asume libre todo ese día.
 //  fechasDisponibles: [Date] días del torneo a considerar
-//  canchas: [{id, nombre}]
+//  canchas: [{id, nombre, dias_semana?, horarios_por_dia?}] — dias_semana y
+//    horarios_por_dia son opcionales (ver torneo_canchas): sin ellos, la
+//    cancha está disponible todos los días del torneo en el horario general.
 //  duracionMinutos: duración estimada de cada partido
 //  ventana: {desde, hasta} en minutos — horario del día que puso el admin
 //    para el torneo (ej: 16:00 a 22:00). Si viene, se usa como base del día
@@ -151,7 +153,7 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
       // distintos según el día (ver ventanaDelTorneo en app.js) — se distingue por si
       // tiene o no la clave "desde" directamente.
       const esMapaPorDia = ventana && typeof ventana === "object" && ventana.desde === undefined;
-      const baseDia = (esMapaPorDia ? ventana[diaSemana] : ventana) || FRANJA_DEFAULT_DIA;
+      const baseDiaTorneo = (esMapaPorDia ? ventana[diaSemana] : ventana) || FRANJA_DEFAULT_DIA;
 
       // canchas de HOY: una cancha con dias_semana cargado (ver torneo_canchas)
       // solo está disponible esos días (ej: el club tiene menos canchas libres
@@ -159,6 +161,25 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
       // todos los días del torneo, como siempre.
       const canchasDeHoy = canchas.filter((c) => !c.dias_semana || c.dias_semana.length === 0 || c.dias_semana.includes(diaSemana));
       if (canchasDeHoy.length === 0) continue;
+
+      // cada cancha puede además tener su PROPIO horario ese día (ver
+      // torneo_canchas.horarios_por_dia — ej: un predio abre 12-22 los
+      // viernes y otro recién a las 16); sin uno propio, usa el horario
+      // general del torneo para ese día, como siempre.
+      const ventanaPorCancha = new Map(canchasDeHoy.map((c) => {
+        const propio = c.horarios_por_dia && (c.horarios_por_dia[diaSemana] || c.horarios_por_dia[String(diaSemana)]);
+        return [c.id, propio ? { desde: horaAMinutos(propio.desde), hasta: horaAMinutos(propio.hasta) } : baseDiaTorneo];
+      }));
+      // la franja "base" del día se ensancha para cubrir a la cancha que abre
+      // más temprano y a la que cierra más tarde, así el orden de búsqueda
+      // sigue siendo "el horario más temprano posible, en cualquier cancha"
+      // (el algoritmo original) — el filtro de la ventana propia de cada
+      // cancha se aplica recién al elegir cancha en cada horario puntual, más abajo.
+      const ventanas = [...ventanaPorCancha.values()];
+      const baseDia = {
+        desde: Math.min(...ventanas.map((v) => v.desde)),
+        hasta: Math.max(...ventanas.map((v) => v.hasta))
+      };
 
       // arranca con toda la franja base libre, y le va restando a cada
       // jugador sus bloqueos de ese día — lo que sobra al final es el
@@ -188,7 +209,11 @@ function asignarHorarios({ cruces, disponibilidadPorJugador, fechasDisponibles, 
           );
           if (!jugadoresLibres) continue;
 
-          const canchaLibre = canchasDeHoy.find((c) => libre(ocupacionCancha[c.id], desdeDate, hastaDate));
+          const canchaLibre = canchasDeHoy.find((c) => {
+            const v = ventanaPorCancha.get(c.id);
+            if (inicio < v.desde || inicio + duracionMinutos > v.hasta) return false; // fuera del horario propio de esta cancha
+            return libre(ocupacionCancha[c.id], desdeDate, hastaDate);
+          });
           if (!canchaLibre) continue;
 
           return { horario: desdeDate, hastaDate, cancha: canchaLibre };

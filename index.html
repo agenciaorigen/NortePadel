@@ -659,6 +659,11 @@
           <label><input type="checkbox" class="chkDiaCanchaNueva" value="2" /> Mar</label>
           <label><input type="checkbox" class="chkDiaCanchaNueva" value="3" /> Mié</label>
         </div>
+        <!-- Solo tiene sentido si se marcó algún día arriba: ese predio puede
+             abrir en un horario distinto al del torneo ese día puntual (ej: el
+             torneo juega 16-22 pero un predio recién abre a las 12). Vacío =
+             usa el horario general del torneo en los días marcados. -->
+        <div id="canchaHorariosPorDiaNuevaForm"></div>
         <button class="secondary small" id="btnAgregarCanchaTorneo">Agregar cancha al torneo</button>
       </div>
 

@@ -1991,6 +1991,43 @@ document.getElementById("tDiasForm").addEventListener("change", (e) => {
 document.getElementById("teDiasForm").addEventListener("change", (e) => {
   if (e.target.classList.contains("chkDiaTorneoEdit")) renderHorariosPorDiaForm("teHorariosPorDiaForm", "chkDiaTorneoEdit");
 });
+document.getElementById("canchaDiasNuevaForm").addEventListener("change", (e) => {
+  if (e.target.classList.contains("chkDiaCanchaNueva")) renderHorariosPorDiaForm("canchaHorariosPorDiaNuevaForm", "chkDiaCanchaNueva");
+});
+// una cancha por fila, cada una con su propio checkbox de días y su propio
+// mini-form de horarios (chkDiaCte-<id>/cteHorarios-<id>, ver canchaTorneoRowHtml)
+// -- delegado en el contenedor porque las filas se re-arman enteras en cada
+// refrescarTrasAccionGestion(), así no hace falta re-cablear un listener por fila.
+document.getElementById("admCanchas").addEventListener("change", (e) => {
+  if (e.target.classList.contains("chkDiaCte")) {
+    const tcId = e.target.dataset.tc;
+    renderHorariosPorDiaForm(`cteHorarios-${tcId}`, `chkDiaCte-${tcId}`);
+  }
+});
+// Una cancha del torneo, con su resumen de días/horario y un editor
+// plegable (✏️) para cambiarle los días y, opcionalmente, un horario propio
+// distinto al general del torneo (ver torneo_canchas.horarios_por_dia).
+function canchaTorneoRowHtml(c) {
+  const complejo = cacheComplejos.find((x) => x.id === c.canchas?.complejo_id);
+  const nombreCompleto = `${complejo ? escapeHtml(complejo.nombre) + " · " : ""}${escapeHtml(c.canchas?.nombre || "?")}`;
+  const resumenDias = c.dias_semana && c.dias_semana.length ? c.dias_semana.map((d) => DIAS_CORTO[d]).join(",") : "todos los días";
+  const tieneHorarioPropio = c.horarios_por_dia && Object.keys(c.horarios_por_dia).length;
+  return `<div class="cancha-torneo-fila">
+    <span class="badge orange">${nombreCompleto} (${resumenDias}${tieneHorarioPropio ? " · horario propio" : ""})
+      <a href="#" class="btnEditarCanchaTorneo" data-tc="${c.id}" title="Editar días y horario">✏️</a>
+      <a href="#" class="btnQuitarCanchaTorneo" data-tc="${c.id}" title="Quitar">✕</a>
+    </span>
+    <div class="cancha-torneo-editor" id="cteEditor-${c.id}" style="display:none">
+      <label style="margin-top:6px">¿Qué días juega esta cancha?</label>
+      <div class="check-grid">
+        ${[4, 5, 6, 0, 1, 2, 3].map((d) => `<label><input type="checkbox" class="chkDiaCte chkDiaCte-${c.id}" value="${d}" ${c.dias_semana && c.dias_semana.includes(d) ? "checked" : ""} /> ${DIAS_CORTO[d]}</label>`).join("")}
+      </div>
+      <label>¿Abre en un horario propio, distinto al general del torneo, alguno de esos días? Dejalo vacío para usar el horario del torneo.</label>
+      <div id="cteHorarios-${c.id}"></div>
+      <button type="button" class="secondary small btnGuardarCanchaTorneo" data-tc="${c.id}">Guardar</button>
+    </div>
+  </div>`;
+}
 
 // el form de crear torneo queda escondido por defecto (puede haber muchos torneos
 // en la lista) y solo se muestra cuando el admin lo pide
@@ -2958,9 +2995,31 @@ async function cargarGestionTorneo(id) {
   renderEstadoCategorias(t.torneo_categorias || []);
 
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id)").eq("torneo_id", id);
-  document.getElementById("admCanchas").innerHTML = (tc || []).map((c) =>
-    `<span class="badge orange" style="margin-right:6px">${c.canchas?.nombre || "?"}${c.dias_semana && c.dias_semana.length ? ` (${c.dias_semana.map((d) => DIAS_CORTO[d]).join(",")})` : ""} <a href="#" class="btnQuitarCanchaTorneo" data-tc="${c.id}" title="Quitar">✕</a></span>`
-  ).join("") || '<p class="empty">Sin canchas asignadas todavía.</p>';
+  document.getElementById("admCanchas").innerHTML = (tc || []).map(canchaTorneoRowHtml).join("")
+    || '<p class="empty">Sin canchas asignadas todavía.</p>';
+  (tc || []).forEach((c) => renderHorariosPorDiaForm(`cteHorarios-${c.id}`, `chkDiaCte-${c.id}`, c.horarios_por_dia || {}));
+  document.querySelectorAll(".btnEditarCanchaTorneo").forEach((a) => a.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    const editor = document.getElementById(`cteEditor-${a.dataset.tc}`);
+    if (editor) editor.style.display = editor.style.display === "none" ? "block" : "none";
+  }));
+  document.querySelectorAll(".btnGuardarCanchaTorneo").forEach((btn) => btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const tcId = btn.dataset.tc;
+      const diasElegidos = Array.from(document.querySelectorAll(`.chkDiaCte-${tcId}:checked`)).map((c) => Number(c.value));
+      const { error } = await sb.from("torneo_canchas").update({
+        dias_semana: diasElegidos.length ? diasElegidos : null,
+        horarios_por_dia: leerHorariosPorDiaForm(`cteHorarios-${tcId}`)
+      }).eq("id", tcId);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Días y horario de la cancha actualizados");
+      refrescarTrasAccionGestion();
+    } finally {
+      btn.disabled = false;
+    }
+  }));
   document.querySelectorAll(".btnQuitarCanchaTorneo").forEach((a) => a.addEventListener("click", async (ev) => {
     ev.preventDefault();
     if (a.dataset.busy) return;
@@ -3172,10 +3231,16 @@ document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", asyn
   const canchaId = document.getElementById("dtSelectCancha").value;
   if (!canchaId || !torneoGestionId) return;
   const diasElegidos = Array.from(document.querySelectorAll(".chkDiaCanchaNueva:checked")).map((c) => Number(c.value));
-  const { error } = await sb.from("torneo_canchas").insert({ torneo_id: torneoGestionId, cancha_id: canchaId, dias_semana: diasElegidos.length ? diasElegidos : null });
+  const { error } = await sb.from("torneo_canchas").insert({
+    torneo_id: torneoGestionId,
+    cancha_id: canchaId,
+    dias_semana: diasElegidos.length ? diasElegidos : null,
+    horarios_por_dia: leerHorariosPorDiaForm("canchaHorariosPorDiaNuevaForm")
+  });
   if (error) { toast("Esa cancha ya está asignada u ocurrió un error"); return; }
   toast("Cancha agregada al torneo");
   document.querySelectorAll(".chkDiaCanchaNueva").forEach((c) => (c.checked = false));
+  renderHorariosPorDiaForm("canchaHorariosPorDiaNuevaForm", "chkDiaCanchaNueva");
   refrescarTrasAccionGestion();
   } finally {
     btn.disabled = false;
@@ -3332,6 +3397,32 @@ function ventanaDelTorneo(torneo) {
     mapa[dia] = v ? { desde: horaAMinutos(v.desde), hasta: horaAMinutos(v.hasta) } : porDefecto;
   });
   return mapa;
+}
+
+// Igual que ventanaDelTorneo, pero para UNA cancha puntual del torneo (ver
+// torneo_canchas.dias_semana/horarios_por_dia): un predio puede jugar solo
+// algunos días y/o tener un horario propio distinto al general (ej: abre
+// más tarde que el resto). Devuelve una función (día de semana -> ventana):
+//  - { cerrado: true } si esa cancha directamente no juega ese día (dias_semana
+//    no lo incluye) — a diferencia de "sin restricción", esto SÍ es información
+//    nueva que hay que mostrar en la grilla.
+//  - { desde, hasta } en minutos si hay una ventana (propia de la cancha, o si
+//    no tiene, la del torneo para ese día).
+//  - null si no hay ninguna restricción cargada (torneo sin horario tampoco) —
+//    se mantiene el comportamiento de siempre: sin límite, todo disponible.
+function ventanaDeCancha(tc, torneo) {
+  const diasHabilitados = tc.dias_semana && tc.dias_semana.length ? new Set(tc.dias_semana) : null;
+  const ventanaTorneo = ventanaDelTorneo(torneo);
+  const propiaPorDia = tc.horarios_por_dia;
+  return (dia) => {
+    if (diasHabilitados && !diasHabilitados.has(dia)) return { cerrado: true };
+    if (propiaPorDia && Object.keys(propiaPorDia).length) {
+      const v = propiaPorDia[dia] || propiaPorDia[String(dia)];
+      if (v) return { desde: horaAMinutos(v.desde), hasta: horaAMinutos(v.hasta) };
+    }
+    if (!ventanaTorneo) return null;
+    return (typeof ventanaTorneo.desde === "number" ? ventanaTorneo : ventanaTorneo[dia]) || null;
+  };
 }
 
 // Trae los horarios BLOQUEADOS de cada jugador para un torneo: los generales
@@ -3667,8 +3758,8 @@ document.getElementById("btnGenerarCalendario").addEventListener("click", async 
   // no encontrarles horario en el mismo acto.
   if (!torneoGestionId) { toast("Elegí primero un torneo en gestión"); return; }
   const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoGestionId).single();
-  const { data: tc } = await sb.from("torneo_canchas").select("dias_semana, canchas(*)").eq("torneo_id", torneoGestionId);
-  const canchas = (tc || []).filter((c) => c.canchas).map((c) => ({ ...c.canchas, dias_semana: c.dias_semana }));
+  const { data: tc } = await sb.from("torneo_canchas").select("dias_semana, horarios_por_dia, canchas(*)").eq("torneo_id", torneoGestionId);
+  const canchas = (tc || []).filter((c) => c.canchas).map((c) => ({ ...c.canchas, dias_semana: c.dias_semana, horarios_por_dia: c.horarios_por_dia }));
   if (canchas.length === 0) { toast("Asigná al menos una cancha a este torneo"); return; }
   if (canchas.length === 1) toast("Ojo: este torneo tiene una sola cancha cargada — todos los partidos van a ir ahí. Agregá más canchas abajo si querés repartirlos.");
 
@@ -3837,20 +3928,27 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
 // ventana horaria del torneo, para poder asignarles un partido sin horario.
 // ============================================================
 function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
+  // cada cancha puede tener su propia ventana horaria (ver ventanaDeCancha) --
+  // se resuelve una sola vez por cancha, no por fila, para no recalcularla en
+  // cada horario de la grilla.
+  const ventanaPorCancha = new Map(canchas.map((c) => [c.id, ventanaDeCancha(c._tc || {}, torneo)]));
   const conHorario = partidos.filter((p) => p.horario);
   const filaPorMinuto = new Map(); // timestamp -> horario ISO de esa fila
   conHorario.forEach((p) => filaPorMinuto.set(new Date(p.horario).getTime(), p.horario));
   if (sintetizarVacios && torneo) {
     const duracion = torneo.duracion_minutos || 90;
-    const ventana = ventanaDelTorneo(torneo);
-    const esMapaPorDia = ventana && typeof ventana === "object" && ventana.desde === undefined;
     fechasDelTorneo(torneo).forEach((fecha) => {
-      const baseDia = (esMapaPorDia ? ventana[fecha.getDay()] : ventana) || FRANJA_DEFAULT_DIA;
-      for (let m = baseDia.desde; m + duracion <= baseDia.hasta; m += duracion) {
-        const d = new Date(fecha);
-        d.setHours(0, m, 0, 0);
-        if (!filaPorMinuto.has(d.getTime())) filaPorMinuto.set(d.getTime(), d.toISOString());
-      }
+      const dia = fecha.getDay();
+      canchas.forEach((c) => {
+        const ventana = ventanaPorCancha.get(c.id)(dia);
+        if (ventana && ventana.cerrado) return; // esta cancha no juega este día -- no sintetiza huecos para ella
+        const win = ventana || FRANJA_DEFAULT_DIA;
+        for (let m = win.desde; m + duracion <= win.hasta; m += duracion) {
+          const d = new Date(fecha);
+          d.setHours(0, m, 0, 0);
+          if (!filaPorMinuto.has(d.getTime())) filaPorMinuto.set(d.getTime(), d.toISOString());
+        }
+      });
     });
   }
   const duracionMin = (torneo && torneo.duracion_minutos) || 90;
@@ -3859,11 +3957,20 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
   const filas = horarios.map((horarioISO) => {
     const desde = new Date(horarioISO);
     const hasta = new Date(desde.getTime() + duracionMin * 60000);
+    const dia = desde.getDay();
+    const minutosDelDia = desde.getHours() * 60 + desde.getMinutes();
     const celdas = canchas.map((c) => {
       const partido = conHorario.find((p) => p.horario === horarioISO && p.cancha_id === c.id);
       if (partido) return { cancha: c, estado: "ocupado", partido };
       const bloqueo = (bloqueos[c.id] || []).find((b) => desde < b.hasta && hasta > b.desde);
       if (bloqueo) return { cancha: c, estado: "bloqueado", bloqueo };
+      // "cerrado": fuera de la ventana propia de ESTA cancha (o directamente no
+      // juega este día) -- distinto de "disponible", que sigue siendo zona de
+      // drop válida para arrastrar un partido.
+      const ventana = ventanaPorCancha.get(c.id)(dia);
+      if (ventana && (ventana.cerrado || minutosDelDia < ventana.desde || minutosDelDia >= ventana.hasta)) {
+        return { cancha: c, estado: "cerrado" };
+      }
       return { cancha: c, estado: "disponible" };
     });
     return { horarioISO, celdas };
@@ -3925,7 +4032,9 @@ function abreviarCategoria(categoria) {
 let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (Administración) — se mantiene entre re-renders (drag&drop, cambio de categoría)
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable) {
   const cont = document.getElementById(containerId);
-  const canchas = canchasTorneo.map((c) => c.canchas).filter(Boolean).sort(compararCanchas);
+  // _tc: referencia a la fila de torneo_canchas (dias_semana/horarios_por_dia)
+  // de esta cancha puntual -- la usa calcularSlots vía ventanaDeCancha().
+  const canchas = canchasTorneo.map((c) => c.canchas && { ...c.canchas, _tc: c }).filter(Boolean).sort(compararCanchas);
   if (canchas.length === 0) {
     cont.innerHTML = '<p class="empty">Todavía no hay canchas asignadas a este torneo.</p>';
     return;
@@ -3986,6 +4095,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
   const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
+  const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">🔒 Cerrada</div>`;
 
   let html = "";
   if (editable && sinHorario.length > 0) {
@@ -4009,10 +4119,11 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       if (fechaTxt !== fechaAnterior) { html += `<div class="calendario-agenda-fecha">${fechaTxt}</div>`; fechaAnterior = fechaTxt; }
       html += `<div class="calendario-agenda-hora">${iconoReloj()} ${d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</div>`;
       fila.celdas.forEach((celda) => {
-        if (celda.estado === "disponible" && !editable) return; // en la agenda pública no hace falta mostrar huecos vacíos
+        if ((celda.estado === "disponible" || celda.estado === "cerrado") && !editable) return; // en la agenda pública no hace falta mostrar huecos vacíos ni cerrados
         html += `<div class="calendario-agenda-item"><p class="match-meta meta-caption" style="margin-bottom:2px">${celda.cancha.nombre}</p>`;
         if (celda.estado === "ocupado") html += tarjetaHtml(celda.partido);
         else if (celda.estado === "bloqueado") html += bloqueadaHtml(celda);
+        else if (celda.estado === "cerrado") html += cerradaHtml();
         else html += vaciaHtml(fila, celda);
         html += `</div>`;
       });
@@ -4034,6 +4145,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       fila.celdas.forEach((celda) => {
         if (celda.estado === "ocupado") html += tarjetaHtml(celda.partido);
         else if (celda.estado === "bloqueado") html += bloqueadaHtml(celda);
+        else if (celda.estado === "cerrado") html += cerradaHtml();
         else html += vaciaHtml(fila, celda);
       });
     });

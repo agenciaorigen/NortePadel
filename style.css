@@ -235,6 +235,15 @@ tr:first-child td { font-weight: 700; }
 .badge.danger { background: rgba(255,92,108,.14); color: var(--danger); border: 1px solid rgba(255,92,108,.3); }
 .badge.solid { background: rgba(111,224,138,.14); color: var(--state-ok); border: 1px solid rgba(111,224,138,.3); font-weight: 700; }
 
+/* Canchas del torneo (Administración): una fila por cancha, con su editor
+   de días/horario propio plegado bajo el badge hasta que se toca ✏️. */
+.cancha-torneo-fila { margin-bottom: 10px; }
+.cancha-torneo-fila .badge { margin-right: 6px; }
+.cancha-torneo-editor {
+  margin-top: 6px; padding: 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-elev);
+}
+
 /* ranking público: menos "tabla" y más lista de leaderboard */
 #tablaRanking { border-radius: var(--radius-sm); overflow: hidden; }
 #tablaRanking th { border-bottom: 2px solid rgba(var(--accent-rgb),.4); }
@@ -678,6 +687,17 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   border: 1px dashed rgba(255,92,108,.4); color: var(--danger); font-size: 10.5px;
   font-weight: 600; display: flex; align-items: center; justify-content: center;
   text-align: center; padding: 4px; line-height: 1.25;
+}
+/* "cerrado": a diferencia de "bloqueada" (un bloqueo puntual que cargó el
+   admin) esto es la cancha fuera de SU PROPIO horario ese día (ver
+   torneo_canchas.horarios_por_dia) — un rayado neutro en vez de rojo,
+   porque no es un problema a resolver, es simplemente "acá no juega". No es
+   zona de drop (no lleva data-horario/data-cancha como .calendario-vacia). */
+.calendario-cerrada {
+  min-height: 56px; border-radius: var(--radius-sm); color: var(--muted); font-size: 10.5px;
+  font-weight: 600; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 4px; line-height: 1.25; opacity: .6;
+  background: repeating-linear-gradient(135deg, var(--bg-elev), var(--bg-elev) 6px, var(--border) 6px, var(--border) 7px);
 }
 
 .calendario-grid-scroll { overflow-x: auto; }
