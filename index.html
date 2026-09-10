@@ -25,9 +25,9 @@
   <div class="card">
     <h2>Cambiá tu contraseña</h2>
     <p class="match-meta">Tu cuenta se creó con una clave provisoria. Elegí una nueva antes de seguir.</p>
-    <label>Nueva contraseña</label>
+    <label for="nuevaClave1">Nueva contraseña</label>
     <input id="nuevaClave1" type="password" autocomplete="new-password" minlength="6" required />
-    <label>Repetila</label>
+    <label for="nuevaClave2">Repetila</label>
     <input id="nuevaClave2" type="password" autocomplete="new-password" minlength="6" required />
     <button class="primary" id="btnGuardarClaveNueva" style="margin-top:10px;width:100%">Guardar y continuar</button>
     <p class="match-meta" id="claveNuevaError"></p>
@@ -217,12 +217,15 @@
 
     <div class="card admin-only" id="crearTorneoCard" style="display:none">
       <h2>Crear torneo</h2>
-      <label>Nombre</label>
+      <label for="tNombre">Nombre</label>
       <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
-      <label>Complejo sede</label>
+      <label for="tComplejo">Complejo sede</label>
       <select id="tComplejo"></select>
-      <label>Duración partido (min)</label>
+      <label for="tDuracion">Duración partido (min)</label>
       <input id="tDuracion" type="number" value="90" />
+      <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
+           correctamente asociado por envolver su propio <input>) — no hay un
+           único control al que apuntarle "for" acá. -->
       <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
       <div class="check-grid" id="tDiasForm">
         <label><input type="checkbox" class="chkDiaTorneo" value="4" /> Jue</label>
@@ -234,36 +237,39 @@
         <label><input type="checkbox" class="chkDiaTorneo" value="3" /> Mié</label>
       </div>
       <div class="row">
-        <div><label>Horario por defecto, desde</label><input id="tHoraDesde" type="time" /></div>
-        <div><label>Horario por defecto, hasta</label><input id="tHoraHasta" type="time" /></div>
+        <div><label for="tHoraDesde">Horario por defecto, desde</label><input id="tHoraDesde" type="time" /></div>
+        <div><label for="tHoraHasta">Horario por defecto, hasta</label><input id="tHoraHasta" type="time" /></div>
       </div>
+      <!-- #tHorariosPorDiaForm se llena dinámicamente (app.js) con varios
+           inputs de horario, cada uno con su propio label/id — este label
+           de arriba es la instrucción general del bloque, no de un control. -->
       <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
       <div id="tHorariosPorDiaForm"></div>
-      <label>Formato de la fase de grupos</label>
+      <label for="tFaseGruposFormato">Formato de la fase de grupos</label>
       <select id="tFaseGruposFormato">
         <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
         <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
         <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
       </select>
       <div class="row" id="tGrupoConfigRow">
-        <div><label>Parejas por grupo</label><input id="tTamanoGrupo" type="number" value="3" min="2" /></div>
-        <div><label>Cuántas avanzan por grupo</label><input id="tAvanzanPorGrupo" type="number" value="2" min="1" /></div>
+        <div><label for="tTamanoGrupo">Parejas por grupo</label><input id="tTamanoGrupo" type="number" value="3" min="2" /></div>
+        <div><label for="tAvanzanPorGrupo">Cuántas avanzan por grupo</label><input id="tAvanzanPorGrupo" type="number" value="2" min="1" /></div>
       </div>
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
       <div class="check-grid" id="tCategoriasForm"></div>
       <div class="row">
         <div>
-          <label>Fecha inicio</label>
+          <label for="tFechaInicio">Fecha inicio</label>
           <input id="tFechaInicio" type="date" />
         </div>
         <div>
-          <label>Fecha fin</label>
+          <label for="tFechaFin">Fecha fin</label>
           <input id="tFechaFin" type="date" />
         </div>
       </div>
-      <label>Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
+      <label for="tCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
       <input id="tCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
-      <label>Flyer del torneo (opcional)</label>
+      <label for="tFlyerArchivo">Flyer del torneo (opcional)</label>
       <input id="tFlyerArchivo" type="file" accept="image/*" />
       <button class="primary" id="btnCrearTorneo">Crear torneo</button>
       <button type="button" class="secondary small" id="btnCancelarCrearTorneo" style="margin-top:8px">Cancelar</button>
@@ -280,16 +286,16 @@
         <button class="primary" id="btnReservaIrAPerfil">Ir a Mi perfil</button>
       </div>
       <div id="reservaFormWrap">
-        <label>Complejo</label>
+        <label for="reservaComplejo">Complejo</label>
         <select id="reservaComplejo"></select>
-        <label>Cancha</label>
+        <label for="reservaCancha">Cancha</label>
         <select id="reservaCancha"></select>
         <div class="row">
-          <div><label>Fecha y hora</label><input id="reservaHorario" type="datetime-local" /></div>
-          <div><label>Duración (min)</label><input id="reservaDuracion" type="number" value="90" min="30" step="15" /></div>
+          <div><label for="reservaHorario">Fecha y hora</label><input id="reservaHorario" type="datetime-local" /></div>
+          <div><label for="reservaDuracion">Duración (min)</label><input id="reservaDuracion" type="number" value="90" min="30" step="15" /></div>
         </div>
         <p class="match-meta" id="reservaCostoTxt"></p>
-        <label>Invitá a tus amigos (opcional, hasta 3 — la cancha es para 4)</label>
+        <label for="reservaBuscarAmigo">Invitá a tus amigos (opcional, hasta 3 — la cancha es para 4)</label>
         <input id="reservaBuscarAmigo" placeholder="Buscá por nombre" autocomplete="off" />
         <div id="reservaSugerencias" class="suggest-list"></div>
         <div id="reservaInvitadosSeleccionados" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -336,6 +342,9 @@
       <button class="primary cta-hero" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
     </div>
     <div class="card">
+      <!-- Este label encabeza tanto los pills de género como el <select> de
+           categoría de abajo — no está pegado a un único control, así que no
+           le sumamos un "for" que sería incorrecto. -->
       <label>Categoría</label>
       <div class="pill-row" id="resFiltroGeneroPills"></div>
       <select id="resFiltroCategoria"></select>
@@ -471,9 +480,9 @@
   <section id="view-perfil" class="view">
     <div class="card card-glow" id="authCard">
       <h2 id="authTitulo">Ingresar</h2>
-      <label>Email</label>
+      <label for="authEmail">Email</label>
       <input id="authEmail" type="email" autocomplete="email" />
-      <label>Contraseña</label>
+      <label for="authPassword">Contraseña</label>
       <input id="authPassword" type="password" autocomplete="current-password" />
       <button class="primary" id="btnLogin">Ingresar</button>
       <button class="secondary" id="btnSignup" style="margin-top:10px;width:100%">Crear cuenta nueva</button>
@@ -485,31 +494,33 @@
       <div style="text-align:center;margin-bottom:14px">
         <img id="fotoPreview" alt="Tu foto de perfil" class="avatar avatar-grande" style="display:none;margin:0 auto" onerror="mostrarFotoPreview(null)" />
         <div id="fotoPlaceholder" class="avatar avatar-grande avatar-placeholder" style="margin:0 auto">🎾</div>
-        <label>Foto de perfil</label>
+        <label for="jFoto">Foto de perfil</label>
         <input id="jFoto" type="file" accept="image/*" />
       </div>
       <div class="row">
-        <div><label>Nombre</label><input id="jNombre" /></div>
-        <div><label>Apellido</label><input id="jApellido" /></div>
+        <div><label for="jNombre">Nombre</label><input id="jNombre" /></div>
+        <div><label for="jApellido">Apellido</label><input id="jApellido" /></div>
       </div>
       <div class="row">
         <div>
-          <label>Categoría</label>
+          <label for="jCategoria">Categoría</label>
           <select id="jCategoria"></select>
           <p class="match-meta" id="categoriaPendienteNotice" style="display:none"></p>
         </div>
         <div>
-          <label>Teléfono</label>
+          <label for="jTelefono">Teléfono</label>
           <input id="jTelefono" />
         </div>
       </div>
-      <label>Lado preferido</label>
+      <label for="jLado">Lado preferido</label>
       <select id="jLado">
         <option value="indistinto" selected>Indistinto</option>
         <option value="drive">Drive</option>
         <option value="reves">Revés</option>
       </select>
 
+      <!-- #disponibilidadForm se llena dinámicamente (app.js) con varios
+           checkboxes/inputs, cada uno con su propio label/id. -->
       <label>¿Hay algún día/horario en el que NO podés jugar? (opcional — si no marcás nada, se asume que podés cualquier día)</label>
       <div id="disponibilidadForm"></div>
 
@@ -556,12 +567,14 @@
       <div class="card card-accent" id="editarTorneoCard" style="display:none">
         <h2>Editar torneo</h2>
         <p class="match-meta" id="teAvisoBloqueo" style="display:none">🔒 Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
-        <label>Nombre</label>
+        <label for="teNombre">Nombre</label>
         <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
-        <label>Complejo sede</label>
+        <label for="teComplejo">Complejo sede</label>
         <select id="teComplejo"></select>
-        <label>Duración partido (min)</label>
+        <label for="teDuracion">Duración partido (min)</label>
         <input id="teDuracion" type="number" value="90" />
+        <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
+             correctamente asociado por envolver su propio <input>). -->
         <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
         <div class="check-grid" id="teDiasForm">
           <label><input type="checkbox" class="chkDiaTorneoEdit" value="4" /> Jue</label>
@@ -573,36 +586,38 @@
           <label><input type="checkbox" class="chkDiaTorneoEdit" value="3" /> Mié</label>
         </div>
         <div class="row">
-          <div><label>Horario por defecto, desde</label><input id="teHoraDesde" type="time" /></div>
-          <div><label>Horario por defecto, hasta</label><input id="teHoraHasta" type="time" /></div>
+          <div><label for="teHoraDesde">Horario por defecto, desde</label><input id="teHoraDesde" type="time" /></div>
+          <div><label for="teHoraHasta">Horario por defecto, hasta</label><input id="teHoraHasta" type="time" /></div>
         </div>
+        <!-- #teHorariosPorDiaForm se llena dinámicamente (app.js) con varios
+             inputs de horario, cada uno con su propio label/id. -->
         <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
         <div id="teHorariosPorDiaForm"></div>
-        <label>Formato de la fase de grupos</label>
+        <label for="teFaseGruposFormato">Formato de la fase de grupos</label>
         <select id="teFaseGruposFormato">
           <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
           <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
           <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
         </select>
         <div class="row" id="teGrupoConfigRow">
-          <div><label>Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
-          <div><label>Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
+          <div><label for="teTamanoGrupo">Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
+          <div><label for="teAvanzanPorGrupo">Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
         </div>
         <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategoriasEdit">seleccionar todas</button></label>
         <div class="check-grid" id="teCategoriasForm"></div>
         <div class="row">
           <div>
-            <label>Fecha inicio</label>
+            <label for="teFechaInicio">Fecha inicio</label>
             <input id="teFechaInicio" type="date" />
           </div>
           <div>
-            <label>Fecha fin</label>
+            <label for="teFechaFin">Fecha fin</label>
             <input id="teFechaFin" type="date" />
           </div>
         </div>
-        <label>Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
+        <label for="teCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
         <input id="teCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
-        <label>Cambiar flyer del torneo (opcional, dejalo vacío para mantener el actual)</label>
+        <label for="teFlyerArchivo">Cambiar flyer del torneo (opcional, dejalo vacío para mantener el actual)</label>
         <input id="teFlyerArchivo" type="file" accept="image/*" />
         <button class="primary" id="btnGuardarTorneo">Guardar cambios</button>
         <button type="button" class="secondary small" id="btnCancelarEditarTorneo" style="margin-top:8px">Cancelar</button>
@@ -618,7 +633,7 @@
         <h2>Inscripciones y parejas</h2>
         <div id="admParejas"></div>
         <div id="admSinPareja"></div>
-        <label style="margin-top:12px">Inscribir una pareja manualmente</label>
+        <label style="margin-top:12px" for="dtSelectJugador1">Inscribir una pareja manualmente</label>
         <input type="text" id="dtSelectJugador1" list="dtListaJugadores1" placeholder="Buscar jugador 1 por nombre..." autocomplete="off" />
         <datalist id="dtListaJugadores1"></datalist>
         <input type="text" id="dtSelectJugador2" list="dtListaJugadores2" placeholder="Buscar jugador 2 por nombre..." autocomplete="off" style="margin-top:6px" />
@@ -630,8 +645,10 @@
       <div class="card card-accent" id="admSeccionCanchas">
         <h2>Canchas del torneo</h2>
         <div id="admCanchas"></div>
-        <label>Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
+        <label for="dtSelectCancha">Agregar / cambiar cancha (por clima, disponibilidad, etc.)</label>
         <select id="dtSelectCancha"></select>
+        <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
+             correctamente asociado por envolver su propio <input>). -->
         <label style="margin-top:6px">¿Disponible solo algunos días? (ej: el club tiene menos canchas libres jueves y viernes) — dejalo sin marcar para que esté disponible todos los días del torneo</label>
         <div class="check-grid" id="canchaDiasNuevaForm">
           <label><input type="checkbox" class="chkDiaCanchaNueva" value="4" /> Jue</label>
@@ -649,13 +666,13 @@
         <h2>Bloqueos de cancha</h2>
         <p class="match-meta" style="margin-bottom:6px">Una cancha bloqueada queda inutilizable para TODOS en ese horario (lluvia, mantenimiento, otro evento) — el armado automático y la planilla la respetan. Esto es distinto de la disponibilidad de un jugador, que es solo su preferencia personal y no bloquea la cancha para nadie más.</p>
         <div id="admBloqueosLista"></div>
-        <label style="margin-top:10px">Cancha</label>
+        <label style="margin-top:10px" for="admBloqueoCancha">Cancha</label>
         <select id="admBloqueoCancha"></select>
         <div class="row" style="margin-top:6px">
-          <div><label>Desde</label><input type="datetime-local" id="admBloqueoDesde" /></div>
-          <div><label>Hasta</label><input type="datetime-local" id="admBloqueoHasta" /></div>
+          <div><label for="admBloqueoDesde">Desde</label><input type="datetime-local" id="admBloqueoDesde" /></div>
+          <div><label for="admBloqueoHasta">Hasta</label><input type="datetime-local" id="admBloqueoHasta" /></div>
         </div>
-        <label style="margin-top:6px">Motivo (opcional)</label>
+        <label style="margin-top:6px" for="admBloqueoMotivo">Motivo (opcional)</label>
         <input id="admBloqueoMotivo" placeholder="Ej: lluvia, mantenimiento" />
         <button class="secondary small" id="admBtnBloquearCancha" style="margin-top:8px">Bloquear horario</button>
       </div>
@@ -667,7 +684,7 @@
         <button class="secondary" id="btnPublicarCalendario" style="margin-top:8px">3. Publicar calendario (recién ahí lo ven los jugadores)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
         <div id="admEstadoCategorias" style="margin-top:10px"></div>
-        <label style="margin-top:12px">Categoría</label>
+        <label style="margin-top:12px" for="partidosCategoriaFiltro">Categoría</label>
         <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
         <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
           <button class="pill active" data-vista="lista">Lista</button>
@@ -684,20 +701,20 @@
     <div id="admConfigGeneralWrap">
     <div class="card card-accent">
       <h2>Configuración general</h2>
-      <label>WhatsApp del club (para coordinar pagos)</label>
+      <label for="cfgWhatsapp">WhatsApp del club (para coordinar pagos)</label>
       <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
-      <label>Instagram (link al perfil)</label>
+      <label for="cfgInstagram">Instagram (link al perfil)</label>
       <input id="cfgInstagram" placeholder="https://instagram.com/tu_club" />
       <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
     </div>
 
     <div class="card card-accent">
       <h2>Nuevo complejo</h2>
-      <label>Nombre</label>
+      <label for="cNombre">Nombre</label>
       <input id="cNombre" placeholder="Ej: Norte Padel Club" />
-      <label>Dirección</label>
+      <label for="cDireccion">Dirección</label>
       <input id="cDireccion" />
-      <label>¿Cuántas canchas tiene?</label>
+      <label for="cCantidadCanchas">¿Cuántas canchas tiene?</label>
       <input id="cCantidadCanchas" type="number" min="0" value="2" />
       <button class="primary" id="btnCrearComplejo">Crear complejo</button>
     </div>
@@ -745,25 +762,25 @@
       <h2>Puntos por ronda</h2>
       <p class="match-meta" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedó eliminada. En la Final, el ganador suma "Campeón" y el perdedor suma "Sub".</p>
       <div class="row">
-        <div><label>Campeón</label><input id="prCampeon" type="number" /></div>
-        <div><label>Sub</label><input id="prSub" type="number" /></div>
+        <div><label for="prCampeon">Campeón</label><input id="prCampeon" type="number" /></div>
+        <div><label for="prSub">Sub</label><input id="prSub" type="number" /></div>
       </div>
       <div class="row">
-        <div><label>Semifinal</label><input id="prSemifinal" type="number" /></div>
-        <div><label>Cuartos</label><input id="prCuartos" type="number" /></div>
+        <div><label for="prSemifinal">Semifinal</label><input id="prSemifinal" type="number" /></div>
+        <div><label for="prCuartos">Cuartos</label><input id="prCuartos" type="number" /></div>
       </div>
       <div class="row">
-        <div><label>Octavos</label><input id="prOctavos" type="number" /></div>
-        <div><label>Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
+        <div><label for="prOctavos">Octavos</label><input id="prOctavos" type="number" /></div>
+        <div><label for="prDieciseisavos">Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
       </div>
       <button class="secondary small" id="btnGuardarPuntosRonda" style="margin-top:10px">Guardar puntos</button>
     </div>
 
     <div class="card card-accent">
       <h2>Jugador del mes</h2>
-      <label>Jugador</label>
+      <label for="jdmSelect">Jugador</label>
       <select id="jdmSelect"></select>
-      <label>Motivo (opcional)</label>
+      <label for="jdmMotivo">Motivo (opcional)</label>
       <input id="jdmMotivo" placeholder="Ej: campeón del último torneo" />
       <button class="secondary small" id="btnDestacarJugador" style="margin-top:10px">Destacar en Inicio</button>
     </div>
@@ -774,13 +791,13 @@
         <button type="button" class="link-btn" id="btnCerrarAuspiciantesTorneo" style="display:none;margin-bottom:8px">← Volver a este torneo</button>
         <h2>Auspiciantes / Publicidad</h2>
         <p class="match-meta" style="margin-bottom:6px">Un auspiciante "General" aparece en Inicio, la columna lateral y en todos los torneos. Si elegís un torneo puntual, el logo aparece solo ahí.</p>
-        <label>Nombre del auspiciante</label>
+        <label for="spNombre">Nombre del auspiciante</label>
         <input id="spNombre" placeholder="Ej: Wilson Padel" />
-        <label>Torneo</label>
+        <label for="spTorneo">Torneo</label>
         <select id="spTorneo"><option value="">General (todos los torneos)</option></select>
-        <label>Link (opcional, a donde va si tocan el logo)</label>
+        <label for="spLink">Link (opcional, a donde va si tocan el logo)</label>
         <input id="spLink" placeholder="https://..." />
-        <label>Logo</label>
+        <label for="spArchivo">Logo</label>
         <input id="spArchivo" type="file" accept="image/*" />
         <button class="secondary small" id="btnSubirSponsor" style="margin-top:12px">Agregar auspiciante</button>
         <div class="sponsor-strip" id="listaSponsors" style="margin-top:16px"></div>
@@ -791,13 +808,13 @@
     <div class="card card-accent">
       <h2>Noticias</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>
-      <label>Título</label>
+      <label for="ntTitulo">Título</label>
       <input id="ntTitulo" placeholder="Ej: ¡Arrancó la Apertura Norte 2026!" />
-      <label>Texto (opcional)</label>
+      <label for="ntTexto">Texto (opcional)</label>
       <textarea id="ntTexto" rows="3" placeholder="Contá la novedad..."></textarea>
-      <label>Link (opcional, ej: al posteo de Instagram)</label>
+      <label for="ntLink">Link (opcional, ej: al posteo de Instagram)</label>
       <input id="ntLink" placeholder="https://..." />
-      <label>Imagen (opcional)</label>
+      <label for="ntArchivo">Imagen (opcional)</label>
       <input id="ntArchivo" type="file" accept="image/*" />
       <button class="secondary small" id="btnSubirNoticia" style="margin-top:12px">Agregar noticia</button>
       <div id="listaNoticiasAdmin" style="margin-top:16px"></div>

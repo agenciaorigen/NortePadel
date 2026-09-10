@@ -114,6 +114,9 @@ header.topbar button {
 }
 header.topbar button svg { display: block; }
 header.topbar button:hover { background: var(--card); }
+/* envuelve el ícono genérico o la foto real (avatarHtml) en #btnPerfil — mismo
+   tamaño para los dos estados así el botón no salta de ancho al iniciar sesión */
+.perfil-avatar-wrap { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex-shrink: 0; }
 
 main { padding: 16px; max-width: 720px; margin: 0 auto; }
 
@@ -158,6 +161,10 @@ input, select, textarea {
 }
 input::placeholder { color: #6b6f6f; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--text); outline-offset: 1px; border-color: var(--text); }
+/* elementos clickeables que no son <button> nativo (tarjetas de partido,
+   avatar ampliable) pero sí tienen tabindex/role="button" -- sin esto,
+   navegar con teclado los enfoca pero no se ve dónde quedó el foco */
+[role="button"]:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
 
 .row { display: flex; gap: 10px; }
 .row > * { flex: 1; }
@@ -197,16 +204,6 @@ button.secondary {
   cursor: pointer;
 }
 button.secondary:hover { border-color: rgba(245,245,245,.4); }
-button.tertiary {
-  background: none;
-  border: none;
-  color: var(--text);
-  font-weight: 600;
-  font-size: 13.5px;
-  padding: 6px 2px;
-  cursor: pointer;
-}
-button.tertiary:hover { text-decoration: underline; }
 button.small { padding: 8px 12px; font-size: 12px; border-radius: 10px; }
 button.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
 
@@ -243,7 +240,6 @@ tr:first-child td { font-weight: 700; }
 #tablaRanking th { border-bottom: 2px solid rgba(var(--accent-rgb),.4); }
 #tablaRanking td { padding: 12px 6px; border-bottom: 1px solid var(--border); }
 #tablaRanking tr:last-child td { border-bottom: none; }
-.tabla-posiciones td { border-bottom: 1px solid var(--border); }
 
 /* podio: la fila entera de los primeros 3 puestos se tiñe con su color de
    medalla (usa las clases pos-1/2/3 que ya emite cargarRanking(), sin
@@ -739,7 +735,6 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    (mobile y desktop) — antes esto era mobile-only porque en desktop se veía
    toda la llave de una: ahora hay que poder cambiar de etapa en cualquier
    tamaño de pantalla. */
-.llave-etapas-nav { display: flex; margin-bottom: 10px; flex-wrap: wrap; }
 @media (max-width: 699px) {
   /* dentro de una etapa con más de una columna (Zonas), cada columna ocupa
      casi toda la pantalla y el scroll "engancha" columna por columna
@@ -801,12 +796,6 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .llave-fila.ganador .llave-pareja { color: var(--accent-bright); font-weight: 800; }
 .llave-fila.ganador .llave-set { background: var(--accent); color: var(--text); }
 .llave-meta { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-
-.tabla-posiciones { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.tabla-posiciones th { text-align: left; color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 4px 6px; border-bottom: 1px solid var(--border); }
-.tabla-posiciones td { padding: 7px 6px; border-bottom: 1px solid var(--border); }
-.tabla-posiciones tr:last-child td { border-bottom: none; }
-.tabla-posiciones tr:first-child td { color: var(--text); font-weight: 700; }
 
 .check-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
 .check-grid label {
@@ -980,24 +969,6 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
   50% { opacity: .6; box-shadow: 0 0 0 5px rgba(226,162,90,0); }
 }
 nav.tabbar .icon { position: relative; }
-
-.day-picker {
-  display: grid;
-  grid-template-columns: 84px 1fr 12px 1fr;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 7px 4px;
-  border-bottom: 1px solid var(--border);
-}
-.day-picker:last-child { border-bottom: none; }
-.day-picker label {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0; font-size: 12.5px; color: var(--text); white-space: nowrap;
-}
-.day-picker input[type="checkbox"] { width: auto; accent-color: var(--text); }
-.day-picker input[type="time"] { width: 100%; padding: 7px 6px; font-size: 12.5px; }
-.day-picker .sep { color: var(--muted); font-size: 11px; text-align: center; }
 
 /* ---------- Tarjeta de partido: categoría/fase, hora/cancha, parejas VS, estado ---------- */
 .match-card {

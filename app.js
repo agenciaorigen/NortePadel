@@ -226,6 +226,16 @@ function idDesdeDatalist(inputId) {
   const input = document.getElementById(inputId);
   return input?._mapaDatalist?.get(input.value.trim()) || "";
 }
+// Escapa texto libre (nombre/apellido de jugador, sponsor, noticia,
+// motivo_rechazo...) antes de interpolarlo en un string que después se asigna
+// a innerHTML/outerHTML — sin esto, cualquiera que edite su nombre puede
+// inyectar HTML/JS que se ejecuta en el navegador de quien vea esa pantalla
+// (stored XSS). Sirve tanto para texto dentro de una etiqueta como para el
+// valor de un atributo entre comillas dobles.
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 // Etiqueta compartida para buscar un jugador por nombre en cualquier datalist
 // (alta de pareja nueva, reemplazo de un jugador en una pareja existente...).
 function labelJugadorBuscable(j) {
@@ -453,6 +463,10 @@ function renderVistaPerfil() {
 renderDisponibilidadForm();
 
 document.getElementById("btnGuardarPerfil").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarPerfil");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!currentUser) { toast("Iniciá sesión primero"); return; }
   const nombre = document.getElementById("jNombre").value.trim();
   const apellido = document.getElementById("jApellido").value.trim();
@@ -515,9 +529,16 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   cargarRanking();
   cargarJugadorDelMes();
   if (torneoActualId) renderInscribirme();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnGuardarClaveNueva").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarClaveNueva");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const c1 = document.getElementById("nuevaClave1").value;
   const c2 = document.getElementById("nuevaClave2").value;
   const err = document.getElementById("claveNuevaError");
@@ -534,6 +555,9 @@ document.getElementById("btnGuardarClaveNueva").addEventListener("click", async 
   document.getElementById("nuevaClave2").value = "";
   document.getElementById("cambiarClaveOverlay").style.display = "none";
   toast("¡Contraseña actualizada! 🔒");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 async function manejarCambioSesion(session) {
@@ -659,7 +683,7 @@ async function cargarRanking() {
     const avatarClass = fotoGrande ? "avatar-master" : "";
     const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
-      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${j.nombre} ${j.apellido} ${badgeMaster}</span></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} ${badgeMaster}</span></div></td>
       <td><strong>${j.puntos_ranking}</strong></td>
       <td>${j.partidos_jugados}</td>
       <td>${j.partidos_ganados}</td>`;
@@ -711,7 +735,7 @@ async function abrirPerfilJugador(jugadorId) {
   cont.innerHTML = (torneosGanados || []).length > 0
     ? torneosGanados.map((t) => `
       <div class="pj-torneo-item">
-        <div><strong>${iconoTrofeo()} ${t.torneo_nombre}</strong><div class="match-meta">con ${t.companero_nombre} ${t.companero_apellido}${t.categoria ? " · " + t.categoria : ""}</div></div>
+        <div><strong>${iconoTrofeo()} ${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
         <span class="match-meta">${t.fecha || ""}</span>
       </div>`).join("")
     : '<p class="empty">Todavía no ganó ningún torneo.</p>';
@@ -737,7 +761,7 @@ async function abrirPerfilJugador(jugadorId) {
   cardSub.style.display = cantPlata > 0 ? "block" : "none";
   contSub.innerHTML = (finalesPerdidas || []).map((t) => `
     <div class="pj-torneo-item">
-      <div><strong>🥈 ${t.torneo_nombre}</strong><div class="match-meta">con ${t.companero_nombre} ${t.companero_apellido}${t.categoria ? " · " + t.categoria : ""}</div></div>
+      <div><strong>🥈 ${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
       <span class="match-meta">${t.fecha || ""}</span>
     </div>`).join("");
 }
@@ -867,8 +891,8 @@ function renderJugadorDelMes() {
           <span>puntos</span>
         </div>
         <div class="destacado-info">
-          <strong>${row.nombre} ${row.apellido}</strong>
-          <span>${row.categoria}${row.motivo ? " · " + row.motivo : ""}</span>
+          <strong>${escapeHtml(row.nombre)} ${escapeHtml(row.apellido)}</strong>
+          <span>${row.categoria}${row.motivo ? " · " + escapeHtml(row.motivo) : ""}</span>
         </div>
       </div>`;
   }).join("");
@@ -890,7 +914,7 @@ async function cargarAscendidos() {
   const item = (a) => `
     <div class="ascendido-item" data-jugador-id="${a.jugador_id}">
       ${avatarHtml(a.foto_url, 56)}
-      <strong>${a.nombre} ${a.apellido}</strong>
+      <strong>${escapeHtml(a.nombre)} ${escapeHtml(a.apellido)}</strong>
       <span>→ ${a.categoria_nueva}</span>
     </div>`;
   const set = `<div class="ascendidos-set">${data.map(item).join("")}</div>`;
@@ -997,8 +1021,8 @@ async function cargarCampeones() {
     <div class="campeon-card">
       <div class="campeon-avatares">${avatarHtml(c.jugador1_foto, 48)}${avatarHtml(c.jugador2_foto, 48)}</div>
       <div class="campeon-nombres">
-        <span class="campeon-nombre-link" data-jugador-id="${c.jugador1_id}">${c.jugador1_nombre} ${c.jugador1_apellido}</span> /
-        <span class="campeon-nombre-link" data-jugador-id="${c.jugador2_id}">${c.jugador2_nombre} ${c.jugador2_apellido}</span>
+        <span class="campeon-nombre-link" data-jugador-id="${c.jugador1_id}">${escapeHtml(c.jugador1_nombre)} ${escapeHtml(c.jugador1_apellido)}</span> /
+        <span class="campeon-nombre-link" data-jugador-id="${c.jugador2_id}">${escapeHtml(c.jugador2_nombre)} ${escapeHtml(c.jugador2_apellido)}</span>
       </div>
       <div class="campeon-torneo">${iconoTrofeo()} ${c.torneo_nombre}</div>
     </div>
@@ -1026,7 +1050,7 @@ function matchVsRowHtml(p, ganador) {
   const jugadorHtml = (nombre, apellido, foto) => `
     <div class="match-pair-player">
       <span class="match-pair-foto">${avatarHtml(foto, 34)}</span>
-      <span class="match-pair-nombre">${[nombre, apellido].filter(Boolean).join(" ") || "?"}</span>
+      <span class="match-pair-nombre">${escapeHtml([nombre, apellido].filter(Boolean).join(" ") || "?")}</span>
     </div>`;
   return `<div class="match-pair ${ganador ? "jugado" : ""}">
     <div class="match-pair-lado ${cls1}">
@@ -1053,6 +1077,10 @@ async function calcularTorneoDestacado() {
 }
 
 document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
+  const btn = document.getElementById("btnDestacarJugador");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const jugadorId = document.getElementById("jdmSelect").value;
   if (!jugadorId) { toast("Elegí un jugador"); return; }
   const motivo = document.getElementById("jdmMotivo").value.trim() || null;
@@ -1061,6 +1089,9 @@ document.getElementById("btnDestacarJugador").addEventListener("click", async ()
   toast("Jugador del mes actualizado");
   document.getElementById("jdmMotivo").value = "";
   cargarJugadorDelMes();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -1097,6 +1128,9 @@ async function cargarComplejos() {
 
   document.querySelectorAll(".btnAgregarCancha").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const complejoId = btn.dataset.complejo;
       const input = document.querySelector(`.inputCancha[data-complejo="${complejoId}"]`);
       const nombre = input.value.trim();
@@ -1105,6 +1139,9 @@ async function cargarComplejos() {
       if (error) { toast("Error: " + error.message); return; }
       input.value = "";
       cargarComplejos();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -1126,6 +1163,10 @@ async function cargarComplejos() {
 }
 
 document.getElementById("btnCrearComplejo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnCrearComplejo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const nombre = document.getElementById("cNombre").value.trim();
   if (!nombre) { toast("Poné un nombre de complejo"); return; }
   const direccion = document.getElementById("cDireccion").value.trim() || null;
@@ -1143,6 +1184,9 @@ document.getElementById("btnCrearComplejo").addEventListener("click", async () =
   document.getElementById("cDireccion").value = "";
   toast("Complejo creado" + (cantidad > 0 ? ` con ${cantidad} cancha(s)` : ""));
   cargarComplejos();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -1196,13 +1240,22 @@ async function cargarCategorias() {
     `).join("");
     listaAdmin.querySelectorAll(".btnBorrarCategoria").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
         const { error } = await sb.from("categorias").delete().eq("id", btn.dataset.id);
         if (error) { toast("Error: " + error.message); return; }
         cargarCategorias();
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
     listaAdmin.querySelectorAll(".btnEditarCategoria").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
         const nombreViejo = btn.dataset.nombre;
         const nuevoNombre = (prompt("Nuevo nombre para la categoría:", nombreViejo) || "").trim();
         if (!nuevoNombre || nuevoNombre === nombreViejo) return;
@@ -1218,12 +1271,19 @@ async function cargarCategorias() {
         cargarCategorias();
         cargarRanking();
         if (isAdmin) cargarJugadoresAdmin();
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
   }
 }
 
 document.getElementById("btnAgregarCategoria").addEventListener("click", async () => {
+  const btn = document.getElementById("btnAgregarCategoria");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const input = document.getElementById("catNueva");
   const nombre = input.value.trim();
   if (!nombre) { toast("Poné un nombre de categoría"); return; }
@@ -1232,6 +1292,9 @@ document.getElementById("btnAgregarCategoria").addEventListener("click", async (
   input.value = "";
   toast("Categoría agregada");
   cargarCategorias();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnTodasCategorias").addEventListener("click", () => {
@@ -1262,16 +1325,26 @@ async function cargarEtiquetas() {
 
   listaAdmin.querySelectorAll(".btnBorrarEtiqueta").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const { error } = await sb.from("etiquetas_jugador").delete().eq("id", btn.dataset.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Etiqueta borrada");
       cargarEtiquetas();
       cargarJugadoresAdmin();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 }
 
 document.getElementById("btnAgregarEtiqueta")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btnAgregarEtiqueta");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const input = document.getElementById("etqNueva");
   const nombre = input.value.trim();
   const color = document.getElementById("etqColorNueva").value;
@@ -1281,6 +1354,9 @@ document.getElementById("btnAgregarEtiqueta")?.addEventListener("click", async (
   input.value = "";
   toast("Etiqueta agregada");
   cargarEtiquetas();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // pill/punto de color para mostrar la etiqueta de un jugador donde le sirva al admin
@@ -1302,30 +1378,31 @@ function etiquetaDotHtml(jugadorId) {
 function parejaRowHtml(p, editable) {
   const catBadge = p.categoria ? `<span class="badge">${p.categoria}</span>` : "";
   const estadoBadge = p.estado === "confirmada" ? `<span class="badge solid">Confirmada</span>`
-    : p.estado === "rechazada" ? `<span class="badge danger" title="${p.motivo_rechazo || ""}">Rechazada</span>`
+    : p.estado === "rechazada" ? `<span class="badge danger" title="${escapeHtml(p.motivo_rechazo || "")}">Rechazada</span>`
     : `<span class="badge orange">Pendiente de confirmar</span>`;
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
   const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
+  const nombrePareja = `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`;
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
-      <span>${etiquetas}🎾 ${p.jugador1_nombre} / ${p.jugador2_nombre} ${catBadge} ${estadoBadge}</span>
+      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
         ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">✏️</button>` : ""}
-        ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${p.jugador1_nombre} / ${p.jugador2_nombre}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${p.jugador1_nombre} / ${p.jugador2_nombre}">×</button>` : ""}
+        ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${escapeHtml(nombrePareja)}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${nombrePareja}">×</button>` : ""}
       </span>
     </div>
     ${editable ? `
     <div class="match-admin-panel" data-editar-pareja="${p.id}" style="display:none">
       <p class="match-meta" style="margin-bottom:6px">Reemplazá al jugador que anotaste sin saber quién iba a jugar de verdad — se corrige en esta pareja y en TODOS los partidos que ya jugó o le falten (zona, octavos, cuartos...), no hace falta tocar cada partido. Si ya hay resultados cargados con el jugador viejo, los puntos de ranking que ya sumó quedan a su nombre hasta que se migren con un script aparte.</p>
       <div class="match-actions">
-        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_1" list="dtListaCambiarJugador_${p.id}_1" placeholder="Buscar reemplazo de ${p.jugador1_nombre}..." autocomplete="off" style="flex:1" />
+        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_1" list="dtListaCambiarJugador_${p.id}_1" placeholder="Buscar reemplazo de ${escapeHtml(p.jugador1_nombre)}..." autocomplete="off" style="flex:1" />
         <datalist id="dtListaCambiarJugador_${p.id}_1"></datalist>
         <button type="button" class="secondary small btnCambiarJugadorPareja" data-p="${p.id}" data-slot="1" data-otro="${p.jugador2_id}">Cambiar</button>
       </div>
       <div class="match-actions" style="margin-top:6px">
-        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_2" list="dtListaCambiarJugador_${p.id}_2" placeholder="Buscar reemplazo de ${p.jugador2_nombre}..." autocomplete="off" style="flex:1" />
+        <input type="text" class="inputCambiarJugador" id="dtCambiarJugador_${p.id}_2" list="dtListaCambiarJugador_${p.id}_2" placeholder="Buscar reemplazo de ${escapeHtml(p.jugador2_nombre)}..." autocomplete="off" style="flex:1" />
         <datalist id="dtListaCambiarJugador_${p.id}_2"></datalist>
         <button type="button" class="secondary small btnCambiarJugadorPareja" data-p="${p.id}" data-slot="2" data-otro="${p.jugador1_id}">Cambiar</button>
       </div>
@@ -1334,7 +1411,8 @@ function parejaRowHtml(p, editable) {
 }
 function sinParejaChipHtml(i, editable) {
   const sufijoEstado = i.estado && i.estado !== "confirmada" ? ` · ${i.estado === "pendiente" ? "pendiente" : i.estado}` : "";
-  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${i.nombre} ${i.apellido}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${i.nombre} ${i.apellido}" aria-label="Sacar a ${i.nombre} del torneo">×</button>` : ""}</span>`;
+  const nombreCompleto = `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`;
+  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
 }
 function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable) {
   // al público no se le muestran parejas rechazadas ni inscripciones
@@ -1348,13 +1426,37 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   contParejas.innerHTML = parejasBase.map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
   if (editable) {
     contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
-      btn.addEventListener("click", async () => await borrarPareja(btn.dataset.id, btn.dataset.nombre, btn.dataset.j1, btn.dataset.j2));
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await borrarPareja(btn.dataset.id, btn.dataset.nombre, btn.dataset.j1, btn.dataset.j2);
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
     contParejas.querySelectorAll(".btnConfirmarPareja").forEach((btn) => {
-      btn.addEventListener("click", async () => await confirmarPareja(btn.dataset.j1, btn.dataset.j2));
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await confirmarPareja(btn.dataset.j1, btn.dataset.j2);
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
     contParejas.querySelectorAll(".btnRechazarPareja").forEach((btn) => {
-      btn.addEventListener("click", async () => await rechazarPareja(btn.dataset.j1, btn.dataset.j2));
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await rechazarPareja(btn.dataset.j1, btn.dataset.j2);
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
 
     // ✏️ reemplazar un jugador de la pareja: se corrige en la pareja misma
@@ -1372,6 +1474,9 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
     });
     contParejas.querySelectorAll(".btnCambiarJugadorPareja").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
         const parejaId = btn.dataset.p;
         const slot = btn.dataset.slot;
         const inputId = `dtCambiarJugador_${parejaId}_${slot}`;
@@ -1394,6 +1499,9 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         toast("Jugador reemplazado en la pareja");
         avisarActualizacionEnVivo();
         refrescarTrasAccionGestion();
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
   }
@@ -1404,7 +1512,15 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
     ${sinPareja.map((i) => sinParejaChipHtml(i, editable)).join("")}`;
   if (editable) {
     contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
-      btn.addEventListener("click", async () => await borrarInscripcion(btn.dataset.id, btn.dataset.nombre));
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await borrarInscripcion(btn.dataset.id, btn.dataset.nombre);
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
   }
 }
@@ -1426,12 +1542,19 @@ async function cargarPuntosRonda() {
 }
 
 document.getElementById("btnGuardarPuntosRonda").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarPuntosRonda");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const filas = Object.entries(RONDAS_INPUT).map(([ronda, inputId]) => ({
     ronda, puntos: Number(document.getElementById(inputId).value) || 0
   }));
   const { error } = await sb.from("puntos_ronda").upsert(filas, { onConflict: "ronda" });
   if (error) { toast("Error: " + error.message); return; }
   toast("Puntos guardados");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -1448,6 +1571,10 @@ async function cargarConfig() {
 }
 
 document.getElementById("btnGuardarConfig").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarConfig");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const whatsapp = document.getElementById("cfgWhatsapp").value.trim().replace(/\D/g, "");
   const instagram = document.getElementById("cfgInstagram").value.trim();
   const { error } = await sb.from("config").upsert([
@@ -1459,6 +1586,9 @@ document.getElementById("btnGuardarConfig").addEventListener("click", async () =
   await cargarConfig();
   cargarNoticias();
   if (torneoActualId) refrescarDetalleTorneo();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -1514,8 +1644,8 @@ function renderListaJugadoresAdmin() {
         <input type="file" class="jaFoto" accept="image/*" style="flex:1" />
       </div>
       <div class="row" style="margin-top:8px">
-        <input type="text" class="jaNombre" value="${j.nombre}" placeholder="Nombre" />
-        <input type="text" class="jaApellido" value="${j.apellido}" placeholder="Apellido" />
+        <input type="text" class="jaNombre" value="${escapeHtml(j.nombre)}" placeholder="Nombre" />
+        <input type="text" class="jaApellido" value="${escapeHtml(j.apellido)}" placeholder="Apellido" />
       </div>
       <div class="row" style="margin-top:8px">
         <select class="jaCategoria">${opcionesCategoria}</select>
@@ -1558,16 +1688,27 @@ function renderListaJugadoresAdmin() {
           await cargarJugadoresAdmin();
           cargarRanking();
         });
-        fila.querySelector(".btnQuitarCategoriaRanking").addEventListener("click", async () => {
+        const btnQuitarCatRanking = fila.querySelector(".btnQuitarCategoriaRanking");
+        btnQuitarCatRanking.addEventListener("click", async () => {
+          if (btnQuitarCatRanking.disabled) return;
           if (!confirm(`¿Sacar a ${j.nombre} ${j.apellido} del ranking de ${categoria}?`)) return;
+          btnQuitarCatRanking.disabled = true;
+          try {
           const { error } = await sb.from("ranking_categoria").delete().eq("jugador_id", j.id).eq("categoria", categoria);
           if (error) { toast("Error: " + error.message); return; }
           toast("Categoría quitada del ranking");
           await cargarJugadoresAdmin();
           cargarRanking();
+          } finally {
+            btnQuitarCatRanking.disabled = false;
+          }
         });
       });
-      div.querySelector(".btnAgregarCategoriaRanking").addEventListener("click", async () => {
+      const btnAgregarCatRanking = div.querySelector(".btnAgregarCategoriaRanking");
+      btnAgregarCatRanking.addEventListener("click", async () => {
+        if (btnAgregarCatRanking.disabled) return;
+        btnAgregarCatRanking.disabled = true;
+        try {
         const categoria = selNueva.value;
         if (!categoria) { toast("No quedan categorías para agregar"); return; }
         const { error } = await sb.from("ranking_categoria").insert({ jugador_id: j.id, categoria, puntos_ranking: 0 });
@@ -1575,6 +1716,9 @@ function renderListaJugadoresAdmin() {
         toast(`${j.nombre} ${j.apellido} ahora también rankea en ${categoria}`);
         await cargarJugadoresAdmin();
         cargarRanking();
+        } finally {
+          btnAgregarCatRanking.disabled = false;
+        }
       });
     };
     renderRankingExtra();
@@ -1589,7 +1733,10 @@ function renderListaJugadoresAdmin() {
       const archivo = e.target.files[0];
       if (archivo) div.querySelector(".jaAvatarPreview").innerHTML = avatarHtml(URL.createObjectURL(archivo), 56);
     });
-    div.querySelector(".btnGuardarJugador").addEventListener("click", async () => {
+    div.querySelector(".btnGuardarJugador").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       const nombre = div.querySelector(".jaNombre").value.trim();
       const apellido = div.querySelector(".jaApellido").value.trim();
       const categoria = div.querySelector(".jaCategoria").value;
@@ -1611,6 +1758,9 @@ function renderListaJugadoresAdmin() {
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
       cargarRanking();
+      } finally {
+        this.disabled = false;
+      }
     });
     // Blanquear la clave de un jugador (ej: la olvidó, o quedó con la provisoria
     // de una importación vieja). No se puede hacer desde el cliente con la clave
@@ -1626,7 +1776,10 @@ function renderListaJugadoresAdmin() {
       if (error || data?.error) { toast("Error: " + (data?.error || error.message)); return; }
       toast(`Clave de ${j.nombre} ${j.apellido} blanqueada — se la pide cambiar al entrar`);
     });
-    div.querySelector(".btnEliminarJugador").addEventListener("click", async () => {
+    div.querySelector(".btnEliminarJugador").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       // "partidos_jugados" solo cuenta partidos con resultado cargado — un jugador
       // placeholder recién armado (0 partidos_jugados) puede igual estar anotado en
       // un partido de zona TODAVÍA NO jugado. Borrar el jugador borra en cascada su
@@ -1656,6 +1809,9 @@ function renderListaJugadoresAdmin() {
       toast("Perfil eliminado");
       cargarJugadoresAdmin();
       cargarRanking();
+      } finally {
+        this.disabled = false;
+      }
     });
     cont.appendChild(div);
   });
@@ -1674,12 +1830,15 @@ function renderSolicitudesCategoria(jugadores) {
   solicitudes.forEach((j) => {
     const div = document.createElement("div");
     div.className = "match-card";
-    div.innerHTML = `<div class="match-teams">${j.nombre} ${j.apellido} <span class="badge">${j.categoria} → ${j.categoria_pendiente}</span></div>
+    div.innerHTML = `<div class="match-teams">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} <span class="badge">${j.categoria} → ${j.categoria_pendiente}</span></div>
       <div class="match-meta" style="display:flex;gap:8px;margin-top:8px">
         <button class="secondary small btnAprobarCategoria">Aprobar</button>
         <button class="secondary small danger btnRechazarCategoria">Rechazar</button>
       </div>`;
-    div.querySelector(".btnAprobarCategoria").addEventListener("click", async () => {
+    div.querySelector(".btnAprobarCategoria").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       const { error } = await sb.from("jugadores").update({ categoria: j.categoria_pendiente, categoria_pendiente: null }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
       // queda registrado para poder mostrar "ascendieron este mes" en Inicio
@@ -1687,12 +1846,21 @@ function renderSolicitudesCategoria(jugadores) {
       toast("Categoría aprobada");
       cargarJugadoresAdmin();
       cargarRanking();
+      } finally {
+        this.disabled = false;
+      }
     });
-    div.querySelector(".btnRechazarCategoria").addEventListener("click", async () => {
+    div.querySelector(".btnRechazarCategoria").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       const { error } = await sb.from("jugadores").update({ categoria_pendiente: null }).eq("id", j.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Solicitud rechazada");
       cargarJugadoresAdmin();
+      } finally {
+        this.disabled = false;
+      }
     });
     cont.appendChild(div);
   });
@@ -1851,6 +2019,10 @@ document.getElementById("teFaseGruposFormato").addEventListener("change", () => 
 toggleGrupoConfigRow("tFaseGruposFormato", "tGrupoConfigRow");
 
 document.getElementById("btnCrearTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnCrearTorneo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!isAdmin) { toast("Solo un administrador puede crear torneos"); return; }
   const nombre = document.getElementById("tNombre").value.trim();
   const complejoId = document.getElementById("tComplejo").value;
@@ -1909,6 +2081,9 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   cargarTorneos();
   cargarInicio();
   abrirTorneo(data.id);
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Abre un torneo y muestra una de sus 8 pantallas Público/Jugador (por
@@ -2002,7 +2177,7 @@ document.getElementById("buscarPareja").addEventListener("input", (e) => {
   ).slice(0, 6);
 
   sugerencias.innerHTML = candidatos.length > 0
-    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${j.nombre} ${j.apellido} <span class="badge" style="margin-left:6px">${j.categoria}</span></button>`).join("")
+    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} <span class="badge" style="margin-left:6px">${j.categoria}</span></button>`).join("")
     : '<div class="suggest-item" style="color:var(--muted);cursor:default">Sin resultados</div>';
 
   sugerencias.querySelectorAll(".suggest-item[data-id]").forEach((btn) => {
@@ -2142,6 +2317,10 @@ async function cargarMiInscripcion() {
 document.getElementById("miInscBtnDisponibilidad").addEventListener("click", () => mostrarPantallaTorneo("mi-disponibilidad"));
 document.getElementById("miInscBtnMisPartidos").addEventListener("click", () => mostrarPantallaTorneo(""));
 document.getElementById("miInscBtnCancelar").addEventListener("click", async () => {
+  const btn = document.getElementById("miInscBtnCancelar");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!miJugador || !torneoActualId) return;
   // si ya tiene pareja confirmada, no se puede cancelar solo/a desde acá (dejaría a
   // la/el compañera/o colgada/o, y borrar la pareja es una acción reservada al
@@ -2162,6 +2341,9 @@ document.getElementById("miInscBtnCancelar").addEventListener("click", async () 
   avisarActualizacionEnVivo();
   refrescarDetalleTorneo();
   mostrarPantallaTorneo("");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Muestra y precarga el picker de horarios bloqueados puntuales para ESTE
@@ -2176,11 +2358,18 @@ async function cargarYMostrarDispTorneo() {
 }
 
 document.getElementById("btnGuardarDispTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarDispTorneo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!miJugador || !torneoActualId) return;
   await sb.from("disponibilidad").delete().eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
   const disponibilidades = leerRestriccionesDeForm("torneoDispBloqueadaForm").map((r) => ({ jugador_id: miJugador.id, torneo_id: torneoActualId, ...r }));
   if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
   toast("¡Guardado! 🎾");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // paso 2: confirmación antes de anotar de verdad (acá se va a sumar el pago más adelante)
@@ -2261,7 +2450,7 @@ document.getElementById("reservaDuracion").addEventListener("input", actualizarC
 
 function renderInvitadosSeleccionados() {
   document.getElementById("reservaInvitadosSeleccionados").innerHTML = invitadosSeleccionados.map((j) => `
-    <span class="badge">${j.nombre} ${j.apellido} <button type="button" class="btnQuitarInvitado" data-id="${j.id}" style="border:none;background:none;color:inherit;cursor:pointer;margin-left:4px">×</button></span>
+    <span class="badge">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} <button type="button" class="btnQuitarInvitado" data-id="${j.id}" aria-label="Quitar a ${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} de invitados" style="border:none;background:none;color:inherit;cursor:pointer;margin-left:4px">×</button></span>
   `).join("");
   document.querySelectorAll(".btnQuitarInvitado").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2282,7 +2471,7 @@ document.getElementById("reservaBuscarAmigo").addEventListener("input", (e) => {
   ).slice(0, 6);
 
   sugerencias.innerHTML = candidatos.length > 0
-    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${j.nombre} ${j.apellido}</button>`).join("")
+    ? candidatos.map((j) => `<button type="button" class="suggest-item" data-id="${j.id}">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}</button>`).join("")
     : '<div class="suggest-item" style="color:var(--muted);cursor:default">Sin resultados</div>';
 
   sugerencias.querySelectorAll(".suggest-item[data-id]").forEach((btn) => {
@@ -2332,16 +2521,22 @@ async function cargarMisReservas() {
     div.innerHTML = `
       <div class="match-teams">${r.cancha_nombre}${r.complejo_nombre ? " · " + r.complejo_nombre : ""}</div>
       <div class="match-meta">${horario} · ${r.duracion_minutos} min${costoTxt} <span class="badge ${estadoBadge}">${r.estado}</span></div>
-      ${r.invitados ? `<div class="match-meta">Con: ${r.invitados}</div>` : ""}
+      ${r.invitados ? `<div class="match-meta">Con: ${escapeHtml(r.invitados)}</div>` : ""}
       ${r.soy_organizador && (r.estado === "pendiente" || r.estado === "confirmada") ? '<button class="secondary small danger btnCancelarReserva" style="margin-top:8px">Cancelar reserva</button>' : ""}
     `;
     if (r.soy_organizador) {
       const btnCancelar = div.querySelector(".btnCancelarReserva");
       if (btnCancelar) btnCancelar.addEventListener("click", async () => {
+        if (btnCancelar.disabled) return;
+        btnCancelar.disabled = true;
+        try {
         const { error } = await sb.from("reservas").update({ estado: "cancelada" }).eq("id", r.id);
         if (error) { toast("Error: " + error.message); return; }
         toast("Reserva cancelada");
         cargarMisReservas();
+        } finally {
+          btnCancelar.disabled = false;
+        }
       });
     }
     cont.appendChild(div);
@@ -2382,23 +2577,35 @@ async function cargarReservasPendientesAdmin() {
     div.innerHTML = `
       <div class="match-teams">${r.cancha_nombre}${r.complejo_nombre ? " · " + r.complejo_nombre : ""}</div>
       <div class="match-meta">${horario} · ${r.duracion_minutos} min${costoTxt}</div>
-      <div class="match-meta">Organiza: ${r.organizador_nombre}${r.organizador_telefono ? " · " + r.organizador_telefono : ""}${r.invitados ? " · Con: " + r.invitados : ""}</div>
+      <div class="match-meta">Organiza: ${escapeHtml(r.organizador_nombre)}${r.organizador_telefono ? " · " + escapeHtml(r.organizador_telefono) : ""}${r.invitados ? " · Con: " + escapeHtml(r.invitados) : ""}</div>
       <div class="match-meta" style="display:flex;gap:8px;margin-top:8px">
         <button class="secondary small btnConfirmarReserva">Confirmar</button>
         <button class="secondary small danger btnRechazarReserva">Rechazar</button>
       </div>
     `;
-    div.querySelector(".btnConfirmarReserva").addEventListener("click", async () => {
+    div.querySelector(".btnConfirmarReserva").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       const { error } = await sb.from("reservas").update({ estado: "confirmada" }).eq("id", r.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Reserva confirmada");
       cargarReservasPendientesAdmin();
+      } finally {
+        this.disabled = false;
+      }
     });
-    div.querySelector(".btnRechazarReserva").addEventListener("click", async () => {
+    div.querySelector(".btnRechazarReserva").addEventListener("click", async function () {
+      if (this.disabled) return;
+      this.disabled = true;
+      try {
       const { error } = await sb.from("reservas").update({ estado: "rechazada" }).eq("id", r.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Reserva rechazada");
       cargarReservasPendientesAdmin();
+      } finally {
+        this.disabled = false;
+      }
     });
     cont.appendChild(div);
   });
@@ -2596,7 +2803,7 @@ function renderBloqueosAdmin() {
       const desde = new Date(b.desde).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       const hasta = new Date(b.hasta).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       return `<div class="pareja-row">
-        <span>${vigente ? "🔴" : "⚪"} ${b.canchas?.nombre || "?"} — ${desde} a ${hasta}${b.motivo ? ` (${b.motivo})` : ""}</span>
+        <span>${vigente ? "🔴" : "⚪"} ${b.canchas?.nombre || "?"} — ${desde} a ${hasta}${b.motivo ? ` (${escapeHtml(b.motivo)})` : ""}</span>
         <button class="secondary small btnQuitarBloqueo" data-id="${b.id}">Quitar</button>
       </div>`;
     }).join("");
@@ -2608,16 +2815,26 @@ function renderBloqueosAdmin() {
 
   cont.querySelectorAll(".btnQuitarBloqueo").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const { error } = await sb.from("canchas_bloqueos").delete().eq("id", btn.dataset.id);
       if (error) { toast("Error: " + error.message); return; }
       toast("Bloqueo eliminado");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 }
 
 document.getElementById("admBtnBloquearCancha").addEventListener("click", async () => {
+  const btn = document.getElementById("admBtnBloquearCancha");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const canchaId = document.getElementById("admBloqueoCancha").value;
   const desde = document.getElementById("admBloqueoDesde").value;
   const hasta = document.getElementById("admBloqueoHasta").value;
@@ -2639,6 +2856,9 @@ document.getElementById("admBtnBloquearCancha").addEventListener("click", async 
   document.getElementById("admBloqueoMotivo").value = "";
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ---------- Administración: torneo en gestión ----------
@@ -2712,11 +2932,17 @@ async function cargarGestionTorneo(id) {
     btnToggleInsc.style.display = "inline-block";
     btnToggleInsc.textContent = t.estado === "inscripcion" ? "🔒 Cerrar inscripción" : "🔓 Reabrir inscripción";
     btnToggleInsc.onclick = async () => {
-      const nuevoEstado = t.estado === "inscripcion" ? "inscripcion_cerrada" : "inscripcion";
-      const { error } = await sb.from("torneos").update({ estado: nuevoEstado }).eq("id", torneoGestionId);
-      if (error) { toast("Error: " + error.message); return; }
-      toast(nuevoEstado === "inscripcion_cerrada" ? "Inscripción cerrada" : "Inscripción reabierta");
-      refrescarTrasAccionGestion();
+      if (btnToggleInsc.disabled) return;
+      btnToggleInsc.disabled = true;
+      try {
+        const nuevoEstado = t.estado === "inscripcion" ? "inscripcion_cerrada" : "inscripcion";
+        const { error } = await sb.from("torneos").update({ estado: nuevoEstado }).eq("id", torneoGestionId);
+        if (error) { toast("Error: " + error.message); return; }
+        toast(nuevoEstado === "inscripcion_cerrada" ? "Inscripción cerrada" : "Inscripción reabierta");
+        refrescarTrasAccionGestion();
+      } finally {
+        btnToggleInsc.disabled = false;
+      }
     };
   } else {
     btnToggleInsc.style.display = "none";
@@ -2737,9 +2963,15 @@ async function cargarGestionTorneo(id) {
   ).join("") || '<p class="empty">Sin canchas asignadas todavía.</p>';
   document.querySelectorAll(".btnQuitarCanchaTorneo").forEach((a) => a.addEventListener("click", async (ev) => {
     ev.preventDefault();
-    await sb.from("torneo_canchas").delete().eq("id", a.dataset.tc);
-    toast("Cancha quitada del torneo");
-    refrescarTrasAccionGestion();
+    if (a.dataset.busy) return;
+    a.dataset.busy = "1";
+    try {
+      await sb.from("torneo_canchas").delete().eq("id", a.dataset.tc);
+      toast("Cancha quitada del torneo");
+      refrescarTrasAccionGestion();
+    } finally {
+      delete a.dataset.busy;
+    }
   }));
   llenarSelect(document.getElementById("dtSelectCancha"), cacheCanchas, (c) => {
     const complejo = cacheComplejos.find((x) => x.id === c.complejo_id);
@@ -2785,9 +3017,9 @@ function renderDiagnosticoTorneo(insc, parejas, partidos) {
   const partidosSinHorario = partidos.filter((p) => !p.horario && p.estado !== "jugado");
 
   const filas = [];
-  if (parejasSinPartido.length) filas.push(`⚠️ ${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${p.jugador1_nombre} / ${p.jugador2_nombre} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
-  if (inscSinPareja.length) filas.push(`⚠️ ${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${i.nombre} ${i.apellido}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
-  if (parejasPendientes.length) filas.push(`⚠️ ${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${p.jugador1_nombre} / ${p.jugador2_nombre}`).join(", ")}.`);
+  if (parejasSinPartido.length) filas.push(`⚠️ ${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
+  if (inscSinPareja.length) filas.push(`⚠️ ${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
+  if (parejasPendientes.length) filas.push(`⚠️ ${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`).join(", ")}.`);
   if (partidosSinHorario.length) filas.push(`⚠️ ${partidosSinHorario.length} partido${partidosSinHorario.length === 1 ? "" : "s"} todavía sin cancha/horario — usá "Generar calendario" o asignalo a mano.`);
 
   cont.innerHTML = filas.length === 0
@@ -2801,6 +3033,10 @@ function renderDiagnosticoTorneo(insc, parejas, partidos) {
 // mano). Pide escribir el nombre exacto del torneo como segunda confirmación
 // porque es irreversible y se lleva puestos resultados ya jugados.
 document.getElementById("btnBorrarTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnBorrarTorneo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!torneoGestionId || !torneoGestionData) return;
   const nombre = torneoGestionData.nombre;
   const escrito = prompt(`Esto borra "${nombre}" para siempre: inscripciones, parejas, partidos y resultados ya jugados. No se puede deshacer.\n\nEscribí el nombre del torneo para confirmar:`);
@@ -2822,6 +3058,9 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
   document.getElementById("admSelectorTorneoCard").style.display = "block";
   await cargarTorneos();
   avisarActualizacionEnVivo();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ---------- editar torneo (nombre, sede, categorías, fechas, costo, flyer) ----------
@@ -2867,6 +3106,10 @@ document.getElementById("btnCancelarEditarTorneo").addEventListener("click", () 
   document.getElementById("editarTorneoCard").style.display = "none";
 });
 document.getElementById("btnGuardarTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarTorneo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!isAdmin || !torneoGestionId) return;
   const nombre = document.getElementById("teNombre").value.trim();
   const complejoId = document.getElementById("teComplejo").value;
@@ -2916,9 +3159,16 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
   cargarTorneos();
   cargarInicio();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnAgregarCanchaTorneo");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const canchaId = document.getElementById("dtSelectCancha").value;
   if (!canchaId || !torneoGestionId) return;
   const diasElegidos = Array.from(document.querySelectorAll(".chkDiaCanchaNueva:checked")).map((c) => Number(c.value));
@@ -2927,11 +3177,18 @@ document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", asyn
   toast("Cancha agregada al torneo");
   document.querySelectorAll(".chkDiaCanchaNueva").forEach((c) => (c.checked = false));
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Inscribe una pareja completa a mano (ej: dos amigos que se lo pidieron directo al club).
 // Siempre entran los dos juntos, nunca un jugador suelto — así nunca queda nadie sin pareja.
 document.getElementById("btnInscribir").addEventListener("click", async () => {
+  const btn = document.getElementById("btnInscribir");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const in1 = document.getElementById("dtSelectJugador1");
   const in2 = document.getElementById("dtSelectJugador2");
   const jugador1Id = idDesdeDatalist("dtSelectJugador1");
@@ -2959,6 +3216,9 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   in2.value = "";
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ---------- sacar a alguien del torneo (ej: no pagó) — solo admin ----------
@@ -3348,6 +3608,10 @@ function agruparPorCategoria(lista) {
 }
 
 document.getElementById("btnArmarPartidos").addEventListener("click", async () => {
+  const btn = document.getElementById("btnArmarPartidos");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   // parejas_publicas ya trae la categoría de cada pareja (la del torneo puntual
   // en el que se anotó) — un torneo puede tener varias categorías corriendo en
   // paralelo (ej: Damas y Caballeros, varias divisiones) y cada una arma su
@@ -3387,9 +3651,16 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   toast(`Se armó el fixture: ${totalGenerados} partidos (todavía sin cancha ni horario). Ahora usá "Generar calendario".`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnGenerarCalendario").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGenerarCalendario");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   // Toma los partidos que ya tienen fixture (pareja1/pareja2 definidos) pero
   // todavía no cancha/horario, y les busca un hueco — separado de "Armar
   // fixture" para que armar quién juega contra quién nunca pierda cruces por
@@ -3442,9 +3713,16 @@ document.getElementById("btnGenerarCalendario").addEventListener("click", async 
     `. Todavía no lo ven los jugadores — revisalo y apretá "Publicar calendario".`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("btnPublicarCalendario").addEventListener("click", async () => {
+  const btn = document.getElementById("btnPublicarCalendario");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   // Pasa de "de prueba" a público SOLO las categorías que están en borrador
   // -- no toca las que ya estaban publicadas ni las que todavía no tienen
   // calendario armado. Es la acción de "aprobar y publicar" que pidió el
@@ -3463,6 +3741,9 @@ document.getElementById("btnPublicarCalendario").addEventListener("click", async
   toast(`Calendario publicado ✅ (${enBorrador.map((c) => c.categoria).join(", ")}) — ya lo pueden ver los jugadores`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // Por cada categoría del torneo, toma los ganadores de SU fase más avanzada
@@ -3473,6 +3754,10 @@ document.getElementById("btnPublicarCalendario").addEventListener("click", async
 // que van más atrasadas que otras (por ejemplo, todavía en fase de grupos
 // mientras otra ya llegó a Cuartos) simplemente esperan su turno.
 document.getElementById("btnGenerarSiguienteFase").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGenerarSiguienteFase");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   if (!torneoGestionId) { toast("Elegí primero un torneo en gestión"); return; }
   const { data: partidos } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoGestionId });
   if (!partidos || partidos.length === 0) { toast("Todavía no armaste ningún partido"); return; }
@@ -3539,6 +3824,9 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
   toast(mensajes.length ? mensajes.join(" · ") : "Ninguna categoría está lista para avanzar todavía");
   if (totalGenerados > 0) avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -3679,16 +3967,16 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   // grande -- así entran muchos partidos por pantalla y se sigue viendo de
   // un vistazo qué zona/categoría es cada uno.
   const tarjetaDetalladaHtml = (p, extraClase = "") => `
-    <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" data-abrir-partido="${p.id}">
-      <div class="calendario-equipo">${p.pareja1_nombre}</div>
+    <div class="calendario-partido ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}" data-abrir-partido="${p.id}" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
+      <div class="calendario-equipo">${escapeHtml(p.pareja1_nombre)}</div>
       <div class="calendario-vs">V</div>
-      <div class="calendario-equipo">${p.pareja2_nombre}</div>
+      <div class="calendario-equipo">${escapeHtml(p.pareja2_nombre)}</div>
       ${p.ronda && p.ronda !== "Fase de grupos" ? `<span class="badge orange" style="margin-top:4px">${p.ronda}</span>` : (p.grupo ? `<span class="badge orange" style="margin-top:4px">Grupo ${p.grupo}</span>` : "")}
       ${p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
     </div>`;
   const tarjetaCompactaHtml = (p, extraClase = "") => {
     const horarioTxt = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
-    const detalle = `${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`.replace(/"/g, "&quot;");
+    const detalle = escapeHtml(`${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`);
     const etiqueta = `${p.slot_cuadro || (p.grupo ? "G" + p.grupo : "")} ${abreviarCategoria(p.categoria)}`.trim();
     return `<div class="calendario-partido calendario-compacta ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}"
         style="background:${colorCategoria(p.categoria)}" title="${detalle}" draggable="true" data-partido="${p.id}">
@@ -3696,7 +3984,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     </div>`;
   };
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
-  const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${celda.bloqueo.motivo || "Cancha bloqueada"}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${celda.bloqueo.motivo}` : ""}</div>`;
+  const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
 
   let html = "";
@@ -3754,7 +4042,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
 
   if (!editable && sinHorario.length > 0) {
     html += `<p class="match-meta" style="margin-top:10px">Sin horario asignado (${sinHorario.length}): ` +
-      sinHorario.map((p) => `${p.pareja1_nombre} vs ${p.pareja2_nombre}`).join(" · ") + "</p>";
+      sinHorario.map((p) => `${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}`).join(" · ") + "</p>";
   }
   cont.innerHTML = html;
 
@@ -3795,8 +4083,11 @@ function wirePlanillaDragAndDrop(containerId) {
     zona.addEventListener("dragover", (e) => e.preventDefault());
     zona.addEventListener("drop", async (e) => {
       e.preventDefault();
+      if (zona.dataset.busy) return;
       const partidoId = arrastrando;
       if (!partidoId) return;
+      zona.dataset.busy = "1";
+      try {
       const nuevoHorario = zona.dataset.horario || null; // sin dataset.horario = soltado en la bandeja
       const nuevaCancha = zona.dataset.cancha || null;
       const duracion = torneoGestionData?.duracion_minutos || 90;
@@ -3824,6 +4115,9 @@ function wirePlanillaDragAndDrop(containerId) {
       toast(nuevoHorario ? "Partido reubicado ✅" : "Partido movido a \"sin horario\"");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
+      } finally {
+        delete zona.dataset.busy;
+      }
     });
   });
 }
@@ -3855,13 +4149,13 @@ function cargaResultadoPanelHtml(p, oculto) {
       <div class="sets-entry" data-p="${p.id}">
         <div class="sets-entry-heads"><span></span><span>Set 1</span><span>Set 2</span><span class="setHead3" style="${hayTercero ? "" : "display:none"}">Set 3</span></div>
         <div class="sets-entry-row">
-          <span class="sets-entry-label" title="${p.pareja1_nombre}">${p.pareja1_nombre}</span>
+          <span class="sets-entry-label" title="${escapeHtml(p.pareja1_nombre)}">${escapeHtml(p.pareja1_nombre)}</span>
           <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="1" value="${val(1, 1)}" />
           <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="1" data-set="2" value="${val(1, 2)}" />
           <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="1" data-set="3" value="${val(1, 3)}" style="${hayTercero ? "" : "display:none"}" />
         </div>
         <div class="sets-entry-row">
-          <span class="sets-entry-label" title="${p.pareja2_nombre}">${p.pareja2_nombre}</span>
+          <span class="sets-entry-label" title="${escapeHtml(p.pareja2_nombre)}">${escapeHtml(p.pareja2_nombre)}</span>
           <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="1" value="${val(2, 1)}" />
           <input type="number" min="0" max="7" class="setCell" data-p="${p.id}" data-lado="2" data-set="2" value="${val(2, 2)}" />
           <input type="number" min="0" max="7" class="setCell setCell3" data-p="${p.id}" data-lado="2" data-set="3" value="${val(2, 3)}" style="${hayTercero ? "" : "display:none"}" />
@@ -3898,6 +4192,9 @@ function wireCargaResultado(cont) {
 
   cont.querySelectorAll(".btnCargarResultado").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const partidoId = btn.dataset.p;
       const celda = (lado, set) => cont.querySelector(`.setCell[data-p="${partidoId}"][data-lado="${lado}"][data-set="${set}"]`);
       const sets = [];
@@ -3926,6 +4223,9 @@ function wireCargaResultado(cont) {
       refrescarTrasAccionGestion();
       cargarRanking();
       if (btn.dataset.ronda === "Final") cargarCampeones();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -3963,7 +4263,7 @@ function llavePartidoCardHtml(p) {
   const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "a definir");
   const puedeCargarResultado = isAdmin && p.estado !== "jugado";
   return `
-    <div class="llave-partido" data-abrir-partido="${p.id}" style="cursor:pointer">
+    <div class="llave-partido" data-abrir-partido="${p.id}" style="cursor:pointer" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
       <div class="llave-fecha">
         <span>${iconoReloj()} ${horario}</span>
         <span style="display:flex;align-items:center;gap:6px">
@@ -3972,11 +4272,11 @@ function llavePartidoCardHtml(p) {
         </span>
       </div>
       <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
-        <span class="llave-pareja">${p.pareja1_nombre}</span>
+        <span class="llave-pareja">${escapeHtml(p.pareja1_nombre)}</span>
         <span class="llave-sets">${setsHtml(1)}</span>
       </div>
       <div class="llave-fila ${ganador === 2 ? "ganador" : ""}">
-        <span class="llave-pareja">${p.pareja2_nombre}</span>
+        <span class="llave-pareja">${escapeHtml(p.pareja2_nombre)}</span>
         <span class="llave-sets">${setsHtml(2)}</span>
       </div>
       <div class="match-meta llave-meta">${iconoPin()} Local: ${local}</div>
@@ -4296,10 +4596,10 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
         ${parejasTorneo.length ? `
         <div class="match-actions">
           <select class="selectCambiarPareja1" data-p="${p.id}">
-            ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja1_id ? "selected" : ""}>${pj.jugador1_nombre} / ${pj.jugador2_nombre}</option>`).join("")}
+            ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja1_id ? "selected" : ""}>${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
           </select>
           <select class="selectCambiarPareja2" data-p="${p.id}">
-            ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja2_id ? "selected" : ""}>${pj.jugador1_nombre} / ${pj.jugador2_nombre}</option>`).join("")}
+            ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja2_id ? "selected" : ""}>${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
           </select>
           <button class="secondary small btnCambiarParejas" data-p="${p.id}">Cambiar parejas</button>
         </div>` : ""}
@@ -4321,6 +4621,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
 
   cont.querySelectorAll(".btnReasignarCancha").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const partidoId = btn.dataset.p;
       const nuevaCancha = cont.querySelector(`.selectReasignar[data-p="${partidoId}"]`).value;
       const partido = ultimosPartidosGestion.find((x) => x.id === partidoId);
@@ -4335,6 +4638,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       toast("Cancha reasignada");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -4343,6 +4649,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
   // reusa el mismo chequeo de choques de cancha, incluyendo bloqueos
   cont.querySelectorAll(".btnCambiarHorario").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const partidoId = btn.dataset.p;
       const valor = cont.querySelector(`.inputHorario[data-p="${partidoId}"]`).value;
       if (!valor) { toast("Elegí una fecha y hora"); return; }
@@ -4374,6 +4683,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       toast("Horario cambiado");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
@@ -4383,6 +4695,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
   // usar la corrección de resultado, que sí revierte el ranking).
   cont.querySelectorAll(".btnCambiarParejas").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
       const partidoId = btn.dataset.p;
       const p1 = cont.querySelector(`.selectCambiarPareja1[data-p="${partidoId}"]`).value;
       const p2 = cont.querySelector(`.selectCambiarPareja2[data-p="${partidoId}"]`).value;
@@ -4392,6 +4707,9 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       toast("Parejas actualizadas");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -4405,12 +4723,20 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
 // transparente y necesitan la caja blanca para leerse sobre el fondo oscuro.
 function renderSponsorItem(s, caption) {
   const esJpg = /\.jpe?g(\?|#|$)/i.test(s.logo_url || "");
-  const contenido = `<img src="${s.logo_url}" alt="${s.nombre}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${s.nombre.replace(/'/g, "\\'")}'}))" />` +
-    (caption ? `<span class="sponsor-caption">${caption}</span>` : "");
+  // El nombre viaja dos veces adentro de este mismo atributo: primero como
+  // literal de un string JS (adentro de comillas simples, dentro del
+  // onerror="..."), después como valor de atributo HTML propiamente dicho.
+  // Hace falta escapar las dos capas por separado y en este orden — si sólo
+  // se escapara una, una comilla doble en el nombre rompe el atributo, o una
+  // barra invertida rompe el escape de la comilla simple del string JS.
+  const nombreJs = String(s.nombre ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const onerror = escapeHtml(`this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${nombreJs}'}))`);
+  const contenido = `<img src="${s.logo_url}" alt="${escapeHtml(s.nombre)}" loading="lazy" onerror="${onerror}" />` +
+    (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
   const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "");
   return s.link_url
-    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${s.nombre}" class="${clase}">${contenido}</a>`
-    : `<span class="${clase}" title="${s.nombre}">${contenido}</span>`;
+    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
+    : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
 }
 
 async function cargarSponsors() {
@@ -4540,6 +4866,10 @@ async function cargarSponsorsTorneo() {
 }
 
 document.getElementById("btnSubirSponsor").addEventListener("click", async () => {
+  const btn = document.getElementById("btnSubirSponsor");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const nombre = document.getElementById("spNombre").value.trim();
   const archivo = document.getElementById("spArchivo").files[0];
   if (!nombre || !archivo) { toast("Poné un nombre y elegí un logo"); return; }
@@ -4560,14 +4890,17 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   document.getElementById("spArchivo").value = "";
   document.getElementById("spTorneo").value = "";
   cargarSponsors();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
 // NOTICIAS (novedades del club en Inicio + botón a Instagram)
 // ============================================================
 function renderNoticiaCard(n) {
-  const imagen = n.imagen_url ? `<img src="${n.imagen_url}" alt="${n.titulo}" loading="lazy" onerror="this.style.display='none'" />` : "";
-  const contenido = `${imagen}<strong>${n.titulo}</strong>${n.texto ? `<p>${n.texto}</p>` : ""}` +
+  const imagen = n.imagen_url ? `<img src="${n.imagen_url}" alt="${escapeHtml(n.titulo)}" loading="lazy" onerror="this.style.display='none'" />` : "";
+  const contenido = `${imagen}<strong>${escapeHtml(n.titulo)}</strong>${n.texto ? `<p>${escapeHtml(n.texto)}</p>` : ""}` +
     (n.link ? `<a href="${n.link}" target="_blank" rel="noopener noreferrer" class="link-btn">Ver más →</a>` : "");
   return `<div class="noticia-card">${contenido}</div>`;
 }
@@ -4600,14 +4933,24 @@ async function cargarNoticias() {
       : '<p class="empty">Todavía no cargaste noticias.</p>';
     admin.querySelectorAll(".btnBorrarNoticia").forEach((btn) => {
       btn.addEventListener("click", async () => {
-        await sb.from("noticias").delete().eq("id", btn.dataset.id);
-        cargarNoticias();
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await sb.from("noticias").delete().eq("id", btn.dataset.id);
+          cargarNoticias();
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
   }
 }
 
 document.getElementById("btnSubirNoticia").addEventListener("click", async () => {
+  const btn = document.getElementById("btnSubirNoticia");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
   const titulo = document.getElementById("ntTitulo").value.trim();
   if (!titulo) { toast("Poné un título"); return; }
 
@@ -4632,6 +4975,9 @@ document.getElementById("btnSubirNoticia").addEventListener("click", async () =>
   document.getElementById("ntLink").value = "";
   document.getElementById("ntArchivo").value = "";
   cargarNoticias();
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ============================================================
@@ -4687,7 +5033,16 @@ async function abrirNotificaciones() {
   await sb.from("notificaciones").update({ leido: true }).eq("jugador_id", miJugador.id).eq("leido", false);
   actualizarContadorNotificaciones();
 }
-document.getElementById("btnNotif").addEventListener("click", abrirNotificaciones);
+document.getElementById("btnNotif").addEventListener("click", async () => {
+  const btn = document.getElementById("btnNotif");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    await abrirNotificaciones();
+  } finally {
+    btn.disabled = false;
+  }
+});
 document.getElementById("listaNotificaciones").addEventListener("click", (e) => {
   const item = e.target.closest(".notif-item");
   if (!item) return;
@@ -4718,6 +5073,16 @@ document.addEventListener("keydown", (e) => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-foto-grande]")) {
     e.preventDefault();
     abrirFotoGrande(e.target.dataset.fotoGrande);
+  }
+});
+// Las tarjetas de partido (Planilla/Calendario y Llave) ya abren el detalle
+// al hacer click (cada vista lo cablea por separado); acá se suma UNA sola
+// vez el equivalente por teclado (Enter/Espacio), mismo patrón que
+// data-foto-grande arriba, para que también se puedan abrir sin mouse.
+document.addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-abrir-partido]")) {
+    e.preventDefault();
+    abrirDetallePartido(e.target.dataset.abrirPartido);
   }
 });
 document.getElementById("btnCerrarFotoGrande").addEventListener("click", cerrarFotoGrande);
