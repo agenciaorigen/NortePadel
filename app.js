@@ -3015,6 +3015,16 @@ async function cargarGestionTorneo(id) {
   torneoGestionData = t;
   document.getElementById("admSelectTorneoGestion").value = id;
   document.getElementById("admGestionTorneoWrap").style.display = "block";
+  // Pantalla enfocada SOLO en este torneo (dashboard aparte): se oculta el
+  // selector suelto y toda la configuración general del club (WhatsApp/
+  // Instagram, complejos, categorías, auspiciantes generales, etc. — eso
+  // vive aparte, en Administración general) sea cual sea la entrada por la
+  // que se llegó acá (el selector de esta misma pantalla, o "Administrar
+  // este torneo" desde el propio torneo).
+  adminFocoTorneoActivo = true;
+  document.getElementById("admSelectorTorneoCard").style.display = "none";
+  mostrarConfigGeneral(false);
+  document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
   document.getElementById("admGestionNombre").textContent = t.nombre;
   document.getElementById("admGestionEstado").innerHTML = badgeEstadoTorneo(t);
   renderAdminGestionSubnav();
@@ -3165,11 +3175,14 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
   }
 
   toast(`"${nombre}" borrado`);
+  adminFocoTorneoActivo = false;
   torneoGestionId = null;
   torneoGestionData = null;
   document.getElementById("admGestionTorneoWrap").style.display = "none";
   document.getElementById("admSelectTorneoGestion").value = "";
   document.getElementById("admSelectorTorneoCard").style.display = "block";
+  mostrarConfigGeneral(true);
+  document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
   await cargarTorneos();
   avisarActualizacionEnVivo();
   } finally {
@@ -4559,20 +4572,21 @@ function renderPartidosLlave(containerId, partidos) {
 // esto" — ver Fase 4 de la reorganización club/torneo).
 document.getElementById("btnAdministrarEsteTorneo").addEventListener("click", async () => {
   if (!torneoActualId) return;
+  // Se marca ANTES de cambiarVista: cambiar el hash a #/admin dispara además un
+  // "hashchange" que vuelve a llamar a cambiarVista("admin") por su cuenta (ver
+  // despacharRuta) — sin este chequeo puesto ya, ese segundo llamado deshacía el
+  // modo enfocado apenas se activaba (ver el chequeo correspondiente en cambiarVista).
   adminFocoTorneoActivo = true;
   cambiarVista("admin", "/admin");
-  await cargarGestionTorneo(torneoActualId);
-  // pantalla enfocada SOLO en este torneo: se oculta el selector suelto y toda la
-  // configuración general del club (canchas, categorías, jugadores, etc. — eso vive
-  // aparte, en Administración general) para que "Administrar este torneo" no se
-  // sienta como "me manda a la configuración general".
-  document.getElementById("admSelectorTorneoCard").style.display = "none";
-  mostrarConfigGeneral(false);
-  document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
+  await cargarGestionTorneo(torneoActualId); // ya deja la pantalla enfocada solo en este torneo (ver más arriba)
   document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", () => {
   adminFocoTorneoActivo = false;
+  torneoGestionId = null;
+  torneoGestionData = null;
+  document.getElementById("admGestionTorneoWrap").style.display = "none";
+  document.getElementById("admSelectTorneoGestion").value = "";
   document.getElementById("admSelectorTorneoCard").style.display = "block";
   mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
