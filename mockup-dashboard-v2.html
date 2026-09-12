@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Norte Padel — Dashboard de gestión de torneo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   Tokens y bases calcados de style.css (la app real) para que este
+   mockup se vea "puesto en la app", no como una maqueta genérica.
+   ============================================================ */
+:root {
+  --bg: #05080A;
+  --bg-elev: #101E19;
+  --card: #25392F;
+  --accent: #0F7A46;
+  --accent-bright: #6FE08A;
+  --accent-ink: #06120C;
+  --accent-2: #E2A25A;
+  --accent-3: #8A6FE0;
+  --text: #EAF1EE;
+  --muted: #9BB0A7;
+  --border: rgba(200,255,225,.14);
+  --state-ok: var(--accent-bright);
+  --state-warn: #ffc24d;
+  --danger: #ff5c6c;
+  --accent-rgb: 15,122,70;
+  --accent-bright-rgb: 111,224,138;
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.35);
+  --shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+h1, h2, h3, button { font-family: "Manrope", -apple-system, sans-serif; font-weight: 800; }
+h2 { font-size: 20px; font-weight: 800; margin: 0 0 14px; letter-spacing: -.015em; }
+h3 { font-size: 14px; font-weight: 800; margin: 0 0 10px; color: var(--text); }
+label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 5px; }
+input, select, textarea {
+  width: 100%; background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+  border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--text); outline-offset: 1px; border-color: var(--text); }
+button { font-family: inherit; cursor: pointer; border-radius: 10px; }
+button.primary { background: var(--accent); color: #fff; border: none; padding: 11px 18px; font-weight: 700; font-size: 14px; }
+button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 9px 14px; font-weight: 600; font-size: 13px; }
+button.secondary:hover { border-color: rgba(245,245,245,.4); }
+button.small { padding: 7px 12px; font-size: 12px; border-radius: 9px; }
+button.danger { border-color: var(--danger); color: var(--danger); background: transparent; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow-sm); }
+.badge { display: inline-block; padding: 4px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid var(--border); }
+.badge.ok { background: rgba(111,224,138,.14); color: var(--accent-bright); border-color: rgba(111,224,138,.3); }
+.badge.warn { background: rgba(255,194,77,.14); color: var(--state-warn); border-color: rgba(255,194,77,.3); }
+.pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--border); background: var(--bg-elev); color: var(--muted); padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.match-meta { color: var(--muted); font-size: 12.5px; margin: 0; }
+.check-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.check-grid label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; font-size: 13px; color: var(--text); margin: 0; cursor: pointer; }
+.check-grid label:has(input:checked) { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+/* ============================================================
+   AVISO de mockup — banner fijo arriba de todo, para que quede
+   clarísimo que esto no es la app real ni tiene datos reales.
+   ============================================================ */
+.aviso-mockup {
+  background: var(--accent-2); color: #201400; font-weight: 700; font-size: 13px;
+  text-align: center; padding: 9px 16px;
+}
+
+/* ============================================================
+   Header liviano (simula el header.topbar real, resumido)
+   ============================================================ */
+.topbar-mock {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 24px; background: var(--bg-elev); border-bottom: 1px solid var(--border);
+}
+.topbar-mock .marca { font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.topbar-mock .volver { color: var(--muted); font-size: 13px; text-decoration: none; font-weight: 600; }
+
+/* ============================================================
+   SHELL DEL DASHBOARD — sidebar angosto + contenido ancho
+   (el corazón del rediseño). Solo aplica de ~960px para arriba;
+   por debajo, se muestra el aviso de que en el celular esto sigue
+   viéndose como las pestañas de siempre, sin tocar nada ahí.
+   ============================================================ */
+.dash-shell { display: flex; min-height: calc(100vh - 90px); }
+
+.dash-sidebar {
+  width: 232px; flex-shrink: 0;
+  background: var(--bg-elev); border-right: 1px solid var(--border);
+  padding: 20px 14px; display: flex; flex-direction: column; gap: 22px;
+}
+.dash-torneo-card { padding: 4px 6px 14px; border-bottom: 1px solid var(--border); }
+.dash-torneo-card strong { display: block; font-size: 15px; font-weight: 800; margin-bottom: 6px; line-height: 1.2; }
+
+.dash-nav-grupo-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; padding: 0 10px; margin-bottom: 6px; }
+.dash-nav { display: flex; flex-direction: column; gap: 2px; }
+.dash-nav button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: transparent; border: none; color: var(--muted);
+  padding: 10px 10px; font-size: 13.5px; font-weight: 600; border-radius: 10px;
+}
+.dash-nav button .ic { font-size: 16px; width: 20px; text-align: center; }
+.dash-nav button:hover { background: rgba(255,255,255,.04); color: var(--text); }
+.dash-nav button.active { background: rgba(var(--accent-rgb),.22); color: var(--accent-bright); }
+
+.dash-sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); }
+.dash-sidebar-footer button { width: 100%; justify-content: flex-start; }
+
+.dash-content { flex: 1; min-width: 0; padding: 28px 32px; max-width: 1320px; }
+.dash-content-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
+.dash-content-header p { margin: 4px 0 0; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* KPIs anchos: en vez de pj-stats angosto de mobile, una fila de cards que
+   usa todo el ancho disponible. */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.kpi-card span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; margin-bottom: 8px; }
+.kpi-card strong { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.kpi-card small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+.dos-columnas { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 1180px) { .dos-columnas { grid-template-columns: 1fr; } }
+
+.lista-chequeo { display: flex; flex-direction: column; gap: 10px; }
+.lista-chequeo li { list-style: none; display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.lista-chequeo .ok { color: var(--accent-bright); }
+.lista-chequeo .warn { color: var(--state-warn); }
+
+.tabla-ancha { width: 100%; border-collapse: collapse; }
+.tabla-ancha th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 0 12px 10px; border-bottom: 1px solid var(--border); }
+.tabla-ancha td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13.5px; vertical-align: middle; }
+.tabla-ancha tr:last-child td { border-bottom: none; }
+.chip-pago { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.chip-pago.si { background: rgba(111,224,138,.14); color: var(--accent-bright); }
+.chip-pago.no { background: rgba(255,92,108,.1); color: var(--danger); }
+
+.filtros-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+.filtros-row input, .filtros-row select { width: auto; min-width: 200px; }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px; }
+.form-grid > div { min-width: 0; }
+.form-grid .full { grid-column: 1 / -1; }
+
+.cancha-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.cancha-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.cancha-card h4 { margin: 0 0 6px; font-size: 14px; }
+
+.puntaje-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 14px; }
+@media (max-width: 1100px) { .puntaje-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.sponsor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.sponsor-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+.sponsor-card .logo-fake { width: 100%; height: 60px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-3)); margin-bottom: 10px; }
+
+/* ---------- Calendario (planilla única por día, con todos los predios uno al lado del
+   otro — como el Excel) ----------
+   Pensado para volumen alto de partidos/categorías: colores por categoría + leyenda con
+   filtro, buscador, una sola grilla por día (cada predio agrupa sus canchas, con una
+   línea divisoria entre uno y otro) y encabezado/columna de hora fijos al scrollear. */
+:root {
+  --cat-1: var(--accent-bright);
+  --cat-2: var(--accent-2);
+  --cat-3: var(--accent-3);
+  --cat-4: #5AB0E0;
+  --cat-5: #E0708A;
+  --cat-6: #C9D96A;
+}
+.cat-4ta-damas { --cat-color: var(--cat-1); }
+.cat-5ta-caballeros { --cat-color: var(--cat-2); }
+.cat-3ra-damas { --cat-color: var(--cat-3); }
+.cat-4ta-caballeros { --cat-color: var(--cat-4); }
+.cat-6ta-mixto { --cat-color: var(--cat-5); }
+.cat-2da-damas { --cat-color: var(--cat-6); }
+
+.cal-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 4px 0 18px; }
+.cal-leyenda label { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--muted); cursor: pointer; margin: 0; }
+.cal-leyenda label:has(input:checked) { color: var(--text); }
+.cal-leyenda input { width: auto; accent-color: var(--accent); }
+.cal-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.cal-leyenda-acciones { display: flex; gap: 8px; margin-left: auto; }
+
+.cal-dia { display: none; flex-direction: column; gap: 16px; }
+.cal-dia.active { display: flex; }
+
+/* Fila 1 de encabezado: nombre del predio, ocupando todas sus canchas (grid-column con span) */
+.calendario-grupo { grid-row: 1; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); text-align: center; padding: 6px 4px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.03); position: sticky; top: 0; z-index: 2; }
+/* Línea divisoria entre el último predio y el que arranca en esa columna — con un
+   pseudo-elemento en el hueco entre columnas para no pisar el color de categoría
+   (que también usa border-left) en las celdas ocupadas. */
+.divisor { position: relative; }
+.divisor::before { content: ""; position: absolute; left: -4px; top: -3px; bottom: -3px; width: 2px; background: var(--accent-2); }
+/* Celda fuera del horario de apertura de ese predio (no es un bloqueo ni un cierre puntual) */
+.calendario-celda.fuera { background: transparent; border: 1px dashed rgba(255,255,255,.06); color: var(--muted); opacity: .4; font-size: 11px; }
+
+.calendario-scroll { overflow: auto; max-height: 460px; border-radius: 10px; }
+.calendario-grid { display: grid; gap: 6px; min-width: max-content; }
+.calendario-head, .calendario-hora, .calendario-esquina { position: sticky; background: var(--card); }
+.calendario-head { grid-row: 2; top: 27px; z-index: 2; font-size: 12px; font-weight: 700; padding: 6px 4px 10px; text-align: center; color: var(--muted); }
+.calendario-hora { left: 0; z-index: 1; font-size: 11px; color: var(--muted); padding: 14px 6px 0 0; text-align: right; }
+/* Ocupa las 2 filas de encabezado (predio + cancha) en la columna del horario, para que
+   el "Cancha 1" de cada predio empiece siempre en la columna que corresponde. */
+.calendario-esquina { grid-row: 1 / span 2; grid-column: 1; top: 0; left: 0; z-index: 3; }
+.calendario-celda { border-radius: 8px; padding: 8px 8px 8px 10px; font-size: 11.5px; min-height: 56px; min-width: 140px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.calendario-celda.ocupada { background: rgba(var(--accent-rgb),.16); border: 1px solid var(--border); border-left: 4px solid var(--cat-color, var(--accent-bright)); color: var(--text); flex-direction: column; gap: 2px; font-weight: 600; cursor: grab; }
+.calendario-celda.ocupada:active { cursor: grabbing; }
+.calendario-celda.ocupada.arrastrando { opacity: .35; }
+.calendario-celda.atenuada { opacity: .15; filter: grayscale(70%); }
+.calendario-celda.vacia { background: var(--bg-elev); border: 1px dashed var(--border); color: var(--muted); }
+.calendario-celda.vacia.drag-over { border-color: var(--accent-bright); background: rgba(111,224,138,.1); color: var(--accent-bright); }
+.calendario-celda.bloqueada { background: rgba(255,92,108,.12); border: 1px solid rgba(255,92,108,.3); color: var(--danger); font-size: 11px; }
+.calendario-celda.cerrada { background: repeating-linear-gradient(45deg, rgba(255,255,255,.03), rgba(255,255,255,.03) 6px, transparent 6px, transparent 12px); color: var(--muted); opacity: .55; font-size: 11px; }
+
+/* Vista compacta: más partidos por pantalla sin scrollear tanto */
+#calDiasWrap.vista-compacta .calendario-celda { min-height: 38px; min-width: 108px; padding: 4px 6px 4px 8px; font-size: 10.5px; gap: 0; }
+#calDiasWrap.vista-compacta .chip-zona { font-size: 9px; padding: 0 5px; margin-bottom: 1px; }
+#calDiasWrap.vista-compacta .calendario-scroll { max-height: 340px; }
+
+.cal-pool { display: flex; flex-wrap: wrap; gap: 10px; min-height: 66px; border: 1px dashed var(--border); border-radius: 10px; padding: 10px; }
+.cal-pool.drag-over { border-color: var(--accent-bright); background: rgba(111,224,138,.06); }
+.cal-pool .calendario-celda { width: 172px; flex: none; min-height: 60px; }
+
+.chip-zona { display: inline-block; font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 6px; letter-spacing: .02em; margin-bottom: 3px; }
+.chip-zona.z1 { background: rgba(var(--accent-rgb),.3); color: var(--accent-bright); }
+.chip-zona.z2 { background: rgba(226,162,90,.28); color: var(--accent-2); }
+.chip-zona.z3 { background: rgba(138,111,224,.28); color: var(--accent-3); }
+.chip-zona.llave { background: rgba(255,255,255,.08); color: var(--muted); }
+
+/* ---------- Tablas de posiciones (por zona) ---------- */
+.tablas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.tabla-ancha.chica th, .tabla-ancha.chica td { padding: 8px 10px; font-size: 12.5px; }
+.tabla-ancha tr.clasifica td:first-child { border-left: 3px solid var(--accent-bright); }
+
+/* ---------- Llave / cuadro eliminatorio ---------- */
+.llave-wrap { display: flex; gap: 32px; overflow-x: auto; padding-bottom: 12px; }
+.llave-ronda { display: flex; flex-direction: column; justify-content: space-around; gap: 20px; min-width: 200px; flex-shrink: 0; }
+.llave-ronda-titulo { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.llave-partido { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; }
+.llave-partido .equipo { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.llave-partido .equipo.ganador { color: var(--accent-bright); font-weight: 700; }
+
+.aviso-mobile-oculto { display: none; }
+@media (max-width: 959px) {
+  .dash-shell { display: none; }
+  .aviso-mobile-oculto {
+    display: block; margin: 40px auto; max-width: 420px; text-align: center; padding: 0 20px; color: var(--muted); font-size: 14px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="aviso-mockup" id="avisoBanner">🔄 Conectando con Supabase…</div>
+
+<div class="topbar-mock">
+  <div class="marca">🎾 Norte Padel</div>
+  <a class="volver" href="#">← Volver a Administración general</a>
+</div>
+
+<div class="dash-shell">
+
+  <aside class="dash-sidebar">
+    <div class="dash-torneo-card">
+      <label style="margin:0 0 6px">Torneo en gestión</label>
+      <select id="dashTorneoSelect" style="margin-bottom:8px"><option>Cargando…</option></select>
+      <span class="badge ok" id="dashTorneoBadge">—</span>
+    </div>
+
+    <div>
+      <div class="dash-nav-grupo-label">Datos</div>
+      <div class="dash-nav" data-grupo="datos">
+        <button type="button" class="active" data-panel="resumen"><span class="ic">📊</span> Resumen</button>
+        <button type="button" data-panel="calendario"><span class="ic">📅</span> Calendario</button>
+        <button type="button" data-panel="resultados"><span class="ic">🎾</span> Resultados</button>
+        <button type="button" data-panel="tablas"><span class="ic">📋</span> Tablas de posiciones</button>
+        <button type="button" data-panel="llave"><span class="ic">🏅</span> Llave</button>
+        <button type="button" data-panel="inscripciones"><span class="ic">👥</span> Inscripciones y pagos</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="dash-nav-grupo-label">Configuración</div>
+      <div class="dash-nav" data-grupo="config">
+        <button type="button" data-panel="datos-torneo"><span class="ic">📝</span> Datos del torneo</button>
+        <button type="button" data-panel="canchas"><span class="ic">🏟️</span> Canchas</button>
+        <button type="button" data-panel="bloqueos"><span class="ic">🚫</span> Bloqueos</button>
+        <button type="button" data-panel="puntaje"><span class="ic">🏆</span> Puntaje y ranking</button>
+        <button type="button" data-panel="auspiciantes"><span class="ic">📢</span> Auspiciantes</button>
+      </div>
+    </div>
+
+    <div class="dash-sidebar-footer">
+      <button type="button" class="secondary small danger">🗑️ Borrar torneo</button>
+    </div>
+  </aside>
+
+  <main class="dash-content">
+
+    <!-- ---------- RESUMEN ---------- -->
+    <section class="panel active" id="panel-resumen">
+      <div class="dash-content-header">
+        <div>
+          <h2>Resumen</h2>
+          <p class="match-meta">Cómo viene el torneo, de un vistazo.</p>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="resumenKpis"></div>
+
+      <div class="dos-columnas">
+        <div class="card">
+          <h3>Diagnóstico</h3>
+          <ul class="lista-chequeo" id="resumenDiagnostico"></ul>
+        </div>
+        <div class="card">
+          <h3>Próximos partidos</h3>
+          <ul class="lista-chequeo" id="resumenProximos"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- CALENDARIO ---------- -->
+    <section class="panel" id="panel-calendario">
+      <div class="dash-content-header">
+        <div>
+          <h2>Calendario</h2>
+          <p class="match-meta">Una sola grilla por día con todos los predios uno al lado del otro (cada uno agrupa sus canchas) — así se ve de un vistazo todo lo que pasa en el mismo horario, sin importar en qué complejo sea. Arrastrá un partido a otra cancha/horario libre para reprogramarlo — se guarda solo. Generar fixture, generar calendario y publicarlo se siguen haciendo desde Administración → Partidos, como hasta ahora.</p>
+        </div>
+      </div>
+
+      <div class="filtros-row">
+        <input type="text" id="calBuscador" placeholder="Buscar jugador o pareja..." style="min-width:220px" />
+        <select id="calFiltroZona"><option value="">Todas las zonas</option></select>
+        <div class="pill-row" id="calVistaRow">
+          <button type="button" class="pill active" data-vista="amplia">Vista amplia</button>
+          <button type="button" class="pill" data-vista="compacta">Vista compacta</button>
+        </div>
+      </div>
+
+      <div class="cal-leyenda" id="calLeyenda">
+        <div class="cal-leyenda-acciones">
+          <button type="button" class="secondary small" id="calLeyendaTodas">Marcar todas</button>
+          <button type="button" class="secondary small" id="calLeyendaNinguna">Desmarcar todas</button>
+        </div>
+      </div>
+
+      <div class="pill-row" id="calDiasRow"></div>
+      <br>
+
+      <div id="calDiasWrap"><p class="match-meta">Cargando calendario…</p></div>
+
+      <div class="card" style="margin-top:18px">
+        <h3>Partidos sin horario asignado <span class="badge warn" id="calPoolBadge">0</span></h3>
+        <p class="match-meta" style="margin-bottom:10px">Arrastralos a una cancha/horario libre de arriba para programarlos.</p>
+        <div class="cal-pool" id="calPool"></div>
+      </div>
+    </section>
+
+    <!-- ---------- RESULTADOS ---------- -->
+    <section class="panel" id="panel-resultados">
+      <div class="dash-content-header">
+        <div>
+          <h2>Resultados</h2>
+          <p class="match-meta">Cargar y revisar resultados de partidos ya jugados o en curso.</p>
+        </div>
+      </div>
+
+      <div class="filtros-row">
+        <input type="text" id="resBuscador" placeholder="Buscar por jugador o pareja..." />
+        <select id="resFiltroCategoria"><option value="">Todas las categorías</option></select>
+        <select id="resFiltroEstado">
+          <option value="">Todos los estados</option>
+          <option value="programado">Sin jugar</option>
+          <option value="en_juego">En juego</option>
+          <option value="jugado">Jugados</option>
+          <option value="suspendido">Suspendidos</option>
+        </select>
+      </div>
+
+      <table class="tabla-ancha">
+        <thead><tr><th>Ronda</th><th>Categoría</th><th>Pareja 1</th><th>Pareja 2</th><th>Resultado</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="resultadosBody"><tr><td colspan="7" class="match-meta">Cargando…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- ---------- TABLAS DE POSICIONES ---------- -->
+    <section class="panel" id="panel-tablas">
+      <div class="dash-content-header">
+        <div>
+          <h2>Tablas de posiciones</h2>
+          <p class="match-meta">Una tabla por zona — ya se calculaba internamente para saber quién avanza, pero nunca se mostraba. Ahora se ve.</p>
+        </div>
+        <select id="tablasFiltroCategoria"></select>
+      </div>
+
+      <div class="tablas-grid" id="tablasGrid"></div>
+    </section>
+
+    <!-- ---------- LLAVE ---------- -->
+    <section class="panel" id="panel-llave">
+      <div class="dash-content-header">
+        <div>
+          <h2>Llave</h2>
+          <p class="match-meta">Cuadro de la fase eliminatoria, de un vistazo.</p>
+        </div>
+        <select id="llaveFiltroCategoria"></select>
+      </div>
+
+      <div class="card">
+        <div class="llave-wrap" id="llaveWrap"></div>
+      </div>
+    </section>
+
+    <!-- ---------- INSCRIPCIONES Y PAGOS ---------- -->
+    <section class="panel" id="panel-inscripciones">
+      <div class="dash-content-header">
+        <div>
+          <h2>Inscripciones y pagos <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Parejas anotadas, categoría y estado de pago.</p>
+        </div>
+      </div>
+
+      <table class="tabla-ancha">
+        <thead><tr><th>Jugador 1</th><th>Jugador 2</th><th>Categoría</th><th>Estado</th><th>Pago J1</th><th>Pago J2</th></tr></thead>
+        <tbody>
+          <tr><td>Gómez, Juan</td><td>Pérez, Martín</td><td>4ta Damas</td><td><span class="badge ok">Confirmada</span></td><td><span class="chip-pago si">✅ Pagó</span></td><td><span class="chip-pago si">✅ Pagó</span></td></tr>
+          <tr><td>Ruiz, Sofía</td><td>Sosa, Valentina</td><td>4ta Damas</td><td><span class="badge ok">Confirmada</span></td><td><span class="chip-pago no">⬜ Falta</span></td><td><span class="chip-pago si">✅ Pagó</span></td></tr>
+          <tr><td>Fernández, Lucas</td><td>Díaz, Nicolás</td><td>5ta Caballeros</td><td><span class="badge warn">Pendiente</span></td><td><span class="chip-pago no">⬜ Falta</span></td><td><span class="chip-pago no">⬜ Falta</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ---------- DATOS DEL TORNEO ---------- -->
+    <section class="panel" id="panel-datos-torneo">
+      <div class="dash-content-header">
+        <div>
+          <h2>Datos del torneo <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Antes era el botón "✏️ Editar torneo" aparte — ahora es una sección más de Configuración.</p>
+        </div>
+        <button type="button" class="primary small">Guardar cambios</button>
+      </div>
+
+      <div class="card">
+        <div class="form-grid">
+          <div><label>Nombre</label><input value="Apertura Norte 2026" /></div>
+          <div><label>Complejo sede</label><select><option>Norte Padel Club</option></select></div>
+          <div><label>Duración partido (min)</label><input type="number" value="90" /></div>
+          <div><label>Fecha inicio</label><input type="date" value="2026-09-05" /></div>
+          <div><label>Fecha fin</label><input type="date" value="2026-10-20" /></div>
+          <div><label>Costo de inscripción</label><input type="number" value="150000" /></div>
+          <div class="full">
+            <label>¿Qué días de la semana se juega?</label>
+            <div class="check-grid">
+              <label><input type="checkbox" checked /> Jue</label>
+              <label><input type="checkbox" checked /> Vie</label>
+              <label><input type="checkbox" checked /> Sáb</label>
+              <label><input type="checkbox" checked /> Dom</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- CANCHAS ---------- -->
+    <section class="panel" id="panel-canchas">
+      <div class="dash-content-header">
+        <div>
+          <h2>Canchas del torneo <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Antes una lista angosta apilada — ahora una grilla que aprovecha el ancho.</p>
+        </div>
+        <button type="button" class="secondary small">+ Agregar cancha</button>
+      </div>
+      <div class="cancha-grid">
+        <div class="cancha-card"><h4>Cancha 1 — Norte Padel Club</h4><p class="match-meta">Jue a Dom · 16:00 a 23:00</p></div>
+        <div class="cancha-card"><h4>Cancha 2 — Norte Padel Club</h4><p class="match-meta">Jue a Dom · 16:00 a 23:00</p></div>
+        <div class="cancha-card"><h4>Cancha 3 — Sur Padel</h4><p class="match-meta">Sáb y Dom · 09:00 a 20:00</p></div>
+        <div class="cancha-card"><h4>Cancha 1 — Sur Padel</h4><p class="match-meta">Sáb y Dom · 09:00 a 20:00</p></div>
+      </div>
+    </section>
+
+    <!-- ---------- BLOQUEOS ---------- -->
+    <section class="panel" id="panel-bloqueos">
+      <div class="dash-content-header">
+        <div>
+          <h2>Bloqueos de cancha <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Lluvia, mantenimiento u otro evento — la cancha queda inutilizable para todos en ese horario.</p>
+        </div>
+      </div>
+      <div class="dos-columnas">
+        <table class="tabla-ancha">
+          <thead><tr><th>Cancha</th><th>Desde</th><th>Hasta</th><th>Motivo</th></tr></thead>
+          <tbody>
+            <tr><td>Cancha 2</td><td>Sáb 09:00</td><td>Sáb 13:00</td><td>Lluvia pronosticada</td></tr>
+          </tbody>
+        </table>
+        <div class="card">
+          <h3>Nuevo bloqueo</h3>
+          <label>Cancha</label><select><option>Cancha 1 — Norte Padel Club</option></select>
+          <div class="row" style="display:flex;gap:10px">
+            <div style="flex:1"><label>Desde</label><input type="datetime-local" /></div>
+            <div style="flex:1"><label>Hasta</label><input type="datetime-local" /></div>
+          </div>
+          <label>Motivo</label><input placeholder="Ej: lluvia, mantenimiento" />
+          <button type="button" class="secondary small" style="margin-top:12px">Bloquear horario</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- PUNTAJE Y RANKING ---------- -->
+    <section class="panel" id="panel-puntaje">
+      <div class="dash-content-header">
+        <div>
+          <h2>Puntaje para el ranking <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Los 6 valores en fila usando todo el ancho, en vez de 3 filas de a dos.</p>
+        </div>
+        <button type="button" class="primary small">Guardar puntaje</button>
+      </div>
+      <div class="card">
+        <label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" checked style="width:auto" /> Este torneo suma puntos al ranking general</label>
+        <div class="puntaje-grid">
+          <div><label>Campeón</label><input type="number" value="1000" /></div>
+          <div><label>Sub</label><input type="number" value="750" /></div>
+          <div><label>Semifinal</label><input type="number" value="500" /></div>
+          <div><label>Cuartos</label><input type="number" value="250" /></div>
+          <div><label>Octavos</label><input type="number" value="125" /></div>
+          <div><label>Dieciseisavos</label><input type="number" value="100" /></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- AUSPICIANTES ---------- -->
+    <section class="panel" id="panel-auspiciantes">
+      <div class="dash-content-header">
+        <div>
+          <h2>Auspiciantes / Publicidad <span class="badge warn" style="vertical-align:middle;font-size:10px">🧪 maqueta</span></h2>
+          <p class="match-meta">Logo "General" o solo para este torneo.</p>
+        </div>
+        <button type="button" class="secondary small">+ Agregar auspiciante</button>
+      </div>
+      <div class="sponsor-grid">
+        <div class="sponsor-card"><div class="logo-fake"></div><strong>Wilson Padel</strong><p class="match-meta">General</p></div>
+        <div class="sponsor-card"><div class="logo-fake"></div><strong>Bebidas del Sur</strong><p class="match-meta">Solo este torneo</p></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<p class="aviso-mobile-oculto">📱 Este rediseño (sidebar + contenido ancho) es solo para pantallas de escritorio. Abrí esta vista previa en una ventana ancha (o agrandá la ventana) para verla — en celular la administración del torneo sigue igual que hoy.</p>
+
+<div id="dashToast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg-elev);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:var(--shadow);display:none;z-index:50;max-width:380px;text-align:center"></div>
+
+<!-- mismo cliente que usa la app real (index.html): si ya iniciaste sesión de
+     administrador en el sitio, en este mismo navegador, esta página reutiliza
+     esa sesión sola (Supabase la guarda en el localStorage del sitio, no de
+     esta página en particular) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.114.0/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="matching.js"></script>
+<script>
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+document.querySelectorAll('.dash-nav button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dash-nav button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+  });
+});
+
+/* ---------- Calendario: pestañas de día (delegado en el contenedor, porque
+   los botones se recrean cada vez que se recargan los datos) ---------- */
+document.getElementById('calDiasRow').addEventListener('click', (e) => {
+  const btn = e.target.closest('.pill');
+  if (!btn) return;
+  document.querySelectorAll('#calDiasRow .pill').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.cal-dia').forEach((d) => d.classList.remove('active'));
+  document.querySelector('.cal-dia[data-dia="' + btn.dataset.dia + '"]').classList.add('active');
+});
+
+/* ---------- Calendario: arrastrar y soltar para reacomodar partidos ----------
+   Nativo del navegador (Drag and Drop API), sin ninguna librería: se delega en
+   document para que funcione también con las celdas que se recrean al
+   recargar los datos, sin tener que re-enganchar listeners a mano. Al soltar,
+   guarda la cancha/horario nuevos en Supabase (o los deja en null si se
+   suelta en el pool de "sin horario") y vuelve a cargar todo desde la base,
+   así el resto del dashboard (resultados, tablas, llave) también queda al día. */
+document.addEventListener('dragstart', (e) => {
+  const item = e.target.closest('[data-cal-id]');
+  if (!item) return;
+  e.dataTransfer.setData('text/plain', item.dataset.calId);
+  e.dataTransfer.effectAllowed = 'move';
+  item.classList.add('arrastrando');
+});
+document.addEventListener('dragend', (e) => {
+  const item = e.target.closest('[data-cal-id]');
+  if (item) item.classList.remove('arrastrando');
+});
+document.addEventListener('dragover', (e) => {
+  if (e.target.closest('.calendario-celda.vacia, .cal-pool')) e.preventDefault();
+});
+document.addEventListener('dragenter', (e) => {
+  const destino = e.target.closest('.calendario-celda.vacia, .cal-pool');
+  if (destino) destino.classList.add('drag-over');
+});
+document.addEventListener('dragleave', (e) => {
+  const destino = e.target.closest('.calendario-celda.vacia, .cal-pool');
+  if (destino && !destino.contains(e.relatedTarget)) destino.classList.remove('drag-over');
+});
+document.addEventListener('drop', async (e) => {
+  const destino = e.target.closest('.calendario-celda.vacia, .cal-pool');
+  if (!destino) return;
+  e.preventDefault();
+  destino.classList.remove('drag-over');
+  const id = e.dataTransfer.getData('text/plain');
+  const origen = document.querySelector('[data-cal-id="' + id + '"]');
+  if (!id || !origen || origen === destino) return;
+
+  const nuevaCancha = destino.classList.contains('cal-pool') ? null : destino.dataset.canchaId;
+  const nuevoHorario = destino.classList.contains('cal-pool') ? null : destino.dataset.horarioIso;
+  const { error } = await sb.from('partidos').update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq('id', id);
+  if (error) { toastDash('No se pudo mover el partido: ' + error.message); return; }
+  toastDash('Partido reprogramado ✅');
+  await cargarTorneoDashboard(torneoActivo.id);
+});
+
+/* ---------- Calendario: filtro por categoría (leyenda), zona y búsqueda de pareja ----------
+   Genérico desde el principio (funciona por atributos data-*), así que sigue
+   sirviendo tal cual aunque las categorías/zonas reales cambien de un torneo
+   a otro. */
+function aplicarFiltrosCalendario() {
+  const categoriasActivas = new Set(
+    Array.from(document.querySelectorAll('#calLeyenda input[data-catfilter]:checked')).map((i) => i.dataset.catfilter)
+  );
+  const zona = document.getElementById('calFiltroZona').value;
+  const busqueda = document.getElementById('calBuscador').value.trim().toLowerCase();
+
+  document.querySelectorAll('.calendario-celda[data-cat]').forEach((celda) => {
+    const pasaCategoria = categoriasActivas.has(celda.dataset.cat);
+    const pasaZona = !zona || celda.dataset.zona === zona;
+    const pasaBusqueda = !busqueda || celda.textContent.toLowerCase().includes(busqueda);
+    celda.classList.toggle('atenuada', !(pasaCategoria && pasaZona && pasaBusqueda));
+  });
+}
+document.getElementById('calLeyenda').addEventListener('change', aplicarFiltrosCalendario);
+document.getElementById('calFiltroZona').addEventListener('change', aplicarFiltrosCalendario);
+document.getElementById('calBuscador').addEventListener('input', aplicarFiltrosCalendario);
+document.getElementById('calLeyendaTodas').addEventListener('click', () => {
+  document.querySelectorAll('#calLeyenda input[data-catfilter]').forEach((i) => (i.checked = true));
+  aplicarFiltrosCalendario();
+});
+document.getElementById('calLeyendaNinguna').addEventListener('click', () => {
+  document.querySelectorAll('#calLeyenda input[data-catfilter]').forEach((i) => (i.checked = false));
+  aplicarFiltrosCalendario();
+});
+
+/* ---------- Calendario: vista amplia / compacta ---------- */
+document.querySelectorAll('#calVistaRow .pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#calVistaRow .pill').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('calDiasWrap').classList.toggle('vista-compacta', btn.dataset.vista === 'compacta');
+  });
+});
+
+/* ============================================================
+   A PARTIR DE ACÁ: carga de datos reales desde Supabase.
+   Calendario, Resultados, Tablas de posiciones y Llave leen (y, Resultados
+   y Calendario, también escriben) los partidos reales del torneo elegido
+   arriba. El resto de las secciones sigue siendo la maqueta original — se
+   marcaron con 🧪 en su título. Reutiliza partidos_publicos (la misma RPC
+   que ya usa la app pública/Administración) y, para la lógica del cuadro de
+   zonas, PLANTILLAS_CUADRO/resolverRondaCuadro/propagarCuadro de matching.js
+   — la misma que ya corrige la llave cuando se carga o corrige un resultado.
+   ============================================================ */
+
+let torneoActivo = null;
+let partidosTorneo = [];
+let categoriasTorneoCache = [];
+
+const PALETA_CATEGORIAS = ['#6FE08A', '#E2A25A', '#8A6FE0', '#5AB0E0', '#E0708A', '#C9D96A', '#E0C15A', '#5AE0C1', '#E05A5A', '#9AA6E0'];
+const RONDA_ORDEN = ['Zona', 'Dieciseisavos', 'Octavos', 'Cuartos', 'Semifinal', 'Final'];
+
+function colorCategoria(cat) {
+  const i = categoriasTorneoCache.indexOf(cat);
+  return PALETA_CATEGORIAS[(i < 0 ? 0 : i) % PALETA_CATEGORIAS.length];
+}
+
+let toastTimer = null;
+function toastDash(msg) {
+  const el = document.getElementById('dashToast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4500);
+}
+
+function claveDia(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function etiquetaDia(clave) {
+  const [y, m, d] = clave.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+}
+function horaDeIso(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+function formatearSets(sets) {
+  if (!Array.isArray(sets) || sets.length === 0) return '—';
+  return sets.map((s) => `${s.p1}-${s.p2}`).join(', ');
+}
+function zonaKeyDeSlot(slot) {
+  return slot && slot[0] === 'Z' ? 'z' + slot.slice(1) : 'llave';
+}
+function etiquetaRonda(p) {
+  if (p.ronda === 'Zona') return 'Zona ' + (p.slot_cuadro ? p.slot_cuadro.slice(1) : '');
+  return p.ronda || '—';
+}
+
+/* ---------- Carga inicial: elegir torneo ---------- */
+async function poblarSelectorTorneos() {
+  const sel = document.getElementById('dashTorneoSelect');
+  const { data: torneos, error } = await sb.from('torneos').select('id, nombre, estado').order('fecha_inicio', { ascending: false });
+  if (error || !torneos || torneos.length === 0) {
+    document.getElementById('avisoBanner').textContent = 'No se pudo cargar la lista de torneos' + (error ? ': ' + error.message : '');
+    return;
+  }
+  sel.innerHTML = torneos.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  const preferido = torneos.find((t) => t.estado === 'en_curso') || torneos[0];
+  sel.value = preferido.id;
+  sel.addEventListener('change', () => cargarTorneoDashboard(sel.value));
+  await cargarTorneoDashboard(preferido.id);
+}
+
+async function cargarTorneoDashboard(torneoId) {
+  document.getElementById('avisoBanner').textContent = '🔄 Cargando datos del torneo…';
+  const [{ data: torneo }, { data: partidos, error }] = await Promise.all([
+    sb.from('torneos').select('*').eq('id', torneoId).single(),
+    sb.rpc('partidos_publicos', { p_torneo_id: torneoId })
+  ]);
+  if (error) { toastDash('Error cargando partidos: ' + error.message); return; }
+
+  torneoActivo = torneo;
+  partidosTorneo = partidos || [];
+  categoriasTorneoCache = Array.from(new Set(partidosTorneo.map((p) => p.categoria).filter(Boolean))).sort();
+
+  const badge = document.getElementById('dashTorneoBadge');
+  badge.textContent = torneo?.estado === 'en_curso' ? 'En curso' : torneo?.estado === 'finalizado' ? 'Finalizado' : torneo?.estado === 'cancelado' ? 'Cancelado' : 'Inscripción';
+  badge.className = 'badge ' + (torneo?.estado === 'finalizado' || torneo?.estado === 'cancelado' ? 'warn' : 'ok');
+
+  document.getElementById('avisoBanner').textContent =
+    `✅ Calendario, Resultados, Tablas de posiciones y Llave muestran datos reales de "${torneo?.nombre || ''}". El resto de las secciones (marcadas 🧪) todavía es una maqueta.`;
+
+  await Promise.all([renderResumen(), renderCalendario(), renderTablas(), renderLlave()]);
+  renderResultados();
+}
+
+/* ---------- Resumen ---------- */
+async function renderResumen() {
+  const [{ count: parejasCount }, { count: confirmadasCount }, { data: torneoCategorias }] = await Promise.all([
+    sb.from('parejas').select('id', { count: 'exact', head: true }).eq('torneo_id', torneoActivo.id),
+    sb.from('inscripciones').select('id', { count: 'exact', head: true }).eq('torneo_id', torneoActivo.id).eq('estado', 'confirmada'),
+    sb.from('torneo_categorias').select('categoria, estado_fase').eq('torneo_id', torneoActivo.id)
+  ]);
+
+  const totalPartidos = partidosTorneo.length;
+  const jugados = partidosTorneo.filter((p) => p.estado === 'jugado').length;
+  const ahora = Date.now();
+  const en7dias = ahora + 7 * 24 * 60 * 60 * 1000;
+  const proximos7 = partidosTorneo.filter((p) => p.horario && new Date(p.horario).getTime() >= ahora && new Date(p.horario).getTime() <= en7dias).length;
+  const canchasDistintas = new Set(partidosTorneo.filter((p) => p.cancha_id).map((p) => p.cancha_id)).size;
+  const complejosDistintos = new Set(partidosTorneo.filter((p) => p.complejo_nombre).map((p) => p.complejo_nombre)).size;
+
+  document.getElementById('resumenKpis').innerHTML = `
+    <div class="kpi-card"><span>Parejas inscriptas</span><strong>${parejasCount ?? '—'}</strong><small>en ${categoriasTorneoCache.length} categoría(s)</small></div>
+    <div class="kpi-card"><span>Partidos jugados</span><strong>${jugados}</strong><small>de ${totalPartidos} programados</small></div>
+    <div class="kpi-card"><span>Próximos 7 días</span><strong>${proximos7}</strong><small>partidos con horario</small></div>
+    <div class="kpi-card"><span>Canchas en uso</span><strong>${canchasDistintas}</strong><small>en ${complejosDistintos} complejo(s)</small></div>
+    <div class="kpi-card"><span>Inscripciones confirmadas</span><strong>${confirmadasCount ?? '—'}</strong><small>jugadores</small></div>
+  `;
+
+  const sinFixture = (torneoCategorias || []).filter((c) => c.estado_fase === 'sin_fixture').map((c) => c.categoria);
+  const sinCancha = partidosTorneo.filter((p) => p.horario && !p.cancha_id).length;
+  document.getElementById('resumenDiagnostico').innerHTML = [
+    sinFixture.length === 0
+      ? `<li><span class="ok">✔</span> Todas las categorías tienen fixture generado</li>`
+      : `<li><span class="warn">⚠</span> Sin fixture todavía: ${sinFixture.join(', ')}</li>`,
+    sinCancha === 0
+      ? `<li><span class="ok">✔</span> Todos los partidos con horario tienen cancha asignada</li>`
+      : `<li><span class="warn">⚠</span> ${sinCancha} partido(s) con horario pero sin cancha asignada</li>`
+  ].join('');
+
+  const proximos = partidosTorneo
+    .filter((p) => p.horario && new Date(p.horario).getTime() >= ahora)
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario))
+    .slice(0, 4);
+  document.getElementById('resumenProximos').innerHTML = proximos.length
+    ? proximos.map((p) => `<li>🕐 ${etiquetaDia(claveDia(p.horario))} ${horaDeIso(p.horario)} — ${p.pareja1_nombre} vs ${p.pareja2_nombre} — ${p.categoria}</li>`).join('')
+    : `<li class="match-meta">No hay partidos programados todavía.</li>`;
+}
+
+/* ---------- Calendario ---------- */
+async function cargarPrediosTorneo() {
+  const { data, error } = await sb.from('torneo_canchas')
+    .select('canchas(id, nombre, activa, complejo_id, complejos(id, nombre))')
+    .eq('torneo_id', torneoActivo.id);
+  if (error) { toastDash('Error cargando canchas: ' + error.message); return []; }
+  const canchas = (data || []).map((r) => r.canchas).filter((c) => c && c.activa);
+  const porComplejo = new Map();
+  canchas.forEach((c) => {
+    if (!porComplejo.has(c.complejo_id)) porComplejo.set(c.complejo_id, { nombre: c.complejos?.nombre || 'Sin predio', canchas: [] });
+    porComplejo.get(c.complejo_id).canchas.push(c);
+  });
+  const predios = Array.from(porComplejo.values());
+  predios.forEach((p) => p.canchas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true })));
+  predios.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  return predios;
+}
+
+async function cargarBloqueos(canchaIds) {
+  if (!canchaIds.length) return [];
+  const { data } = await sb.from('canchas_bloqueos').select('cancha_id, desde, hasta, motivo').in('cancha_id', canchaIds);
+  return data || [];
+}
+
+function bloqueoEnHorario(bloqueos, canchaId, iso) {
+  const t = new Date(iso).getTime();
+  return bloqueos.find((b) => b.cancha_id === canchaId && new Date(b.desde).getTime() <= t && t < new Date(b.hasta).getTime());
+}
+
+// null = sin horario configurado para el torneo -> no se marca ninguna celda
+// "fuera" (no hay forma de saber el horario real de apertura)
+function horaFueraDeRango(minutosDelDia) {
+  if (!torneoActivo.hora_desde || !torneoActivo.hora_hasta) return false;
+  const [hd, md] = torneoActivo.hora_desde.split(':').map(Number);
+  const [hh, mh] = torneoActivo.hora_hasta.split(':').map(Number);
+  return minutosDelDia < hd * 60 + md || minutosDelDia >= hh * 60 + mh;
+}
+
+function celdaPartidoHtml(p, { claseExtra = '', attrs = '' } = {}) {
+  const zona = zonaKeyDeSlot(p.slot_cuadro);
+  const chipLabel = p.slot_cuadro && p.slot_cuadro[0] === 'Z' ? 'Z' + p.slot_cuadro.slice(1) : (p.ronda || 'Llave');
+  const chipClass = zona === 'llave' ? 'llave' : zona;
+  const p2 = p.pareja2_id ? p.pareja2_nombre : 'bye';
+  return `<div class="calendario-celda ocupada${claseExtra}" draggable="true" data-cal-id="${p.id}" data-cat="${p.categoria || ''}" data-zona="${zona}" style="--cat-color:${colorCategoria(p.categoria)}" ${attrs}>
+    <span class="chip-zona ${chipClass}">${chipLabel}</span><span>${p.pareja1_nombre}</span><span>vs ${p2}</span>
+  </div>`;
+}
+
+function renderDiaHtml(clave, activo, predios, bloqueos) {
+  const partidosDia = partidosTorneo.filter((p) => p.horario && claveDia(p.horario) === clave);
+  const columnas = predios.reduce((acc, predio) => acc + predio.canchas.length, 0);
+  if (columnas === 0) {
+    return `<div class="card cal-dia ${activo ? 'active' : ''}" data-dia="${clave}"><p class="match-meta">Este torneo todavía no tiene canchas asignadas (Administración → Configuración → Canchas).</p></div>`;
+  }
+
+  // filas horarias: unión de los horarios reales de ese día + la grilla según
+  // el horario de apertura/duración del torneo, si está configurado (se
+  // ignoran horarios_por_dia/días de la semana particulares, por simplicidad)
+  const minutosSet = new Set();
+  partidosDia.forEach((p) => { const d = new Date(p.horario); minutosSet.add(d.getHours() * 60 + d.getMinutes()); });
+  if (torneoActivo.hora_desde && torneoActivo.hora_hasta) {
+    const [hd, md] = torneoActivo.hora_desde.split(':').map(Number);
+    const [hh, mh] = torneoActivo.hora_hasta.split(':').map(Number);
+    const paso = torneoActivo.duracion_minutos || 90;
+    for (let m = hd * 60 + md; m < hh * 60 + mh; m += paso) minutosSet.add(m);
+  }
+  const minutos = Array.from(minutosSet).sort((a, b) => a - b);
+
+  const [y, mo, d] = clave.split('-').map(Number);
+  const isoDeMinuto = (min) => new Date(y, mo - 1, d, Math.floor(min / 60), min % 60, 0, 0).toISOString();
+
+  let html = `<div class="card cal-dia ${activo ? 'active' : ''}" data-dia="${clave}">
+    <p class="match-meta" style="margin-bottom:12px">${columnas} cancha(s) entre ${predios.length} predio(s) en uso este día.</p>
+    <div class="calendario-scroll">
+      <div class="calendario-grid" style="grid-template-columns: 64px repeat(${columnas}, minmax(120px,1fr))">
+        <div class="calendario-esquina"></div>`;
+
+  let colIndex = 2;
+  predios.forEach((predio, pi) => {
+    if (predio.canchas.length === 0) return;
+    html += `<div class="calendario-grupo ${pi > 0 ? 'divisor' : ''}" style="grid-column: ${colIndex} / span ${predio.canchas.length}">🏟️ ${predio.nombre}</div>`;
+    colIndex += predio.canchas.length;
+  });
+
+  predios.forEach((predio, pi) => {
+    predio.canchas.forEach((c, ci) => {
+      html += `<div class="calendario-head ${ci === 0 && pi > 0 ? 'divisor' : ''}">${c.nombre}</div>`;
+    });
+  });
+
+  minutos.forEach((min) => {
+    const h = String(Math.floor(min / 60)).padStart(2, '0');
+    const m = String(min % 60).padStart(2, '0');
+    html += `<div class="calendario-hora">${h}:${m}</div>`;
+    const iso = isoDeMinuto(min);
+    const fuera = horaFueraDeRango(min);
+    predios.forEach((predio, pi) => {
+      predio.canchas.forEach((c, ci) => {
+        const divisorClase = ci === 0 && pi > 0 ? ' divisor' : '';
+        const partido = partidosDia.find((p) => p.cancha_id === c.id && (() => { const dd = new Date(p.horario); return dd.getHours() * 60 + dd.getMinutes() === min; })());
+        const bloqueo = bloqueoEnHorario(bloqueos, c.id, iso);
+        if (partido) {
+          html += celdaPartidoHtml(partido, { claseExtra: divisorClase, attrs: `data-cancha-id="${c.id}" data-horario-iso="${iso}"` });
+        } else if (bloqueo) {
+          html += `<div class="calendario-celda bloqueada${divisorClase}">🚫 Bloqueada${bloqueo.motivo ? '<br>(' + bloqueo.motivo + ')' : ''}</div>`;
+        } else if (fuera) {
+          html += `<div class="calendario-celda fuera${divisorClase}">—</div>`;
+        } else {
+          html += `<div class="calendario-celda vacia${divisorClase}" data-cancha-id="${c.id}" data-horario-iso="${iso}">Libre</div>`;
+        }
+      });
+    });
+  });
+
+  html += `</div></div></div>`;
+  return html;
+}
+
+async function renderCalendario() {
+  const predios = await cargarPrediosTorneo();
+  const todasLasCanchas = predios.flatMap((p) => p.canchas);
+  const bloqueos = await cargarBloqueos(todasLasCanchas.map((c) => c.id));
+
+  const leyenda = document.getElementById('calLeyenda');
+  leyenda.querySelectorAll('label[data-catfilter-label]').forEach((l) => l.remove());
+  const acciones = leyenda.querySelector('.cal-leyenda-acciones');
+  categoriasTorneoCache.forEach((cat) => {
+    const label = document.createElement('label');
+    label.dataset.catfilterLabel = '1';
+    label.innerHTML = `<input type="checkbox" checked data-catfilter="${cat}" /><span class="cal-dot" style="background:${colorCategoria(cat)}"></span>${cat}`;
+    leyenda.insertBefore(label, acciones);
+  });
+
+  const zonas = Array.from(new Set(partidosTorneo.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === 'Z').map((p) => p.slot_cuadro)))
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  document.getElementById('calFiltroZona').innerHTML =
+    `<option value="">Todas las zonas</option>` +
+    zonas.map((z) => `<option value="${zonaKeyDeSlot(z)}">Zona ${z.slice(1)}</option>`).join('') +
+    `<option value="llave">Fase eliminatoria</option>`;
+
+  const claves = Array.from(new Set(partidosTorneo.filter((p) => p.horario).map((p) => claveDia(p.horario)))).sort();
+  const diasRow = document.getElementById('calDiasRow');
+  const wrap = document.getElementById('calDiasWrap');
+  if (claves.length === 0) {
+    diasRow.innerHTML = '';
+    wrap.innerHTML = `<p class="match-meta">Todavía no hay partidos con horario asignado — generá el calendario desde Administración → Partidos.</p>`;
+  } else {
+    diasRow.innerHTML = claves.map((c, i) => `<button type="button" class="pill ${i === 0 ? 'active' : ''}" data-dia="${c}">${etiquetaDia(c)}</button>`).join('');
+    wrap.innerHTML = claves.map((clave, i) => renderDiaHtml(clave, i === 0, predios, bloqueos)).join('');
+  }
+
+  const sinHorario = partidosTorneo.filter((p) => !p.horario && !(p.estado === 'jugado' && !p.pareja2_id));
+  document.getElementById('calPoolBadge').textContent = sinHorario.length;
+  document.getElementById('calPool').innerHTML = sinHorario.map((p) => celdaPartidoHtml(p)).join('') || `<span class="match-meta">No hay partidos sin horario.</span>`;
+
+  aplicarFiltrosCalendario();
+}
+
+/* ---------- Resultados ---------- */
+let filtrosResultadosListos = false;
+function renderResultados() {
+  const sel = document.getElementById('resFiltroCategoria');
+  const previa = sel.value;
+  sel.innerHTML = `<option value="">Todas las categorías</option>` + categoriasTorneoCache.map((c) => `<option value="${c}">${c}</option>`).join('');
+  sel.value = categoriasTorneoCache.includes(previa) ? previa : '';
+
+  if (!filtrosResultadosListos) {
+    filtrosResultadosListos = true;
+    document.getElementById('resBuscador').addEventListener('input', pintarResultadosTabla);
+    document.getElementById('resFiltroCategoria').addEventListener('change', pintarResultadosTabla);
+    document.getElementById('resFiltroEstado').addEventListener('change', pintarResultadosTabla);
+  }
+  pintarResultadosTabla();
+}
+
+function partidosFiltradosResultados() {
+  const busqueda = document.getElementById('resBuscador').value.trim().toLowerCase();
+  const categoria = document.getElementById('resFiltroCategoria').value;
+  const estado = document.getElementById('resFiltroEstado').value;
+  return partidosTorneo.filter((p) => {
+    if (categoria && p.categoria !== categoria) return false;
+    if (estado && p.estado !== estado) return false;
+    if (busqueda && !`${p.pareja1_nombre} ${p.pareja2_nombre}`.toLowerCase().includes(busqueda)) return false;
+    return true;
+  }).sort((a, b) => new Date(a.horario || 0) - new Date(b.horario || 0));
+}
+
+function filaResultadoHtml(p) {
+  const esBye = p.estado === 'jugado' && !p.pareja2_id;
+  const resultado = esBye ? 'Default / bye' : formatearSets(p.sets);
+  const estadoBadge = p.estado === 'jugado' ? `<span class="badge ok">Jugado</span>`
+    : p.estado === 'en_juego' ? `<span class="badge warn">En juego</span>`
+    : p.estado === 'suspendido' ? `<span class="badge warn">Suspendido</span>`
+    : `<span class="badge warn">Sin jugar</span>`;
+  const accion = !p.pareja2_id ? '' : `<button type="button" class="${p.estado === 'jugado' ? 'secondary' : 'primary'} small" data-cargar="${p.id}">${p.estado === 'jugado' ? 'Editar' : 'Cargar'}</button>`;
+  return `<tr id="fila-resultado-${p.id}">
+    <td>${etiquetaRonda(p)}</td><td>${p.categoria || '—'}</td><td>${p.pareja1_nombre}</td><td>${p.pareja2_id ? p.pareja2_nombre : '—'}</td>
+    <td>${resultado}</td><td>${estadoBadge}</td><td>${accion}</td>
+  </tr>`;
+}
+
+function pintarResultadosTabla() {
+  const tbody = document.getElementById('resultadosBody');
+  const lista = partidosFiltradosResultados();
+  tbody.innerHTML = lista.map((p) => filaResultadoHtml(p)).join('') || `<tr><td colspan="7" class="match-meta">No hay partidos que coincidan con el filtro.</td></tr>`;
+  tbody.querySelectorAll('[data-cargar]').forEach((btn) => btn.addEventListener('click', () => abrirFormularioResultado(btn.dataset.cargar)));
+}
+
+function abrirFormularioResultado(partidoId) {
+  const existente = document.getElementById('form-resultado-' + partidoId);
+  document.querySelectorAll('[id^="form-resultado-"]').forEach((f) => f.remove()); // solo uno abierto a la vez
+  if (existente) return; // ya estaba abierto: togglear a cerrado
+
+  const p = partidosTorneo.find((x) => x.id === partidoId);
+  const fila = document.getElementById('fila-resultado-' + partidoId);
+  if (!p || !fila) return;
+
+  const tr = document.createElement('tr');
+  tr.id = 'form-resultado-' + partidoId;
+  tr.innerHTML = `<td colspan="7"><div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+    ${[1, 2, 3].map((set) => `
+      <div${set === 3 ? ' class="set3-' + partidoId + '" style="display:none"' : ''}>
+        <label style="margin:0 0 4px">Set ${set}</label>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="number" min="0" max="7" style="width:52px" data-set="${set}-1" />
+          <span>-</span>
+          <input type="number" min="0" max="7" style="width:52px" data-set="${set}-2" />
+        </div>
+      </div>`).join('')}
+    <button type="button" class="primary small" id="btnGuardarResultado-${partidoId}">Guardar</button>
+    <button type="button" class="secondary small" id="btnCancelarResultado-${partidoId}">Cancelar</button>
+  </div></td>`;
+  fila.after(tr);
+
+  const val = (set, lado) => {
+    const v = tr.querySelector(`[data-set="${set}-${lado}"]`).value.trim();
+    return v === '' ? null : Number(v);
+  };
+  const actualizarSet3 = () => {
+    const s1a = val(1, 1), s1b = val(1, 2), s2a = val(2, 1), s2b = val(2, 2);
+    const g1 = s1a !== null && s1b !== null && s1a !== s1b ? (s1a > s1b ? 1 : 2) : null;
+    const g2 = s2a !== null && s2b !== null && s2a !== s2b ? (s2a > s2b ? 1 : 2) : null;
+    tr.querySelector('.set3-' + partidoId).style.display = g1 !== null && g2 !== null && g1 !== g2 ? '' : 'none';
+  };
+  tr.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', actualizarSet3));
+  tr.querySelector('#btnCancelarResultado-' + partidoId).addEventListener('click', () => tr.remove());
+  tr.querySelector('#btnGuardarResultado-' + partidoId).addEventListener('click', () => guardarResultado(p, val));
+}
+
+async function guardarResultado(p, val) {
+  const sets = [];
+  for (let set = 1; set <= 3; set++) {
+    const v1 = val(set, 1), v2 = val(set, 2);
+    if (v1 === null && v2 === null) continue;
+    if (v1 === null || v2 === null) { toastDash(`Completá los dos games del Set ${set}`); return; }
+    if (v1 === v2) { toastDash(`El Set ${set} no puede terminar empatado`); return; }
+    sets.push({ p1: v1, p2: v2 });
+  }
+  if (sets.length < 2) { toastDash('Cargá al menos 2 sets'); return; }
+  const g1 = sets.filter((s) => s.p1 > s.p2).length;
+  const g2 = sets.filter((s) => s.p2 > s.p1).length;
+  if (g1 === g2) { toastDash('El resultado tiene que tener un ganador — completá el Set 3 para desempatar'); return; }
+  const ganadorParejaId = g1 > g2 ? p.pareja1_id : p.pareja2_id;
+
+  const { error } = await sb.from('partidos').update({ sets, estado: 'jugado', ganador_pareja_id: ganadorParejaId }).eq('id', p.id);
+  if (error) { toastDash('Error: ' + error.message); return; }
+  toastDash('Resultado cargado, ranking actualizado ✅');
+
+  if (p.slot_cuadro) {
+    const { avisos } = await propagarCuadro(p.categoria, torneoActivo.id);
+    avisos.forEach((a) => toastDash(a));
+  }
+  await cargarTorneoDashboard(torneoActivo.id);
+}
+
+/* ---------- Tablas de posiciones ---------- */
+function tablaZonaHtml(titulo, filas) {
+  return `<div class="card"><h3>${titulo}</h3><table class="tabla-ancha chica">
+    <thead><tr><th>Pareja</th><th>PJ</th><th>PG</th><th>Sets +/-</th><th>Games +/-</th></tr></thead>
+    <tbody>${filas.map((f) => `<tr class="${f.clasifica ? 'clasifica' : ''}"><td>${f.nombre}</td><td>${f.pj}</td><td>${f.pg}</td><td>${f.sets > 0 ? '+' : ''}${f.sets}</td><td>${f.games > 0 ? '+' : ''}${f.games}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function pintarTablas() {
+  const categoria = document.getElementById('tablasFiltroCategoria').value;
+  const cont = document.getElementById('tablasGrid');
+  if (!categoria) { cont.innerHTML = `<p class="match-meta">No hay categorías cargadas todavía.</p>`; return; }
+  const partidosCat = partidosTorneo.filter((p) => p.categoria === categoria);
+
+  if (torneoActivo.fase_grupos_formato === 'cuadro_zonas') {
+    const zonas = Array.from(new Set(partidosCat.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === 'Z').map((p) => p.slot_cuadro)))
+      .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+    cont.innerHTML = zonas.map((slot) => {
+      const p = partidosCat.find((x) => x.slot_cuadro === slot);
+      const filas = [];
+      if (p.pareja2_id) {
+        const gano1 = p.estado === 'jugado' && p.ganador_pareja_id === p.pareja1_id;
+        const gano2 = p.estado === 'jugado' && p.ganador_pareja_id === p.pareja2_id;
+        const setsA = p.estado === 'jugado' ? (p.sets || []).filter((s) => s.p1 > s.p2).length - (p.sets || []).filter((s) => s.p2 > s.p1).length : 0;
+        const gamesA = p.estado === 'jugado' ? (p.sets || []).reduce((acc, s) => acc + s.p1 - s.p2, 0) : 0;
+        filas.push({ nombre: p.pareja1_nombre, pj: p.estado === 'jugado' ? 1 : 0, pg: gano1 ? 1 : 0, sets: setsA, games: gamesA, clasifica: gano1 });
+        filas.push({ nombre: p.pareja2_nombre, pj: p.estado === 'jugado' ? 1 : 0, pg: gano2 ? 1 : 0, sets: -setsA, games: -gamesA, clasifica: gano2 });
+      } else {
+        filas.push({ nombre: p.pareja1_nombre, pj: 0, pg: 0, sets: 0, games: 0, clasifica: true }); // bye: pasa directo, sin jugar
+      }
+      return tablaZonaHtml('Zona ' + slot.slice(1), filas);
+    }).join('') || `<p class="match-meta">Esta categoría todavía no tiene zonas armadas.</p>`;
+    return;
+  }
+
+  // formato clásico de grupos (todos contra todos): agrupar por partidos.grupo
+  const grupos = new Map();
+  partidosCat.forEach((p) => {
+    if (p.grupo == null) return;
+    if (!grupos.has(p.grupo)) grupos.set(p.grupo, []);
+    grupos.get(p.grupo).push(p);
+  });
+  if (grupos.size === 0) { cont.innerHTML = `<p class="match-meta">Esta categoría todavía no tiene grupos armados.</p>`; return; }
+  cont.innerHTML = Array.from(grupos.entries()).sort((a, b) => a[0] - b[0]).map(([grupo, partidos]) => {
+    const stats = new Map();
+    const asegurar = (id, nombre) => { if (!stats.has(id)) stats.set(id, { nombre, pj: 0, pg: 0, sets: 0, games: 0 }); return stats.get(id); };
+    partidos.forEach((p) => {
+      if (p.estado !== 'jugado' || !p.pareja2_id) return;
+      const a = asegurar(p.pareja1_id, p.pareja1_nombre), b = asegurar(p.pareja2_id, p.pareja2_nombre);
+      a.pj++; b.pj++;
+      const setsA = (p.sets || []).filter((s) => s.p1 > s.p2).length, setsB = (p.sets || []).filter((s) => s.p2 > s.p1).length;
+      a.sets += setsA - setsB; b.sets += setsB - setsA;
+      const gamesA = (p.sets || []).reduce((acc, s) => acc + s.p1, 0), gamesB = (p.sets || []).reduce((acc, s) => acc + s.p2, 0);
+      a.games += gamesA - gamesB; b.games += gamesB - gamesA;
+      if (p.ganador_pareja_id === p.pareja1_id) a.pg++; else if (p.ganador_pareja_id === p.pareja2_id) b.pg++;
+    });
+    const filas = Array.from(stats.values()).sort((x, y) => y.pg - x.pg || y.sets - x.sets || y.games - x.games);
+    filas.forEach((f, i) => { f.clasifica = i < (torneoActivo.avanzan_por_grupo || 2); });
+    return tablaZonaHtml('Grupo ' + grupo, filas);
+  }).join('');
+}
+
+let filtroTablasListo = false;
+function renderTablas() {
+  const sel = document.getElementById('tablasFiltroCategoria');
+  const previa = sel.value;
+  sel.innerHTML = categoriasTorneoCache.map((c) => `<option value="${c}">${c}</option>`).join('');
+  sel.value = categoriasTorneoCache.includes(previa) ? previa : (categoriasTorneoCache[0] || '');
+  if (!filtroTablasListo) { filtroTablasListo = true; sel.addEventListener('change', pintarTablas); }
+  pintarTablas();
+}
+
+/* ---------- Llave ---------- */
+function pintarLlave() {
+  const categoria = document.getElementById('llaveFiltroCategoria').value;
+  const cont = document.getElementById('llaveWrap');
+  if (!categoria) { cont.innerHTML = `<p class="match-meta">No hay categorías cargadas todavía.</p>`; return; }
+
+  const partidosCat = partidosTorneo.filter((p) => p.categoria === categoria && p.ronda && p.ronda !== 'Zona');
+  const rondas = RONDA_ORDEN.filter((r) => r !== 'Zona' && partidosCat.some((p) => p.ronda === r));
+  if (rondas.length === 0) { cont.innerHTML = `<p class="match-meta">Esta categoría todavía no llegó a la fase eliminatoria.</p>`; return; }
+
+  cont.innerHTML = rondas.map((ronda) => {
+    const partidos = partidosCat.filter((p) => p.ronda === ronda).sort((a, b) => Number(a.slot_cuadro.slice(1)) - Number(b.slot_cuadro.slice(1)));
+    return `<div class="llave-ronda">
+      <div class="llave-ronda-titulo">${ronda}</div>
+      ${partidos.map((p) => `<div class="llave-partido">
+        <div class="equipo ${p.estado === 'jugado' && p.ganador_pareja_id === p.pareja1_id ? 'ganador' : ''}">${p.pareja1_nombre}</div>
+        <div class="equipo ${p.estado === 'jugado' && p.ganador_pareja_id === p.pareja2_id ? 'ganador' : ''}">${p.pareja2_id ? p.pareja2_nombre : '— / —'}</div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+let filtroLlaveListo = false;
+function renderLlave() {
+  const sel = document.getElementById('llaveFiltroCategoria');
+  const previa = sel.value;
+  sel.innerHTML = categoriasTorneoCache.map((c) => `<option value="${c}">${c}</option>`).join('');
+  sel.value = categoriasTorneoCache.includes(previa) ? previa : (categoriasTorneoCache[0] || '');
+  if (!filtroLlaveListo) { filtroLlaveListo = true; sel.addEventListener('change', pintarLlave); }
+  pintarLlave();
+}
+
+poblarSelectorTorneos();
+</script>
+
+</body>
+</html>

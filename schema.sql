@@ -245,6 +245,14 @@ alter table torneos add column if not exists fase_grupos_formato text not null d
 alter table torneos add column if not exists tamano_grupo int not null default 3; -- parejas por grupo (solo aplica si fase_grupos_formato='grupos')
 alter table torneos add column if not exists avanzan_por_grupo int not null default 2; -- cuántas parejas de cada grupo pasan a la siguiente fase
 
+-- Puntaje de ranking propio de ESTE torneo (antes era un único valor global
+-- para todos, ver más abajo "PUNTOS POR RONDA"). es_puntuable=false es para
+-- torneos amistosos/exhibición: sus partidos no suman ni restan nada del
+-- ranking general ni del de categoría, aunque se carguen resultados igual.
+alter table torneos add column if not exists es_puntuable boolean not null default true;
+alter table torneos add column if not exists puntos_ronda jsonb not null default
+  '{"Campeón":1000,"Sub":750,"Semifinal":500,"Cuartos":250,"Octavos":125,"Dieciseisavos":100}'::jsonb;
+
 -- torneo_id null = bloqueo general del perfil (aplica siempre); con torneo_id
 -- cargado, es un bloqueo puntual para ESE torneo nada más (además del general).
 -- va acá (no junto a la tabla) porque necesita que "torneos" ya exista.
@@ -443,16 +451,9 @@ alter table notificaciones add column if not exists pantalla text;
 -- la pareja PERDEDORA suma los puntos de esa ronda (llegó hasta ahí y quedó eliminada).
 -- En la Final, el ganador suma "Campeón" y el perdedor suma "Sub". Los partidos que no son
 -- de una de estas rondas (ej: fase de grupos) no suman puntos de ranking, solo estadísticas
--- de partidos jugados/ganados. El admin puede editar estos valores desde el panel de admin.
-create table if not exists puntos_ronda (
-  ronda text primary key,
-  puntos int not null
-);
-
-insert into puntos_ronda (ronda, puntos) values
-  ('Campeón', 1000), ('Sub', 750), ('Semifinal', 500),
-  ('Cuartos', 250), ('Octavos', 125), ('Dieciseisavos', 100)
-on conflict (ronda) do nothing;
+-- de partidos jugados/ganados. Estos valores ya NO son globales — cada torneo tiene los
+-- suyos en torneos.puntos_ronda (ver más arriba, junto a la tabla torneos), editables solo
+-- desde el dashboard de ESE torneo.
 
 -- ---------- HISTORIAL DE CATEGORÍA (para mostrar "ascendidos" en Inicio) ----------
 -- Se carga una fila cada vez que el admin aprueba un pedido de cambio de categoría
@@ -529,134 +530,180 @@ create index if not exists idx_historial_categoria_fecha on historial_categoria(
 create index if not exists idx_noticias_fecha on noticias(created_at);
 
 -- ============================================================
--- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
+-- FUNCIÓN COMPARTIDA: revertir los puntos/estadísticas que un partido
+-- "jugado" ya le había dado a sus 4 jugadores — la usan tanto la
+-- corrección de un resultado (actualizar_ranking) como el borrado directo
+-- de un partido (revertir_ranking_al_borrar_partido). Cada torneo tiene su
+-- propio puntaje (torneos.puntos_ronda) y puede estar marcado como "no
+-- puntuable" (torneos.es_puntuable=false, para amistosos/exhibición): en
+-- ese caso nunca se sumó nada al jugarse, así que tampoco hay nada que
+-- revertir acá.
 -- ============================================================
-create or replace function actualizar_ranking() returns trigger as $$
+create or replace function revertir_puntos_partido(
+  p_torneo_id uuid,
+  p_ronda text,
+  p_categoria text,
+  p_ganador_pareja_id uuid,
+  p_pareja1_id uuid,
+  p_pareja2_id uuid
+) returns void as $$
 declare
+  v_es_puntuable boolean;
+  v_puntos_ronda jsonb;
   ganador parejas%rowtype;
   perdedor_id uuid;
   perdedor parejas%rowtype;
   pts_ganador int := 0;
   pts_perdedor int := 0;
-  es_correccion boolean;
-  old_ganador parejas%rowtype;
-  old_perdedor_id uuid;
-  old_perdedor parejas%rowtype;
-  old_pts_ganador int := 0;
-  old_pts_perdedor int := 0;
 begin
-  -- solo actuar cuando el partido pasa a "jugado" y tiene ganador
-  if new.estado = 'jugado' and new.ganador_pareja_id is not null
-     and (old.estado is distinct from 'jugado' or old.ganador_pareja_id is distinct from new.ganador_pareja_id) then
+  if p_ganador_pareja_id is null then
+    return;
+  end if;
 
-    -- si el partido YA estaba jugado con otro ganador, es una corrección de
-    -- un resultado que ya había sumado puntos: hay que revertir exactamente
-    -- lo que se le dio al ganador/perdedor viejo ANTES de sumar el nuevo,
-    -- para no dejar el ranking inflado con cada corrección (bug detectado:
-    -- antes de este fix, una corrección solo sumaba y nunca restaba).
-    es_correccion := old.estado = 'jugado' and old.ganador_pareja_id is not null
-                      and old.ganador_pareja_id is distinct from new.ganador_pareja_id;
+  select es_puntuable, puntos_ronda into v_es_puntuable, v_puntos_ronda from torneos where id = p_torneo_id;
+  if not coalesce(v_es_puntuable, true) then
+    return;
+  end if;
 
-    if es_correccion then
-      select * into old_ganador from parejas where id = old.ganador_pareja_id;
-      old_perdedor_id := case when old.pareja1_id = old.ganador_pareja_id then old.pareja2_id else old.pareja1_id end;
-      select * into old_perdedor from parejas where id = old_perdedor_id;
+  select * into ganador from parejas where id = p_ganador_pareja_id;
+  perdedor_id := case when p_pareja1_id = p_ganador_pareja_id then p_pareja2_id else p_pareja1_id end;
+  select * into perdedor from parejas where id = perdedor_id;
 
-      if old.ronda = 'Final' then
-        select puntos into old_pts_ganador from puntos_ronda where ronda = 'Campeón';
-        select puntos into old_pts_perdedor from puntos_ronda where ronda = 'Sub';
-      elsif old.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
-        select puntos into old_pts_perdedor from puntos_ronda where ronda = old.ronda;
-      end if;
+  if p_ronda = 'Final' then
+    pts_ganador := coalesce((v_puntos_ronda->>'Campeón')::int, 0);
+    pts_perdedor := coalesce((v_puntos_ronda->>'Sub')::int, 0);
+  elsif p_ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+    pts_perdedor := coalesce((v_puntos_ronda->>p_ronda)::int, 0);
+  end if;
 
-      update jugadores set
-        puntos_ranking = puntos_ranking - coalesce(old_pts_ganador, 0),
+  if ganador.id is not null then
+    update jugadores set
+      puntos_ranking = puntos_ranking - pts_ganador,
+      partidos_jugados = partidos_jugados - 1,
+      partidos_ganados = partidos_ganados - 1
+      where id in (ganador.jugador1_id, ganador.jugador2_id);
+    if p_categoria is not null then
+      update ranking_categoria set
+        puntos_ranking = puntos_ranking - pts_ganador,
         partidos_jugados = partidos_jugados - 1,
-        partidos_ganados = partidos_ganados - 1
-      where id in (old_ganador.jugador1_id, old_ganador.jugador2_id);
+        partidos_ganados = partidos_ganados - 1,
+        updated_at = now()
+        where categoria = p_categoria and jugador_id in (ganador.jugador1_id, ganador.jugador2_id);
+    end if;
+  end if;
 
-      if old.categoria is not null then
-        update ranking_categoria set
-          puntos_ranking = puntos_ranking - coalesce(old_pts_ganador, 0),
-          partidos_jugados = partidos_jugados - 1,
-          partidos_ganados = partidos_ganados - 1,
-          updated_at = now()
-        where categoria = old.categoria and jugador_id in (old_ganador.jugador1_id, old_ganador.jugador2_id);
+  if perdedor.id is not null then
+    update jugadores set
+      puntos_ranking = puntos_ranking - pts_perdedor,
+      partidos_jugados = partidos_jugados - 1
+      where id in (perdedor.jugador1_id, perdedor.jugador2_id);
+    if p_categoria is not null then
+      update ranking_categoria set
+        puntos_ranking = puntos_ranking - pts_perdedor,
+        partidos_jugados = partidos_jugados - 1,
+        updated_at = now()
+        where categoria = p_categoria and jugador_id in (perdedor.jugador1_id, perdedor.jugador2_id);
+    end if;
+  end if;
+end;
+$$ language plpgsql;
+
+-- ============================================================
+-- TRIGGER: al cargar resultado de un partido, sumar puntos de ranking
+-- ============================================================
+create or replace function actualizar_ranking() returns trigger as $$
+declare
+  era_jugado_con_ganador boolean;
+  es_jugado_con_ganador boolean;
+  v_es_puntuable boolean;
+  v_puntos_ronda jsonb;
+  ganador parejas%rowtype;
+  perdedor_id uuid;
+  perdedor parejas%rowtype;
+  pts_ganador int := 0;
+  pts_perdedor int := 0;
+begin
+  era_jugado_con_ganador := (old.estado = 'jugado' and old.ganador_pareja_id is not null);
+  es_jugado_con_ganador := (new.estado = 'jugado' and new.ganador_pareja_id is not null);
+
+  -- revertir los puntos viejos si: el partido dejó de estar "jugado con
+  -- ganador" (se des-jugó / se le borró el ganador), o sigue jugado pero
+  -- el ganador cambió (corrección de resultado).
+  if era_jugado_con_ganador and (not es_jugado_con_ganador or old.ganador_pareja_id <> new.ganador_pareja_id) then
+    perform revertir_puntos_partido(old.torneo_id, old.ronda, old.categoria, old.ganador_pareja_id, old.pareja1_id, old.pareja2_id);
+  end if;
+
+  -- aplicar los puntos nuevos solo si el partido queda "jugado con ganador"
+  -- y es una asignación nueva (no exactamente lo mismo que ya había, para
+  -- no duplicar si se re-guarda sin cambios reales).
+  if es_jugado_con_ganador and not (era_jugado_con_ganador and old.ganador_pareja_id = new.ganador_pareja_id) then
+    -- ganador/perdedor se resuelven siempre (los necesita la notificación de
+    -- abajo aunque el torneo no sea puntuable) — solo el bloque de puntos
+    -- queda condicionado a que el torneo sí sume al ranking.
+    select * into ganador from parejas where id = new.ganador_pareja_id;
+    perdedor_id := case when new.pareja1_id = new.ganador_pareja_id then new.pareja2_id else new.pareja1_id end;
+    select * into perdedor from parejas where id = perdedor_id;
+
+    select es_puntuable, puntos_ronda into v_es_puntuable, v_puntos_ronda from torneos where id = new.torneo_id;
+
+    if coalesce(v_es_puntuable, true) then
+      -- puntos según la ronda: en la Final, ganador = Campeón y perdedor = Sub;
+      -- en las demás rondas de bracket, solo el perdedor suma (quedó eliminado ahí)
+      if new.ronda = 'Final' then
+        pts_ganador := coalesce((v_puntos_ronda->>'Campeón')::int, 0);
+        pts_perdedor := coalesce((v_puntos_ronda->>'Sub')::int, 0);
+      elsif new.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
+        pts_perdedor := coalesce((v_puntos_ronda->>new.ronda)::int, 0);
       end if;
 
-      if old_perdedor.id is not null then
+      -- puntos + partido jugado + partido ganado para la pareja ganadora
+      if ganador.id is not null then
         update jugadores set
-          puntos_ranking = puntos_ranking - coalesce(old_pts_perdedor, 0),
-          partidos_jugados = partidos_jugados - 1
-        where id in (old_perdedor.jugador1_id, old_perdedor.jugador2_id);
+          puntos_ranking = puntos_ranking + pts_ganador,
+          partidos_jugados = partidos_jugados + 1,
+          partidos_ganados = partidos_ganados + 1
+          where id in (ganador.jugador1_id, ganador.jugador2_id);
 
-        if old.categoria is not null then
-          update ranking_categoria set
-            puntos_ranking = puntos_ranking - coalesce(old_pts_perdedor, 0),
-            partidos_jugados = partidos_jugados - 1,
-            updated_at = now()
-          where categoria = old.categoria and jugador_id in (old_perdedor.jugador1_id, old_perdedor.jugador2_id);
+        -- mismo resultado, pero en la categoría del partido dentro de ranking_categoria: así un
+        -- jugador que compite en más de una categoría a la vez suma en la que corresponde, sin
+        -- perder lo que ya tenía en las demás. Si todavía no tenía fila en esa categoría (recién
+        -- arranca a jugarla), se crea sola (insert ... on conflict, no un simple update).
+        if new.categoria is not null then
+          insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
+          select j, new.categoria, pts_ganador, 1, 1
+          from unnest(array[ganador.jugador1_id, ganador.jugador2_id]) as j
+          where j is not null
+          on conflict (jugador_id, categoria) do update set
+            puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
+            partidos_jugados = ranking_categoria.partidos_jugados + 1,
+            partidos_ganados = ranking_categoria.partidos_ganados + 1,
+            updated_at = now();
+        end if;
+      end if;
+
+      -- puntos + partido jugado para la pareja perdedora
+      if perdedor.id is not null then
+        update jugadores set
+          puntos_ranking = puntos_ranking + pts_perdedor,
+          partidos_jugados = partidos_jugados + 1
+          where id in (perdedor.jugador1_id, perdedor.jugador2_id);
+
+        if new.categoria is not null then
+          insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
+          select j, new.categoria, pts_perdedor, 1, 0
+          from unnest(array[perdedor.jugador1_id, perdedor.jugador2_id]) as j
+          where j is not null
+          on conflict (jugador_id, categoria) do update set
+            puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
+            partidos_jugados = ranking_categoria.partidos_jugados + 1,
+            updated_at = now();
         end if;
       end if;
     end if;
 
-    select * into ganador from parejas where id = new.ganador_pareja_id;
-
-    perdedor_id := case when new.pareja1_id = new.ganador_pareja_id then new.pareja2_id else new.pareja1_id end;
-    select * into perdedor from parejas where id = perdedor_id;
-
-    -- puntos según la ronda: en la Final, ganador = Campeón y perdedor = Sub;
-    -- en las demás rondas de bracket, solo el perdedor suma (quedó eliminado ahí)
-    if new.ronda = 'Final' then
-      select puntos into pts_ganador from puntos_ronda where ronda = 'Campeón';
-      select puntos into pts_perdedor from puntos_ronda where ronda = 'Sub';
-    elsif new.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
-      select puntos into pts_perdedor from puntos_ronda where ronda = new.ronda;
-    end if;
-
-    -- puntos + partido jugado + partido ganado para la pareja ganadora
-    update jugadores set
-      puntos_ranking = puntos_ranking + coalesce(pts_ganador, 0),
-      partidos_jugados = partidos_jugados + 1,
-      partidos_ganados = partidos_ganados + 1
-    where id in (ganador.jugador1_id, ganador.jugador2_id);
-
-    -- mismo resultado, pero en la categoría del partido dentro de ranking_categoria: así un
-    -- jugador que compite en más de una categoría a la vez suma en la que corresponde, sin
-    -- perder lo que ya tenía en las demás. Si todavía no tenía fila en esa categoría (recién
-    -- arranca a jugarla), se crea sola.
-    if new.categoria is not null then
-      insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
-      select j, new.categoria, coalesce(pts_ganador, 0), 1, 1
-      from unnest(array[ganador.jugador1_id, ganador.jugador2_id]) as j
-      where j is not null
-      on conflict (jugador_id, categoria) do update set
-        puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
-        partidos_jugados = ranking_categoria.partidos_jugados + 1,
-        partidos_ganados = ranking_categoria.partidos_ganados + 1,
-        updated_at = now();
-    end if;
-
-    -- puntos + partido jugado para la pareja perdedora
-    if perdedor.id is not null then
-      update jugadores set
-        puntos_ranking = puntos_ranking + coalesce(pts_perdedor, 0),
-        partidos_jugados = partidos_jugados + 1
-      where id in (perdedor.jugador1_id, perdedor.jugador2_id);
-
-      if new.categoria is not null then
-        insert into ranking_categoria (jugador_id, categoria, puntos_ranking, partidos_jugados, partidos_ganados)
-        select j, new.categoria, coalesce(pts_perdedor, 0), 1, 0
-        from unnest(array[perdedor.jugador1_id, perdedor.jugador2_id]) as j
-        where j is not null
-        on conflict (jugador_id, categoria) do update set
-          puntos_ranking = ranking_categoria.puntos_ranking + excluded.puntos_ranking,
-          partidos_jugados = ranking_categoria.partidos_jugados + 1,
-          updated_at = now();
-      end if;
-    end if;
-
-    -- notificación in-app a los 4 jugadores (tocarla lleva a Resultados de ese torneo)
+    -- notificación in-app a los 4 jugadores (tocarla lleva a Resultados de ese
+    -- torneo) — se manda siempre que se carga un resultado nuevo, puntúe o no
+    -- el torneo para el ranking (esto es aparte de los puntos).
     insert into notificaciones (jugador_id, mensaje, torneo_id, partido_id, pantalla)
     select j, 'Resultado cargado: revisá el partido en Norte Padel', new.torneo_id, new.id, 'resultados'
     from unnest(array[ganador.jugador1_id, ganador.jugador2_id, perdedor.jugador1_id, perdedor.jugador2_id]) as j
@@ -677,61 +724,12 @@ for each row execute function actualizar_ranking();
 -- se borró el torneo entero: on delete cascade SÍ dispara este trigger, es un
 -- delete real fila por fila) hay que revertir los puntos que ya se le habían
 -- sumado a esas 4 parejas/jugadores — si no, el ranking queda con puntos de
--- partidos que ya no existen. Misma cuenta que la corrección de resultado de
--- más arriba, aplicada sobre old en vez de new.
+-- partidos que ya no existen. Reutiliza la misma función compartida de arriba.
 create or replace function revertir_ranking_al_borrar_partido() returns trigger as $$
-declare
-  ganador parejas%rowtype;
-  perdedor_id uuid;
-  perdedor parejas%rowtype;
-  pts_ganador int := 0;
-  pts_perdedor int := 0;
 begin
   if old.estado = 'jugado' and old.ganador_pareja_id is not null then
-    select * into ganador from parejas where id = old.ganador_pareja_id;
-    perdedor_id := case when old.pareja1_id = old.ganador_pareja_id then old.pareja2_id else old.pareja1_id end;
-    select * into perdedor from parejas where id = perdedor_id;
-
-    if old.ronda = 'Final' then
-      select puntos into pts_ganador from puntos_ronda where ronda = 'Campeón';
-      select puntos into pts_perdedor from puntos_ronda where ronda = 'Sub';
-    elsif old.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
-      select puntos into pts_perdedor from puntos_ronda where ronda = old.ronda;
-    end if;
-
-    if ganador.id is not null then
-      update jugadores set
-        puntos_ranking = puntos_ranking - coalesce(pts_ganador, 0),
-        partidos_jugados = partidos_jugados - 1,
-        partidos_ganados = partidos_ganados - 1
-      where id in (ganador.jugador1_id, ganador.jugador2_id);
-
-      if old.categoria is not null then
-        update ranking_categoria set
-          puntos_ranking = puntos_ranking - coalesce(pts_ganador, 0),
-          partidos_jugados = partidos_jugados - 1,
-          partidos_ganados = partidos_ganados - 1,
-          updated_at = now()
-        where categoria = old.categoria and jugador_id in (ganador.jugador1_id, ganador.jugador2_id);
-      end if;
-    end if;
-
-    if perdedor.id is not null then
-      update jugadores set
-        puntos_ranking = puntos_ranking - coalesce(pts_perdedor, 0),
-        partidos_jugados = partidos_jugados - 1
-      where id in (perdedor.jugador1_id, perdedor.jugador2_id);
-
-      if old.categoria is not null then
-        update ranking_categoria set
-          puntos_ranking = puntos_ranking - coalesce(pts_perdedor, 0),
-          partidos_jugados = partidos_jugados - 1,
-          updated_at = now()
-        where categoria = old.categoria and jugador_id in (perdedor.jugador1_id, perdedor.jugador2_id);
-      end if;
-    end if;
+    perform revertir_puntos_partido(old.torneo_id, old.ronda, old.categoria, old.ganador_pareja_id, old.pareja1_id, old.pareja2_id);
   end if;
-
   return old;
 end;
 $$ language plpgsql;
@@ -748,10 +746,11 @@ for each row execute function revertir_ranking_al_borrar_partido();
 -- segundo trigger cubre ese caso mirándolo al revés: antes de borrar UNA
 -- pareja, revisa sus propios partidos "jugado" (que a esta altura todavía
 -- existen, porque el cascade de partidos recién corre después de este borrado)
--- y revierte lo que esa pareja puntual se llevó en cada uno. Si el otro
--- trigger ya se adelantó (torneo chico donde el orden salió al revés), acá no
--- encuentra partidos para esa pareja y no hace nada — no se duplica la resta
--- pase lo que pase con el orden real de la cascada.
+-- y revierte lo que esa pareja puntual se llevó en cada uno, mirando el
+-- puntaje propio del torneo de cada partido. Si el otro trigger ya se
+-- adelantó (torneo chico donde el orden salió al revés), acá no encuentra
+-- partidos para esa pareja y no hace nada — no se duplica la resta pase lo
+-- que pase con el orden real de la cascada.
 create or replace function revertir_ranking_al_borrar_pareja() returns trigger as $$
 declare
   p record;
@@ -759,27 +758,33 @@ declare
   pts int;
 begin
   for p in
-    select * from partidos
-    where estado = 'jugado' and ganador_pareja_id is not null
-      and (pareja1_id = old.id or pareja2_id = old.id)
+    select pa.*, t.es_puntuable, t.puntos_ronda
+    from partidos pa
+    join torneos t on t.id = pa.torneo_id
+    where pa.estado = 'jugado' and pa.ganador_pareja_id is not null
+      and (pa.pareja1_id = old.id or pa.pareja2_id = old.id)
   loop
+    if not coalesce(p.es_puntuable, true) then
+      continue;
+    end if;
+
     gano := p.ganador_pareja_id = old.id;
     pts := 0;
     if p.ronda = 'Final' then
-      select puntos into pts from puntos_ronda where ronda = (case when gano then 'Campeón' else 'Sub' end);
+      pts := coalesce((p.puntos_ronda->>(case when gano then 'Campeón' else 'Sub' end))::int, 0);
     elsif not gano and p.ronda in ('Semifinal', 'Cuartos', 'Octavos', 'Dieciseisavos') then
-      select puntos into pts from puntos_ronda where ronda = p.ronda;
+      pts := coalesce((p.puntos_ronda->>p.ronda)::int, 0);
     end if;
 
     update jugadores set
-      puntos_ranking = puntos_ranking - coalesce(pts, 0),
+      puntos_ranking = puntos_ranking - pts,
       partidos_jugados = partidos_jugados - 1,
       partidos_ganados = partidos_ganados - (case when gano then 1 else 0 end)
     where id in (old.jugador1_id, old.jugador2_id);
 
     if p.categoria is not null then
       update ranking_categoria set
-        puntos_ranking = puntos_ranking - coalesce(pts, 0),
+        puntos_ranking = puntos_ranking - pts,
         partidos_jugados = partidos_jugados - 1,
         partidos_ganados = partidos_ganados - (case when gano then 1 else 0 end),
         updated_at = now()
@@ -1236,7 +1241,6 @@ alter table canchas enable row level security;
 alter table canchas_bloqueos enable row level security;
 alter table categorias enable row level security;
 alter table etiquetas_jugador enable row level security;
-alter table puntos_ronda enable row level security;
 alter table jugadores enable row level security;
 alter table disponibilidad enable row level security;
 alter table torneos enable row level security;
@@ -1316,12 +1320,6 @@ create policy "categorias_write" on categorias for all using (is_admin()) with c
 -- las puede leer o escribir, es una herramienta interna para armar horarios.
 drop policy if exists "etiquetas_jugador_all" on etiquetas_jugador;
 create policy "etiquetas_jugador_all" on etiquetas_jugador for all using (is_admin()) with check (is_admin());
-
--- puntos_ronda: lectura pública, solo admin edita los valores
-drop policy if exists "puntos_ronda_select" on puntos_ronda;
-create policy "puntos_ronda_select" on puntos_ronda for select using (true);
-drop policy if exists "puntos_ronda_write" on puntos_ronda;
-create policy "puntos_ronda_write" on puntos_ronda for all using (is_admin()) with check (is_admin());
 
 -- jugadores: cada uno ve/edita su propia fila; admin ve/edita todas.
 -- Para mostrar nombres en público se usan las funciones *_publicos() de arriba.

@@ -685,6 +685,26 @@
         <input id="admBloqueoMotivo" placeholder="Ej: lluvia, mantenimiento" />
         <button class="secondary small" id="admBtnBloquearCancha" style="margin-top:8px">Bloquear horario</button>
       </div>
+
+      <div class="card card-accent" id="admSeccionPuntaje">
+        <h2>Puntaje para el ranking</h2>
+        <label><input type="checkbox" id="chkTorneoPuntuable" /> Este torneo suma puntos al ranking general</label>
+        <p class="match-meta" id="avisoTorneoNoPuntuable" style="display:none">Los partidos de este torneo no suman ni restan puntos de ranking a nadie. Igual se pueden cargar resultados y se ven en el cuadro, como cualquier torneo, pero no impactan el ranking general ni el de categoria.</p>
+        <p class="match-meta" id="avisoTorneoPuntuable" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedo eliminada. En la Final, el ganador suma "Campeon" y el perdedor suma "Sub".</p>
+        <div class="row">
+          <div><label for="prCampeon">Campeón</label><input id="prCampeon" type="number" /></div>
+          <div><label for="prSub">Sub</label><input id="prSub" type="number" /></div>
+        </div>
+        <div class="row">
+          <div><label for="prSemifinal">Semifinal</label><input id="prSemifinal" type="number" /></div>
+          <div><label for="prCuartos">Cuartos</label><input id="prCuartos" type="number" /></div>
+        </div>
+        <div class="row">
+          <div><label for="prOctavos">Octavos</label><input id="prOctavos" type="number" /></div>
+          <div><label for="prDieciseisavos">Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
+        </div>
+        <button class="secondary small" id="btnGuardarPuntosTorneo" style="margin-top:10px">Guardar puntaje</button>
+      </div>
       </div>
 
       <div class="card partidos-poster" id="admSeccionPartidos">
@@ -770,24 +790,6 @@
       <h2>Reservas pendientes</h2>
       <p class="match-meta" style="margin-bottom:6px">Pedidos de cancha para jugar/entrenar (fuera de los torneos). Confirmá cuando el pago esté ok.</p>
       <div id="listaReservasPendientes"></div>
-    </div>
-
-    <div class="card card-accent">
-      <h2>Puntos por ronda</h2>
-      <p class="match-meta" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedó eliminada. En la Final, el ganador suma "Campeón" y el perdedor suma "Sub".</p>
-      <div class="row">
-        <div><label for="prCampeon">Campeón</label><input id="prCampeon" type="number" /></div>
-        <div><label for="prSub">Sub</label><input id="prSub" type="number" /></div>
-      </div>
-      <div class="row">
-        <div><label for="prSemifinal">Semifinal</label><input id="prSemifinal" type="number" /></div>
-        <div><label for="prCuartos">Cuartos</label><input id="prCuartos" type="number" /></div>
-      </div>
-      <div class="row">
-        <div><label for="prOctavos">Octavos</label><input id="prOctavos" type="number" /></div>
-        <div><label for="prDieciseisavos">Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
-      </div>
-      <button class="secondary small" id="btnGuardarPuntosRonda" style="margin-top:10px">Guardar puntos</button>
     </div>
 
     <div class="card card-accent">

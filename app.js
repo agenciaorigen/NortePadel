@@ -1581,32 +1581,55 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
 }
 
 // ============================================================
-// PUNTOS POR RONDA (ranking por eliminación directa)
+// PUNTOS POR RONDA (ranking por eliminación directa) — POR TORNEO
 // ============================================================
+// Antes era un valor global (una sola tabla puntos_ronda para todos los
+// torneos). Ahora cada torneo tiene su propio puntaje (torneos.puntos_ronda,
+// jsonb) y puede marcarse como "no puntuable" (torneos.es_puntuable) para
+// torneos amistosos/exhibición que no deben sumar ni restar nada del
+// ranking general. Por eso esto vive solo acá, en el dashboard de UN
+// torneo (sección Configuración) — ya no en la Configuración general.
 const RONDAS_INPUT = {
   "Campeón": "prCampeon", "Sub": "prSub", "Semifinal": "prSemifinal",
   "Cuartos": "prCuartos", "Octavos": "prOctavos", "Dieciseisavos": "prDieciseisavos"
 };
 
-async function cargarPuntosRonda() {
-  const { data } = await sb.from("puntos_ronda").select("*");
-  (data || []).forEach((r) => {
-    const input = document.getElementById(RONDAS_INPUT[r.ronda]);
-    if (input) input.value = r.puntos;
-  });
+// Habilita/deshabilita los 6 inputs de puntaje según el checkbox de
+// "puntuable" — un torneo no puntuable no necesita valores cargados.
+function aplicarEstadoPuntuableTorneo(esPuntuable) {
+  document.getElementById("avisoTorneoNoPuntuable").style.display = esPuntuable ? "none" : "block";
+  document.getElementById("avisoTorneoPuntuable").style.display = esPuntuable ? "block" : "none";
+  Object.values(RONDAS_INPUT).forEach((inputId) => { document.getElementById(inputId).disabled = !esPuntuable; });
 }
 
-document.getElementById("btnGuardarPuntosRonda").addEventListener("click", async () => {
-  const btn = document.getElementById("btnGuardarPuntosRonda");
-  if (btn.disabled) return;
+// Se llama desde cargarGestionTorneo con el torneo ya cargado (t.puntos_ronda
+// y t.es_puntuable ya vienen en el select("*") de ese torneo).
+function cargarPuntosTorneo(t) {
+  const esPuntuable = t.es_puntuable !== false;
+  document.getElementById("chkTorneoPuntuable").checked = esPuntuable;
+  const pr = t.puntos_ronda || {};
+  Object.entries(RONDAS_INPUT).forEach(([ronda, inputId]) => {
+    document.getElementById(inputId).value = pr[ronda] ?? "";
+  });
+  aplicarEstadoPuntuableTorneo(esPuntuable);
+}
+
+document.getElementById("chkTorneoPuntuable").addEventListener("change", (e) => aplicarEstadoPuntuableTorneo(e.target.checked));
+
+document.getElementById("btnGuardarPuntosTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnGuardarPuntosTorneo");
+  if (btn.disabled || !torneoGestionId) return;
   btn.disabled = true;
   try {
-  const filas = Object.entries(RONDAS_INPUT).map(([ronda, inputId]) => ({
-    ronda, puntos: Number(document.getElementById(inputId).value) || 0
-  }));
-  const { error } = await sb.from("puntos_ronda").upsert(filas, { onConflict: "ronda" });
-  if (error) { toast("Error: " + error.message); return; }
-  toast("Puntos guardados");
+    const esPuntuable = document.getElementById("chkTorneoPuntuable").checked;
+    const puntosRonda = {};
+    Object.entries(RONDAS_INPUT).forEach(([ronda, inputId]) => {
+      puntosRonda[ronda] = Number(document.getElementById(inputId).value) || 0;
+    });
+    const { error } = await sb.from("torneos").update({ es_puntuable: esPuntuable, puntos_ronda: puntosRonda }).eq("id", torneoGestionId);
+    if (error) { toast("Error: " + error.message); return; }
+    if (torneoGestionData) { torneoGestionData.es_puntuable = esPuntuable; torneoGestionData.puntos_ronda = puntosRonda; }
+    toast("Puntaje guardado");
   } finally {
     btn.disabled = false;
   }
@@ -3027,6 +3050,7 @@ async function cargarGestionTorneo(id) {
   document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
   document.getElementById("admGestionNombre").textContent = t.nombre;
   document.getElementById("admGestionEstado").innerHTML = badgeEstadoTorneo(t);
+  cargarPuntosTorneo(t);
   renderAdminGestionSubnav();
 
   const btnToggleInsc = document.getElementById("btnToggleInscripcion");
@@ -3928,6 +3952,8 @@ document.getElementById("btnGenerarSiguienteFase").addEventListener("click", asy
 
   for (const categoria of Object.keys(grupos)) {
     if (torneo.fase_grupos_formato === "cuadro_zonas") {
+      const { avisos } = await propagarCuadro(categoria, torneoGestionId);
+      mensajes.push(...avisos);
       const resultado = await generarSiguienteRondaCuadro(categoria, torneoGestionId);
       if (!resultado) continue;
       if (resultado.esperando) mensajes.push(`${categoria}: faltan resultados para poder armar "${resultado.esperando}"`);
@@ -4394,11 +4420,18 @@ function wireCargaResultado(cont) {
       }
       const ganadorParejaId = setsGanadosP1 > setsGanadosP2 ? btn.dataset.p1 : btn.dataset.p2;
 
-      const { error } = await sb.from("partidos").update({
+      const { data: partidoActualizado, error } = await sb.from("partidos").update({
         sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
-      }).eq("id", partidoId);
+      }).eq("id", partidoId).select("categoria, torneo_id, slot_cuadro").single();
       if (error) { toast("Error: " + error.message); return; }
       toast("Resultado cargado, ranking actualizado ✅");
+      if (partidoActualizado?.slot_cuadro) {
+        // si esto alimenta una fase ya armada del cuadro de zonas, que el
+        // rival de esa fase se actualice solo en vez de quedar trabado con
+        // el resultado viejo (ver propagarCuadro)
+        const { avisos } = await propagarCuadro(partidoActualizado.categoria, partidoActualizado.torneo_id);
+        avisos.forEach((a) => toast(a));
+      }
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
       cargarRanking();
@@ -5352,7 +5385,6 @@ async function init() {
     cargarAscendidos(),
     cargarSponsors(),
     cargarRanking(),
-    cargarPuntosRonda(),
     cargarConfig(),
     cargarNoticias()
   ]);

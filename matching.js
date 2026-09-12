@@ -414,3 +414,75 @@ function resolverRondaCuadro(matchesPlantilla, prefijo, mapaSlots) {
   }
   return partidos;
 }
+
+// Vuelve a evaluar, ronda por ronda, TODOS los cruces del cuadro que ya
+// existen como fila en la base — a diferencia de generarSiguienteRondaCuadro
+// (app.js), que solo inserta lo que falta y nunca revisa lo que ya armó. Hace
+// falta para dos casos que si no quedan "trabados" para siempre: (1) se
+// corrige un resultado ya cargado y el rival de la fase siguiente cambia;
+// (2) una zona que era bye recién ahora se resuelve y el cruce que la
+// esperaba ya estaba armado con el placeholder viejo. Si el rival de un
+// cruce cambió pero ese cruce YA tiene su propio resultado cargado (sets
+// reales, no un default automático), no lo toca — devuelve un aviso para que
+// el admin lo revise a mano en vez de arriesgarse a pisar un partido que sí
+// se jugó. Vive acá (no en app.js) porque tanto la app real como el
+// dashboard de gestión la necesitan después de guardar un resultado, y así
+// hay una sola versión en vez de dos copias que se puedan desincronizar.
+// Usa `sb` (el cliente de Supabase) como global — quien la llama ya lo tiene
+// definido en su propio script antes de que esta función se ejecute.
+async function propagarCuadro(categoria, torneoId) {
+  const { data: partidos } = await sb.from("partidos")
+    .select("id, slot_cuadro, pareja1_id, pareja2_id, ganador_pareja_id, estado, sets")
+    .eq("torneo_id", torneoId).eq("categoria", categoria).not("slot_cuadro", "is", null);
+  if (!partidos || partidos.length === 0) return { avisos: [] };
+
+  const nZonas = partidos.filter((p) => p.slot_cuadro[0] === "Z").length;
+  const plantilla = PLANTILLAS_CUADRO[nZonas];
+  if (!plantilla) return { avisos: [] };
+
+  const porSlot = {};
+  partidos.forEach((p) => { porSlot[p.slot_cuadro] = p; });
+  // ganador/perdedor real de una fila, tal cual está guardada hoy en la base
+  // (nunca lo que "debería" ser según la plantilla) — es la fuente de verdad
+  // para las rondas siguientes, incluso cuando se decidió dejar un cruce sin
+  // tocar por tener resultado propio.
+  const gananciaDe = (p) => (p.estado === "jugado" && p.ganador_pareja_id)
+    ? { ganador: p.ganador_pareja_id, perdedor: p.pareja2_id ? (p.ganador_pareja_id === p.pareja1_id ? p.pareja2_id : p.pareja1_id) : null }
+    : undefined;
+
+  const mapaSlots = {};
+  partidos.forEach((p) => { if (p.slot_cuadro[0] === "Z") { const g = gananciaDe(p); if (g) mapaSlots[p.slot_cuadro] = g; } });
+
+  const avisos = [];
+  for (const nombreRonda of Object.keys(plantilla)) {
+    const prefijo = nombreRonda[0];
+    const resueltos = resolverRondaCuadro(plantilla[nombreRonda], prefijo, mapaSlots);
+    if (!resueltos) break; // esta ronda (y las siguientes) todavía no se puede evaluar
+
+    for (const r of resueltos) {
+      const fila = porSlot[r.slot];
+      if (!fila) continue; // esta ronda todavía no se armó — le toca a "Generar siguiente fase"
+
+      const tieneResultadoPropio = !!fila.pareja2_id && Array.isArray(fila.sets) && fila.sets.length > 0;
+      const cambioRival = fila.pareja1_id !== r.pareja1_id || fila.pareja2_id !== r.pareja2_id;
+
+      if (cambioRival && tieneResultadoPropio) {
+        avisos.push(`${categoria} ${r.slot}: ya tiene un resultado cargado pero su rival cambió — revisalo a mano`);
+      } else if (cambioRival) {
+        const patch = {
+          pareja1_id: r.pareja1_id, pareja2_id: r.pareja2_id,
+          estado: r.walkover ? "jugado" : "programado",
+          ganador_pareja_id: r.walkover ? r.pareja1_id : null,
+          sets: null, updated_at: new Date().toISOString()
+        };
+        const { error } = await sb.from("partidos").update(patch).eq("id", fila.id);
+        if (error) { avisos.push(`${categoria} ${r.slot}: error al actualizar — ${error.message}`); continue; }
+        Object.assign(fila, patch); // para que las rondas siguientes de este mismo pase ya vean el cambio
+      }
+
+      const g = gananciaDe(fila);
+      if (g) mapaSlots[r.slot] = g;
+    }
+  }
+  return { avisos };
+}
