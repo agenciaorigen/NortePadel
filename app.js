@@ -4797,6 +4797,12 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
   partidos.forEach((p) => {
     const div = document.createElement("div");
     const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+    // un "bye" (pasó de ronda sin rival) queda con estado='jugado' pero no
+    // tiene ningún resultado real que proteger -- si el bye está mal (el
+    // cruce en realidad tenía que jugarse contra alguien) el admin tiene que
+    // poder arreglarlo con "Cambiar parejas" igual que un partido programado,
+    // en vez de quedar trabado para siempre por figurar como "jugado".
+    const esByeSinJugar = p.estado === "jugado" && !p.pareja2_id;
     div.className = "match-card" + (p.estado === "jugado" ? " match-card-jugado" : "") + (!editable ? " clickeable" : "");
     if (!editable) div.dataset.abrirPartido = p.id;
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
@@ -4804,12 +4810,12 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       ${matchVsRowHtml(p, ganador)}
       <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
-      ${editable && p.estado === "jugado" ? `
+      ${editable && p.estado === "jugado" && !esByeSinJugar ? `
       <div class="match-actions">
         <button type="button" class="secondary small btnTogglePartidoAdmin" data-p="${p.id}">✏️ Corregir resultado</button>
       </div>
       ${cargaResultadoPanelHtml(p, true)}` : ""}
-      ${editable && p.estado !== "jugado" ? `
+      ${editable && (p.estado !== "jugado" || esByeSinJugar) ? `
       ${cargaResultadoPanelHtml(p)}
       <div class="match-admin-panel">
         <div class="match-actions">
@@ -4938,8 +4944,23 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       const p1 = cont.querySelector(`.selectCambiarPareja1[data-p="${partidoId}"]`).value;
       const p2 = cont.querySelector(`.selectCambiarPareja2[data-p="${partidoId}"]`).value;
       if (!p1 || !p2 || p1 === p2) { toast("Elegí dos parejas distintas"); return; }
-      const { error } = await sb.from("partidos").update({ pareja1_id: p1, pareja2_id: p2 }).eq("id", partidoId);
+      const partido = ultimosPartidosGestion.find((x) => x.id === partidoId);
+      const cambios = { pareja1_id: p1, pareja2_id: p2 };
+      // si esto era un "bye" (pasaba de ronda sin rival) y ahora se le asigna
+      // un rival real, deja de estar "jugado": vuelve a programado y se le
+      // borra el resultado automático del bye para poder cargar el real
+      if (partido?.estado === "jugado" && !partido?.pareja2_id) {
+        cambios.estado = "programado"; cambios.ganador_pareja_id = null; cambios.sets = null;
+      }
+      const { error } = await sb.from("partidos").update(cambios).eq("id", partidoId);
       if (error) { toast("Error: " + error.message); return; }
+      // si este cruce alimenta al cuadro de zonas, la corrección tiene que
+      // poder llegar a las rondas siguientes ya armadas (misma lógica que al
+      // cargar un resultado)
+      if (partido?.slot_cuadro) {
+        const { avisos } = await propagarCuadro(partido.categoria, torneoGestionId);
+        avisos.forEach((a) => toast(a));
+      }
       toast("Parejas actualizadas");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
