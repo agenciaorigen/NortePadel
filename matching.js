@@ -473,7 +473,11 @@ async function propagarCuadro(categoria, torneoId) {
           pareja1_id: r.pareja1_id, pareja2_id: r.pareja2_id,
           estado: r.walkover ? "jugado" : "programado",
           ganador_pareja_id: r.walkover ? r.pareja1_id : null,
-          sets: null, updated_at: new Date().toISOString()
+          sets: null, updated_at: new Date().toISOString(),
+          // limpia el texto viejo de la carga manual del cuadro (p.ej. "Perdedor
+          // Z1"): si no se vacía acá, partidos_publicos() lo sigue mostrando como
+          // resguardo aunque pareja1_id/pareja2_id ya estén bien resueltos
+          pareja1_nombre_manual: null, pareja2_nombre_manual: null
         };
         const { error } = await sb.from("partidos").update(patch).eq("id", fila.id);
         if (error) { avisos.push(`${categoria} ${r.slot}: error al actualizar — ${error.message}`); continue; }
