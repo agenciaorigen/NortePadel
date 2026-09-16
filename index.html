@@ -566,6 +566,7 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Configuración general</span>
       </button>
+      <div id="admSidebarSubnavConfig" style="display:none"></div>
       <button type="button" class="adm-side-item" data-adm-nav="torneo">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v10H4z"/></svg>
         <span>Torneo en gestión</span>
@@ -771,8 +772,8 @@
          cuando se entra a administrar un torneo específico (ver admBtnVolverConfigGeneral
          y btnAdministrarEsteTorneo en app.js): esa pantalla queda solo para ESE torneo. -->
     <div id="admConfigGeneralWrap">
-    <div class="card card-accent">
-      <h2>Configuración general</h2>
+    <div class="card card-accent" id="admCfgClub">
+      <h2>Configuración del club</h2>
       <label for="cfgWhatsapp">WhatsApp del club (para coordinar pagos)</label>
       <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
       <label for="cfgInstagram">Instagram (link al perfil)</label>
@@ -780,6 +781,7 @@
       <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
     </div>
 
+    <div id="admCfgComplejos">
     <div class="card card-accent">
       <h2>Nuevo complejo</h2>
       <label for="cNombre">Nombre</label>
@@ -795,8 +797,9 @@
       <h2>Complejos y canchas</h2>
       <div id="listaComplejos"></div>
     </div>
+    </div>
 
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgCategorias">
       <h2>Categorías</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen para elegir en el perfil del jugador y al crear un torneo.</p>
       <div class="pill-row" id="listaCategoriasAdmin"></div>
@@ -806,7 +809,7 @@
       </div>
     </div>
 
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgEtiquetas">
       <h2>Etiquetas de jugadores</h2>
       <p class="match-meta" style="margin-bottom:6px">Uso interno, solo para el admin: etiquetas con color (ej. "Veterano") para ayudarte a acomodar horarios y partidos. No las ven los jugadores.</p>
       <div class="pill-row" id="listaEtiquetasAdmin"></div>
@@ -817,7 +820,7 @@
       </div>
     </div>
 
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgSolicitudes">
       <h2>Solicitudes de categoría</h2>
       <p class="match-meta" style="margin-bottom:6px">Jugadores que pidieron cambiar de categoría. Al aprobar, pasan a jugar (y sumar puntos) en la nueva.</p>
       <div id="listaSolicitudesCategoria"></div>
@@ -830,7 +833,7 @@
       <div id="listaReservasPendientes"></div>
     </div>
 
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgJugadorDelMes">
       <h2>Jugador del mes</h2>
       <label for="jdmSelect">Jugador</label>
       <select id="jdmSelect"></select>
@@ -859,7 +862,7 @@
     </div>
 
     <div id="admConfigGeneralWrap2">
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgNoticias">
       <h2>Noticias</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>
       <label for="ntTitulo">Título</label>
@@ -874,7 +877,7 @@
       <div id="listaNoticiasAdmin" style="margin-top:16px"></div>
     </div>
 
-    <div class="card card-accent">
+    <div class="card card-accent" id="admCfgJugadores">
       <div class="torneo-card-header">
         <h2>Jugadores registrados</h2>
         <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>

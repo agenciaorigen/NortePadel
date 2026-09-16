@@ -106,7 +106,7 @@ function cambiarVista(nombre, ruta) {
     document.getElementById("admSelectorTorneoCard").style.display = "block";
     mostrarConfigGeneral(true);
     document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-    sincronizarAdmSidebar();
+    mostrarSeccionConfigGeneral(seccionConfigActiva);
   } else if (nombre !== "admin") {
     adminFocoTorneoActivo = false;
   }
@@ -3032,11 +3032,18 @@ document.getElementById("admSelectTorneoGestion").addEventListener("change", asy
 // scroll largo. seccionGestionActiva se mantiene entre refrescos de la
 // pantalla (no vuelve a "Inscripciones" cada vez que se recarga algo).
 let seccionGestionActiva = "resumen";
+// Canchas/Bloqueos/Puntaje vivían agrupadas bajo una sola sección
+// "Configuración" (admSeccionConfiguracion) -- ahora cada una es su propia
+// entrada, para que la sidebar deje ver una sola cosa por vez y nunca las
+// tres juntas (admSeccionConfiguracion sigue en el HTML como envoltorio sin
+// estilo propio, ya no se referencia acá).
 const SECCIONES_GESTION = {
   resumen: { id: "admSeccionResumen", label: "Resumen" },
-  partidos: { id: "admSeccionPartidos", label: "Partidos" },
   inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones y pagos" },
-  configuracion: { id: "admSeccionConfiguracion", label: "Configuración" }
+  canchas: { id: "admSeccionCanchas", label: "Canchas del torneo" },
+  bloqueos: { id: "admSeccionBloqueos", label: "Bloqueos de cancha" },
+  puntaje: { id: "admSeccionPuntaje", label: "Puntaje para el ranking" },
+  partidos: { id: "admSeccionPartidos", label: "Partidos" }
 };
 function renderAdminGestionSubnav() {
   const cont = document.getElementById("admGestionSubnav");
@@ -3055,12 +3062,42 @@ function mostrarSeccionGestion(clave) {
   sincronizarAdmSidebar();
 }
 
+// "Configuración general" tenía el mismo problema que "Torneo en gestión"
+// tenía antes de armar SECCIONES_GESTION: 9 cards mostrándose todas juntas
+// apenas se entraba. Mismo mecanismo acá (mapa clave->id + una función que
+// muestra solo esa una): nunca más de una a la vez.
+let seccionConfigActiva = "club";
+const SECCIONES_CONFIG_GENERAL = {
+  club: { id: "admCfgClub", label: "Configuración del club" },
+  complejos: { id: "admCfgComplejos", label: "Canchas y predios" },
+  categorias: { id: "admCfgCategorias", label: "Categorías" },
+  etiquetas: { id: "admCfgEtiquetas", label: "Etiquetas de jugadores" },
+  solicitudes: { id: "admCfgSolicitudes", label: "Solicitudes de categoría" },
+  jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes" },
+  auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes" },
+  noticias: { id: "admCfgNoticias", label: "Noticias" },
+  jugadores: { id: "admCfgJugadores", label: "Jugadores registrados" }
+};
+function mostrarSeccionConfigGeneral(clave) {
+  seccionConfigActiva = clave;
+  // en mobile no hay sidebar (ver #admSidebar en style.css) ni ningún otro
+  // nav para volver a elegir sección -- ahí "Configuración general" sigue
+  // mostrando las 9 cards juntas, como siempre. Achicar a una sola solo
+  // tiene sentido en escritorio, donde la sidebar es la forma de cambiar.
+  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
+  Object.entries(SECCIONES_CONFIG_GENERAL).forEach(([key, info]) => {
+    document.getElementById(info.id).style.display = (!esDesktop || key === clave) ? "block" : "none";
+  });
+  sincronizarAdmSidebar();
+}
+
 // ---------- Sidebar de Administración (#admSidebar, solo escritorio) ----------
 // Capa fina de navegación: cada click dispara la MISMA acción/botón de
-// siempre (mostrarSeccionGestion, admBtnVolverConfigGeneral, cargarGestionTorneo)
-// y después se sincroniza para reflejar qué quedó activo — la sidebar no es
-// dueña de ningún estado nuevo, solo lo muestra. En mobile #admSidebar ni se
-// ve (ver style.css), así que esto no cambia nada ahí.
+// siempre (mostrarSeccionGestion, mostrarSeccionConfigGeneral,
+// admBtnVolverConfigGeneral, cargarGestionTorneo) y después se sincroniza
+// para reflejar qué quedó activo — la sidebar no es dueña de ningún estado
+// nuevo, solo lo muestra. En mobile #admSidebar ni se ve (ver style.css),
+// así que esto no cambia nada ahí.
 document.querySelectorAll("#admSidebar > .adm-side-item").forEach((btn) => {
   btn.addEventListener("click", () => {
     if (btn.dataset.admNav === "config-general") {
@@ -3081,15 +3118,26 @@ function sincronizarAdmSidebar() {
     btn.classList.toggle("active", enGestion ? btn.dataset.admNav === "torneo" : btn.dataset.admNav === "config-general");
   });
 
-  const subnav = document.getElementById("admSidebarSubnav");
-  if (!enGestion) { subnav.style.display = "none"; subnav.innerHTML = ""; return; }
+  renderSubnavLateral("admSidebarSubnav", SECCIONES_GESTION, seccionGestionActiva, enGestion, mostrarSeccionGestion, "seccion-gestion", "seccionGestion");
+  renderSubnavLateral("admSidebarSubnavConfig", SECCIONES_CONFIG_GENERAL, seccionConfigActiva, !enGestion, mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
+}
+
+// Pinta uno de los dos sub-menús de la sidebar (el de "Torneo en gestión" o
+// el de "Configuración general") -- misma lógica para los dos, solo cambia
+// qué mapa/función usan, para no repetir el mismo bloque dos veces.
+// attrKebab/attrCamel: mismo dato en las dos formas que pide el DOM
+// (atributo "data-seccion-gestion" en el HTML <-> propiedad .dataset.seccionGestion en JS).
+function renderSubnavLateral(contId, mapa, claveActiva, visible, onClick, attrKebab, attrCamel) {
+  const subnav = document.getElementById(contId);
+  if (!visible) { subnav.style.display = "none"; subnav.innerHTML = ""; return; }
   subnav.style.display = "block";
-  subnav.innerHTML = Object.entries(SECCIONES_GESTION)
-    .map(([key, info]) => `<button type="button" class="adm-side-item" data-seccion-gestion="${key}">${info.label}</button>`)
+  subnav.innerHTML = Object.entries(mapa)
+    .map(([key, info]) => `<button type="button" class="adm-side-item" data-${attrKebab}="${key}">${info.label}</button>`)
     .join("");
-  subnav.querySelectorAll("[data-seccion-gestion]").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.seccionGestion === seccionGestionActiva);
-    btn.addEventListener("click", () => mostrarSeccionGestion(btn.dataset.seccionGestion));
+  subnav.querySelectorAll(`[data-${attrKebab}]`).forEach((btn) => {
+    const clave = btn.dataset[attrCamel];
+    btn.classList.toggle("active", clave === claveActiva);
+    btn.addEventListener("click", () => onClick(clave));
   });
 }
 
@@ -4698,7 +4746,7 @@ document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", (
   document.getElementById("admSelectorTorneoCard").style.display = "block";
   mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-  sincronizarAdmSidebar();
+  mostrarSeccionConfigGeneral(seccionConfigActiva);
 });
 
 // Atajo pedido por el club: desde "Administrar este torneo" poder cargar/ver

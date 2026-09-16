@@ -1473,12 +1473,20 @@ body.is-admin #btnAdminPanel { display: flex; }
   .adm-side-item:hover { color: #f3f6f2; }
   .adm-side-item.active { color: #f3f6f2; background: rgba(185,255,61,.08); border-left-color: #B9FF3D; font-weight: 600; }
 
-  /* sub-secciones de "Torneo en gestión" (Resumen/Partidos/Inscripciones/
-     Configuración -- las mismas 4 de siempre, ver SECCIONES_GESTION en
-     app.js), anidadas visualmente debajo de ese ítem cuando hay un torneo
-     cargado (sincronizarAdmSidebar las muestra/oculta). */
-  #admSidebarSubnav .adm-side-item { padding-left: 48px; font-size: 12.5px; }
+  /* sub-secciones de "Torneo en gestión" (Resumen/Inscripciones/Canchas/
+     Bloqueos/Puntaje/Partidos, ver SECCIONES_GESTION en app.js) y de
+     "Configuración general" (ver SECCIONES_CONFIG_GENERAL) -- anidadas
+     visualmente debajo de su ítem padre, una sola visible por vez
+     (sincronizarAdmSidebar decide cuál de las dos listas mostrar). */
+  #admSidebarSubnav .adm-side-item, #admSidebarSubnavConfig .adm-side-item { padding-left: 48px; font-size: 12.5px; }
 
   #admContenido { flex: 1; min-width: 0; padding: 0 0 0 36px; }
   #admContenido h1, #admContenido h2, #admContenido h3 { font-family: "Bodoni Moda", Georgia, serif; }
+
+  /* el pill-row de "Torneo en gestión" (admGestionSubnav) navega entre las
+     mismas secciones que ya están en la sidebar (#admSidebarSubnav) -- en
+     escritorio queda redundante, así que se oculta ahí; en mobile (donde no
+     hay sidebar) sigue siendo la única forma de cambiar de sección, así que
+     no se toca fuera de este media query. */
+  #admGestionSubnav { display: none; }
 }
