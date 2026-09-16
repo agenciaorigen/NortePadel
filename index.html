@@ -16,7 +16,10 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;800&family=Bodoni+Moda:opsz,wght@6..96,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<!-- Bodoni Moda / Work Sans: identidad propia del panel de administración
+     (rediseño pedido aparte, ver #admSidebar en style.css) -- distinta a
+     Playfair/Manrope, que siguen siendo la identidad del resto del sitio. -->
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -252,16 +255,14 @@
            de arriba es la instrucción general del bloque, no de un control. -->
       <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
       <div id="tHorariosPorDiaForm"></div>
-      <label for="tFaseGruposFormato">Formato de la fase de grupos</label>
-      <select id="tFaseGruposFormato">
-        <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
-        <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
-        <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
-      </select>
-      <div class="row" id="tGrupoConfigRow">
-        <div><label for="tTamanoGrupo">Parejas por grupo</label><input id="tTamanoGrupo" type="number" value="3" min="2" /></div>
-        <div><label for="tAvanzanPorGrupo">Cuántas avanzan por grupo</label><input id="tAvanzanPorGrupo" type="number" value="2" min="1" /></div>
-      </div>
+      <!-- Único formato que usa el club: zonas de 2 + cuadro de repechaje propio
+           (ver PLANTILLAS_CUADRO en matching.js, transcripto del Excel del club).
+           Ya no se elige -- tFaseGruposFormato queda fijo en "cuadro_zonas". -->
+      <label>Formato de la fase de grupos</label>
+      <p style="color:var(--muted);font-size:13px;margin-top:-6px">
+        <strong>Zonas + repechaje</strong> — zonas de 2 parejas armadas por ranking, con el cuadro de repechaje del club (5 a 28 parejas). Las zonas no se eliminan: ganadora y perdedora de cada zona siguen caminos distintos.
+      </p>
+      <input type="hidden" id="tFaseGruposFormato" value="cuadro_zonas" />
       <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
       <div class="check-grid" id="tCategoriasForm"></div>
       <div class="row">
@@ -545,6 +546,34 @@
 
   <!-- ADMIN -->
   <section id="view-admin" class="view">
+  <div id="admShell">
+    <!-- Sidebar solo de escritorio (ver style.css, @media min-width:960px) --
+         en mobile queda oculta y admContenido se ve como una única columna,
+         igual que antes de este rediseño. Los clicks disparan las MISMAS
+         funciones/botones que ya manejaban cada sección (mostrarSeccionGestion,
+         btnAdministrarEsteTorneo, admBtnVolverConfigGeneral, etc.) — la sidebar
+         no duplica lógica, solo la dispara y refleja el estado (ver
+         sincronizarAdmSidebar en app.js). -->
+    <nav id="admSidebar" aria-label="Secciones de administración">
+      <div class="adm-side-brand">
+        <span class="mark">N</span>
+        <span>
+          <span class="name">Norte Padel</span>
+          <span class="sub">Panel de administración</span>
+        </span>
+      </div>
+      <button type="button" class="adm-side-item" data-adm-nav="config-general">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Configuración general</span>
+      </button>
+      <button type="button" class="adm-side-item" data-adm-nav="torneo">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v10H4z"/></svg>
+        <span>Torneo en gestión</span>
+      </button>
+      <div id="admSidebarSubnav" style="display:none"></div>
+    </nav>
+
+    <div id="admContenido">
     <div class="card card-accent" id="admSelectorTorneoCard">
       <h2>Torneo en gestión</h2>
       <p class="match-meta" style="margin-bottom:6px">Elegí un torneo para administrar sus inscripciones, parejas, canchas, bloqueos y partidos. La edición de un torneo vive solo acá — la vista pública nunca muestra estas herramientas.</p>
@@ -857,6 +886,8 @@
       </div>
     </div>
     </div>
+    </div><!-- /admContenido -->
+  </div><!-- /admShell -->
   </section>
 
 </main>

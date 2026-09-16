@@ -106,6 +106,7 @@ function cambiarVista(nombre, ruta) {
     document.getElementById("admSelectorTorneoCard").style.display = "block";
     mostrarConfigGeneral(true);
     document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
+    sincronizarAdmSidebar();
   } else if (nombre !== "admin") {
     adminFocoTorneoActivo = false;
   }
@@ -2151,9 +2152,13 @@ function toggleGrupoConfigRow(selectId, rowId) {
   const row = document.getElementById(rowId);
   if (select && row) row.style.display = select.value === "grupos" ? "flex" : "none";
 }
-document.getElementById("tFaseGruposFormato").addEventListener("change", () => toggleGrupoConfigRow("tFaseGruposFormato", "tGrupoConfigRow"));
+// "Crear torneo" ya no tiene selector propio -- el formato del club
+// ("cuadro_zonas") queda fijo en el input oculto tFaseGruposFormato, así que
+// tGrupoConfigRow ("Parejas por grupo"/"Cuántas avanzan") ni existe más ahí.
+// "Editar torneo" sigue con las 3 opciones (no se toca): un torneo ya creado
+// puede seguir usando "grupos"/"eliminación" y cambiarle el formato a mitad
+// de camino podría romper el cuadro ya armado.
 document.getElementById("teFaseGruposFormato").addEventListener("change", () => toggleGrupoConfigRow("teFaseGruposFormato", "teGrupoConfigRow"));
-toggleGrupoConfigRow("tFaseGruposFormato", "tGrupoConfigRow");
 
 document.getElementById("btnCrearTorneo").addEventListener("click", async () => {
   const btn = document.getElementById("btnCrearTorneo");
@@ -2193,9 +2198,10 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
     hora_desde: document.getElementById("tHoraDesde").value || null,
     hora_hasta: document.getElementById("tHoraHasta").value || null,
     horarios_por_dia: leerHorariosPorDiaForm("tHorariosPorDiaForm"),
-    fase_grupos_formato: document.getElementById("tFaseGruposFormato").value,
-    tamano_grupo: Number(document.getElementById("tTamanoGrupo").value) || 3,
-    avanzan_por_grupo: Number(document.getElementById("tAvanzanPorGrupo").value) || 2
+    // único formato del club (ver el cartel fijo en el form) -- tamano_grupo
+    // y avanzan_por_grupo ni se mandan: solo aplican a "grupos" y ya tienen
+    // default en la base (3 y 2) para los torneos viejos que sí lo usan.
+    fase_grupos_formato: document.getElementById("tFaseGruposFormato").value
   };
   const { data, error } = await sb.from("torneos").insert(torneo).select().single();
   if (error) { toast("Error: " + error.message); return; }
@@ -3046,6 +3052,45 @@ function mostrarSeccionGestion(clave) {
     document.getElementById(info.id).style.display = key === clave ? "block" : "none";
   });
   document.getElementById("admGestionSubnav").querySelectorAll(".pill").forEach((btn) => btn.classList.toggle("active", btn.dataset.seccion === clave));
+  sincronizarAdmSidebar();
+}
+
+// ---------- Sidebar de Administración (#admSidebar, solo escritorio) ----------
+// Capa fina de navegación: cada click dispara la MISMA acción/botón de
+// siempre (mostrarSeccionGestion, admBtnVolverConfigGeneral, cargarGestionTorneo)
+// y después se sincroniza para reflejar qué quedó activo — la sidebar no es
+// dueña de ningún estado nuevo, solo lo muestra. En mobile #admSidebar ni se
+// ve (ver style.css), así que esto no cambia nada ahí.
+document.querySelectorAll("#admSidebar > .adm-side-item").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.admNav === "config-general") {
+      document.getElementById("admBtnVolverConfigGeneral").click();
+    } else if (torneoGestionId) {
+      cargarGestionTorneo(torneoGestionId);
+    } else {
+      document.getElementById("admSelectorTorneoCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+});
+
+function sincronizarAdmSidebar() {
+  const sidebar = document.getElementById("admSidebar");
+  if (!sidebar) return;
+  const enGestion = document.getElementById("admGestionTorneoWrap").style.display !== "none";
+  sidebar.querySelectorAll(":scope > .adm-side-item").forEach((btn) => {
+    btn.classList.toggle("active", enGestion ? btn.dataset.admNav === "torneo" : btn.dataset.admNav === "config-general");
+  });
+
+  const subnav = document.getElementById("admSidebarSubnav");
+  if (!enGestion) { subnav.style.display = "none"; subnav.innerHTML = ""; return; }
+  subnav.style.display = "block";
+  subnav.innerHTML = Object.entries(SECCIONES_GESTION)
+    .map(([key, info]) => `<button type="button" class="adm-side-item" data-seccion-gestion="${key}">${info.label}</button>`)
+    .join("");
+  subnav.querySelectorAll("[data-seccion-gestion]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.seccionGestion === seccionGestionActiva);
+    btn.addEventListener("click", () => mostrarSeccionGestion(btn.dataset.seccionGestion));
+  });
 }
 
 async function cargarGestionTorneo(id) {
@@ -3074,6 +3119,7 @@ async function cargarGestionTorneo(id) {
   document.getElementById("admGestionEstado").innerHTML = badgeEstadoTorneo(t);
   cargarPuntosTorneo(t);
   renderAdminGestionSubnav();
+  sincronizarAdmSidebar();
 
   const btnToggleInsc = document.getElementById("btnToggleInscripcion");
   if (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada") {
@@ -4652,6 +4698,7 @@ document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", (
   document.getElementById("admSelectorTorneoCard").style.display = "block";
   mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
+  sincronizarAdmSidebar();
 });
 
 // Atajo pedido por el club: desde "Administrar este torneo" poder cargar/ver

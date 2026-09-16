@@ -1420,3 +1420,65 @@ body.is-admin #btnAdminPanel { display: flex; }
 
   .card { padding: 24px; }
 }
+
+/* ============================================================
+   PANEL DE ADMINISTRACIÓN: sidebar oscura (solo escritorio)
+   Identidad propia del panel (Bodoni Moda + Work Sans, verde lícida),
+   separada a propósito de Playfair/Manrope del resto del sitio -- ver
+   #admShell en index.html y sincronizarAdmSidebar() en app.js. En mobile
+   este bloque entero no aplica: #admSidebar queda oculta (regla base,
+   FUERA del media query) y admContenido se ve exactamente como antes,
+   en una sola columna.
+   ============================================================ */
+#admSidebar { display: none; }
+
+@media (min-width: 960px) {
+  /* el panel admin necesita más aire que el resto del sitio (sidebar +
+     contenido con formularios largos) -- se ensancha SOLO cuando view-admin
+     es la vista activa, sin tocar el ancho de ninguna otra pantalla. */
+  .app-body:has(#view-admin.active) { max-width: 1360px; }
+
+  #view-admin.view.active { display: block; }
+  #admShell { display: flex; align-items: flex-start; gap: 0; }
+
+  #admSidebar {
+    width: 232px; flex: none;
+    background: #0a1410; color: #f3f6f2;
+    display: flex; flex-direction: column; padding: 24px 0;
+    position: sticky; top: calc(var(--topbar-h) + var(--navbar-h) + 20px);
+    max-height: calc(100vh - var(--topbar-h) - var(--navbar-h) - 40px);
+    overflow-y: auto;
+    font-family: "Work Sans", system-ui, -apple-system, sans-serif;
+    border-radius: var(--radius-lg);
+  }
+  #admSidebar .adm-side-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 24px 22px; border-bottom: 1px solid rgba(243,246,242,.1); margin-bottom: 10px;
+  }
+  #admSidebar .adm-side-brand .mark {
+    width: 34px; height: 34px; background: #B9FF3D; color: #05100b;
+    display: flex; align-items: center; justify-content: center; flex: none;
+    font-family: "Bodoni Moda", Georgia, serif; font-weight: 900; font-size: 16px;
+  }
+  #admSidebar .adm-side-brand .name { display: block; font-size: 14px; font-weight: 700; font-family: "Bodoni Moda", Georgia, serif; }
+  #admSidebar .adm-side-brand .sub { display: block; font-size: 10.5px; color: #6e8177; }
+
+  .adm-side-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 11px 24px; font-size: 13.5px; font-family: inherit;
+    color: #9db3a6; background: none; border: none; border-left: 3px solid transparent;
+    text-align: left; cursor: pointer;
+  }
+  .adm-side-item svg { flex: none; }
+  .adm-side-item:hover { color: #f3f6f2; }
+  .adm-side-item.active { color: #f3f6f2; background: rgba(185,255,61,.08); border-left-color: #B9FF3D; font-weight: 600; }
+
+  /* sub-secciones de "Torneo en gestión" (Resumen/Partidos/Inscripciones/
+     Configuración -- las mismas 4 de siempre, ver SECCIONES_GESTION en
+     app.js), anidadas visualmente debajo de ese ítem cuando hay un torneo
+     cargado (sincronizarAdmSidebar las muestra/oculta). */
+  #admSidebarSubnav .adm-side-item { padding-left: 48px; font-size: 12.5px; }
+
+  #admContenido { flex: 1; min-width: 0; padding: 0 0 0 36px; }
+  #admContenido h1, #admContenido h2, #admContenido h3 { font-family: "Bodoni Moda", Georgia, serif; }
+}
