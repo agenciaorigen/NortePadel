@@ -594,6 +594,7 @@ async function manejarCambioSesion(session) {
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
   calcularTorneoDestacado();
   cargarHeroPosicion();
+  cargarMisUltimosPartidos();
   if (torneoActualId) refrescarDetalleTorneo();
   if (FEATURE_JUGAR_HABILITADA) renderJugar();
 
@@ -1025,12 +1026,33 @@ async function cargarCampeones() {
         <span class="campeon-nombre-link" data-jugador-id="${c.jugador1_id}">${escapeHtml(c.jugador1_nombre)} ${escapeHtml(c.jugador1_apellido)}</span> /
         <span class="campeon-nombre-link" data-jugador-id="${c.jugador2_id}">${escapeHtml(c.jugador2_nombre)} ${escapeHtml(c.jugador2_apellido)}</span>
       </div>
-      <div class="campeon-torneo">${iconoTrofeo()} ${c.torneo_nombre}</div>
+      <div class="campeon-torneo">${iconoTrofeo()} ${escapeHtml(c.torneo_nombre)}${c.categoria ? " · " + escapeHtml(c.categoria) : ""}</div>
     </div>
   `).join("");
 
   document.querySelectorAll("#campeonesContenido .campeon-nombre-link").forEach((el) => {
     el.addEventListener("click", () => abrirPerfilJugador(el.dataset.jugadorId));
+  });
+}
+
+// "Tus últimos partidos": solo con sesión iniciada (miJugador). Reutiliza la
+// misma tarjeta que ya usan Resultados/Llave (llavePartidoCardHtml) — acá
+// arriba de cada una hace falta indicar de qué torneo/categoría es, porque a
+// diferencia de esas vistas estos partidos pueden ser de torneos distintos.
+async function cargarMisUltimosPartidos() {
+  const wrap = document.getElementById("inicioMisPartidosWrap");
+  if (!miJugador) { wrap.style.display = "none"; return; }
+  const { data } = await sb.rpc("mis_ultimos_partidos_publico", { p_jugador_id: miJugador.id });
+  if (!data || data.length === 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  document.getElementById("inicioMisPartidosGrid").innerHTML = data.map((p) => `
+    <div>
+      <div class="match-meta meta-caption">${escapeHtml(p.torneo_nombre)}${p.categoria ? " · " + escapeHtml(p.categoria) : ""}</div>
+      ${llavePartidoCardHtml(p)}
+    </div>
+  `).join("");
+  document.querySelectorAll("#inicioMisPartidosGrid [data-abrir-partido]").forEach((el) => {
+    el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
 }
 
@@ -4435,7 +4457,14 @@ function wireCargaResultado(cont) {
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
       cargarRanking();
-      if (btn.dataset.ronda === "Final") cargarCampeones();
+      if (btn.dataset.ronda === "Final") {
+        // el campeón de esta categoría se define acá mismo -- no debería hacer
+        // falta volver a apretar "Generar siguiente fase" para que el torneo
+        // deje de figurar "en curso" (ver actualizarEstadoTorneoPorFases)
+        await sb.from("torneo_categorias").update({ estado_fase: "finalizada" }).eq("torneo_id", partidoActualizado.torneo_id).eq("categoria", partidoActualizado.categoria);
+        await actualizarEstadoTorneoPorFases(partidoActualizado.torneo_id);
+        cargarCampeones();
+      }
       } finally {
         btn.disabled = false;
       }
@@ -4718,18 +4747,27 @@ function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
 
   const contLista = document.getElementById("admPartidosLista");
   const contLlave = document.getElementById("admPartidosLlave");
+  const contTabla = document.getElementById("admPartidosTabla");
+  contLista.style.display = "none";
+  contLlave.style.display = "none";
+  contTabla.style.display = "none";
   if (vistaPartidosAdmin === "llave") {
-    contLista.style.display = "none";
     contLlave.style.display = "block";
-    // la llave agrupa por fase/zona -- mezclar categorías distintas en un
-    // mismo cuadro no tiene sentido, así que acá sí hace falta elegir una.
+    // la llave (y la tabla, más abajo) agrupan por fase/zona -- mezclar
+    // categorías distintas en un mismo cuadro no tiene sentido, así que acá sí
+    // hace falta elegir una.
     contLlave.innerHTML = partidosCategoriaFiltro
       ? ""
       : '<p class="empty">Elegí una categoría arriba para ver su llave.</p>';
     if (partidosCategoriaFiltro) renderPartidosLlave("admPartidosLlave", visibles);
+  } else if (vistaPartidosAdmin === "tabla") {
+    contTabla.style.display = "block";
+    contTabla.innerHTML = partidosCategoriaFiltro
+      ? ""
+      : '<p class="empty">Elegí una categoría arriba para ver su tabla.</p>';
+    if (partidosCategoriaFiltro) renderPartidosTabla("admPartidosTabla", visibles, canchasTorneo, ultimasParejasGestion);
   } else {
     contLista.style.display = "block";
-    contLlave.style.display = "none";
     if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", visibles, canchasTorneo, true);
     else renderPartidosLista("admPartidosLista", visibles, canchasTorneo, true, ultimasParejasGestion);
   }
@@ -4857,6 +4895,18 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
     return;
   }
 
+  wireAccionesPartidoAdmin(cont);
+}
+
+// Engancha TODAS las acciones de edición de un partido dentro de `cont`: cargar/
+// corregir resultado (wireCargaResultado), reasignar cancha, cambiar horario y
+// cambiar parejas. Vive aparte de renderPartidosLista para que la vista Tabla
+// (renderPartidosTabla) pueda reusar exactamente el mismo comportamiento y
+// validaciones en vez de duplicarlas — un solo lugar donde arreglar un bug o
+// agregar una validación nueva. Todo acá adentro lee sus datos de ids en el DOM
+// (data-p) y de los globales ya cargados (ultimosPartidosGestion, torneoGestionData,
+// etc.), así que no hace falta pasarle más que el contenedor.
+function wireAccionesPartidoAdmin(cont) {
   // sets-entry (Set 3 condicional) + guardado de resultado: lógica compartida
   // con la tarjeta pública de la vista Llave, ver wireCargaResultado.
   wireCargaResultado(cont);
@@ -4969,6 +5019,122 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       }
     });
   });
+}
+
+// vista "tabla": el cuadro de zonas como planilla real — una fila por cruce
+// (Z1, Z2, Octavos 1...) con pareja 1/2, resultado, ganadora, cancha/horario y
+// un ✏️ que despliega debajo el mismo editor que ya usa la Lista (cargar
+// resultado, reasignar cancha, cambiar horario, cambiar parejas — ver
+// wireAccionesPartidoAdmin). No es un cuadro nuevo: son los mismos partidos de
+// siempre mostrados como tabla en vez de tarjetas, así que cualquier cambio acá
+// (incluida la propagación automática a la fase siguiente) es exactamente el
+// mismo que ya corre en Lista/Llave — no hay una segunda fuente de verdad.
+function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo) {
+  const cont = document.getElementById(containerId);
+  if (partidos.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay partidos armados.</p>';
+    return;
+  }
+  const ORDEN_FASES_TABLA = ["Zona", "Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
+  const rondaDe = (p) => (p.ronda === "Fase de grupos" || !p.ronda ? "Zona" : p.ronda);
+  const numeroDe = (p) => Number((p.slot_cuadro || "").slice(1)) || p.grupo || 0;
+  const ordenados = [...partidos].sort((a, b) => {
+    const ia = ORDEN_FASES_TABLA.indexOf(rondaDe(a)), ib = ORDEN_FASES_TABLA.indexOf(rondaDe(b));
+    if (ia !== ib) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    return numeroDe(a) - numeroDe(b);
+  });
+
+  const filaHtml = (p) => {
+    const ganador = p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+    const sets = p.sets || [];
+    const resultado = sets.length ? sets.map((s) => `${s.p1}-${s.p2}`).join(", ") : "—";
+    const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "sin horario";
+    const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : "sin cancha";
+    const slot = p.slot_cuadro || (p.grupo ? `G${p.grupo}` : "—");
+    const nombreGanadora = ganador === 1 ? p.pareja1_nombre : ganador === 2 ? p.pareja2_nombre : null;
+    return `
+      <tr class="tabla-cuadro-fila">
+        <td class="tabla-cuadro-slot">${escapeHtml(slot)}</td>
+        <td><span class="badge orange">${escapeHtml(rondaDe(p))}</span></td>
+        <td class="${ganador === 1 ? "tabla-cuadro-ganadora" : ""}">${escapeHtml(p.pareja1_nombre || "—")}</td>
+        <td class="${ganador === 2 ? "tabla-cuadro-ganadora" : ""}">${escapeHtml(p.pareja2_nombre || "—")}</td>
+        <td>${escapeHtml(resultado)}</td>
+        <td class="tabla-cuadro-ganadora">${nombreGanadora ? escapeHtml(nombreGanadora) : "—"}</td>
+        <td class="tabla-cuadro-meta">${escapeHtml(local)} · ${escapeHtml(horario)}</td>
+        <td><button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${p.id}" title="Editar" aria-label="Editar ${escapeHtml(slot)}">✏️</button></td>
+      </tr>
+      <tr class="tabla-cuadro-editrow" data-fila-edicion="${p.id}" style="display:none">
+        <td colspan="8">
+          ${cargaResultadoPanelHtml(p)}
+          <div class="match-admin-panel" draggable="false">
+            <div class="match-actions">
+              <select class="selectReasignar" data-p="${p.id}">
+                ${[...canchasTorneo].sort((a, b) => compararCanchas(a.canchas, b.canchas)).map((c) => {
+                  const complejo = cacheComplejos.find((x) => x.id === c.canchas?.complejo_id);
+                  return `<option value="${c.canchas?.id}" ${c.canchas?.id === p.cancha_id ? "selected" : ""}>${complejo ? complejo.nombre + " · " : ""}${c.canchas?.nombre}</option>`;
+                }).join("")}
+              </select>
+              <button class="secondary small btnReasignarCancha" data-p="${p.id}">Cambiar cancha</button>
+            </div>
+            <div class="match-actions">
+              <input type="datetime-local" class="inputHorario" data-p="${p.id}" value="${toDatetimeLocalValue(p.horario)}" style="flex:1" />
+              <button class="secondary small btnCambiarHorario" data-p="${p.id}">${p.horario ? "Cambiar horario" : "Asignar horario"}</button>
+            </div>
+            ${parejasTorneo.length ? `
+            <div class="match-actions">
+              <select class="selectCambiarPareja1" data-p="${p.id}">
+                ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja1_id ? "selected" : ""}>${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
+              </select>
+              <select class="selectCambiarPareja2" data-p="${p.id}">
+                ${parejasTorneo.filter((pj) => pj.categoria === p.categoria).map((pj) => `<option value="${pj.id}" ${pj.id === p.pareja2_id ? "selected" : ""}>${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
+              </select>
+              <button class="secondary small btnCambiarParejas" data-p="${p.id}">Cambiar parejas</button>
+            </div>` : ""}
+          </div>
+        </td>
+      </tr>`;
+  };
+
+  // Filas proyectadas: rondas del cuadro del club que todavía no se armaron
+  // como partido real (falta que se jueguen las zonas u otras rondas previas)
+  // pero que ya se sabe, por la plantilla, quién entraría a cada cruce — ej.
+  // "Octavos 1: Ganador Z1 vs Perdedor Z7". Solo aplica al formato del club
+  // (cuadro_zonas); no son editables porque todavía no existen como partido.
+  const nZonas = partidos.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === "Z").length;
+  const slotsYaArmados = new Set(partidos.map((p) => p.slot_cuadro).filter(Boolean));
+  const proyectadas = nZonas
+    ? proyeccionCuadroCompleto(nZonas).filter((f) => !slotsYaArmados.has(f.slot))
+    : [];
+  const filaProyectadaHtml = (f) => `
+    <tr class="tabla-cuadro-fila tabla-cuadro-proyectada">
+      <td class="tabla-cuadro-slot">${escapeHtml(f.slot)}</td>
+      <td><span class="badge orange">${escapeHtml(RONDA_DISPLAY_CUADRO[f.ronda] || f.ronda)}</span></td>
+      <td>${escapeHtml(refLabelCuadro(f.refA))}</td>
+      <td>${escapeHtml(refLabelCuadro(f.refB))}</td>
+      <td>—</td>
+      <td>—</td>
+      <td class="tabla-cuadro-meta">a definir</td>
+      <td></td>
+    </tr>`;
+
+  cont.innerHTML = `
+    <div class="tabla-cuadro-scroll">
+      <table class="tabla-cuadro">
+        <thead><tr><th>Slot</th><th>Ronda</th><th>Pareja 1</th><th>Pareja 2</th><th>Resultado</th><th>Ganadora</th><th>Cancha · horario</th><th></th></tr></thead>
+        <tbody>${ordenados.map(filaHtml).join("")}${proyectadas.map(filaProyectadaHtml).join("")}</tbody>
+      </table>
+    </div>`;
+
+  // el ✏️ de esta vista despliega la fila entera de edición (no el mini-panel
+  // interno de wireCargaResultado, que acá se muestra siempre abierto una vez
+  // desplegada la fila) — por eso usa su propia clase y no .btnTogglePartidoAdmin.
+  cont.querySelectorAll(".tabla-cuadro-editbtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const fila = cont.querySelector(`[data-fila-edicion="${btn.dataset.toggleFila}"]`);
+      if (fila) fila.style.display = fila.style.display === "none" ? "table-row" : "none";
+    });
+  });
+  wireAccionesPartidoAdmin(cont);
 }
 
 // ============================================================

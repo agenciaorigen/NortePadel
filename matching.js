@@ -364,6 +364,33 @@ const PLANTILLAS_CUADRO = {
   }
 };
 
+// Traduce una referencia de plantilla ("GZ3", "PO2") a texto para mostrar
+// ("Ganador Z3", "Perdedor O2") -- se usa para proyectar en la tabla quién
+// entraría en un cruce que todavía no se armó como partido real (ver
+// proyeccionCuadroCompleto, más abajo).
+function refLabelCuadro(ref) {
+  return (ref[0] === "G" ? "Ganador " : "Perdedor ") + ref.slice(1);
+}
+
+// Aplana la plantilla de un tamaño de cuadro en la lista completa de cruces
+// de repechaje/eliminación (todo menos Zona, que ya se arma con parejas
+// reales apenas se conocen las parejas de la categoría) — permite mostrar en
+// la tabla, ni bien se arman las zonas, la pinta completa del cuadro ("Octavos
+// 1: Ganador Z1 vs Perdedor Z7") aunque esas rondas todavía no se jugaron ni
+// se armaron como partido real.
+function proyeccionCuadroCompleto(nZonas) {
+  const plantilla = PLANTILLAS_CUADRO[nZonas];
+  if (!plantilla) return [];
+  const filas = [];
+  Object.keys(plantilla).forEach((nombreRonda) => {
+    const prefijo = nombreRonda[0]; // D, O, C o S
+    plantilla[nombreRonda].forEach(([refA, refB], i) => {
+      filas.push({ ronda: nombreRonda, slot: prefijo + (i + 1), refA, refB });
+    });
+  });
+  return filas;
+}
+
 // Arma las zonas (de a 2 parejas) según el ranking: la pareja mejor rankeada
 // va como cabeza de serie de la zona 1, la segunda mejor de la zona 2, etc.
 // (la "ventaja" que pidió el club de estar en una zona de número bajo), y a

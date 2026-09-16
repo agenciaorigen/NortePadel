@@ -1075,6 +1075,31 @@ nav.tabbar .icon { position: relative; }
   text-transform: uppercase; letter-spacing: .06em;
 }
 
+/* Partidos → vista Tabla: el cuadro entero (Z1, Z2, Octavos 1...) como
+   planilla real en vez de tarjetas — pedido explícito del club para poder ver
+   y tocar cualquier cruce sin tener que abrir uno por uno. El scroll horizontal
+   propio evita que una tabla ancha empuje el resto de la página (ver .card). */
+.tabla-cuadro-scroll { overflow-x: auto; margin-top: 4px; }
+.tabla-cuadro { min-width: 720px; font-size: 13px; }
+.tabla-cuadro th { white-space: nowrap; }
+.tabla-cuadro td { vertical-align: middle; }
+.tabla-cuadro tbody tr:first-child td { font-weight: 400; } /* pisa la regla global "primera fila en negrita" pensada para rankings */
+.tabla-cuadro-fila:hover { background: rgba(var(--accent-bright-rgb),.05); }
+.tabla-cuadro-slot { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.tabla-cuadro-ganadora { color: var(--state-ok); font-weight: 700; }
+.tabla-cuadro-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tabla-cuadro-editbtn {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px;
+}
+.tabla-cuadro-editrow td { background: var(--bg-elev); padding: 14px; }
+/* filas proyectadas (cruce que todavía no se armó como partido real, ver
+   proyeccionCuadroCompleto en matching.js): mismo look, atenuado, para que
+   se note de un vistazo que es una proyección y no un partido de verdad */
+.tabla-cuadro-proyectada td { color: var(--muted); font-style: italic; }
+.tabla-cuadro-proyectada .badge { opacity: .6; }
+
 /* tarjeta "Partidos" (Lista / Calendario / Llave) con fondo tipo póster */
 .card.partidos-poster {
   position: relative;

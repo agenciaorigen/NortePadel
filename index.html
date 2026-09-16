@@ -132,6 +132,13 @@
       </div>
     </div>
 
+    <!-- Solo si hay sesión iniciada (ver cargarMisUltimosPartidos en app.js) --
+         reutiliza la misma tarjeta de partido que "Últimos resultados"/Llave. -->
+    <div class="seccion" id="inicioMisPartidosWrap" style="display:none">
+      <h3>Tus últimos partidos</h3>
+      <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
+    </div>
+
     <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
       <div class="marquee-track" aria-hidden="true">
         <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
@@ -722,9 +729,11 @@
           <button class="pill active" data-vista="lista">Lista</button>
           <button class="pill" data-vista="planilla">Planilla (arrastrar y soltar — solo PC)</button>
           <button class="pill" data-vista="llave">Llave</button>
+          <button class="pill" data-vista="tabla">Tabla</button>
         </div>
         <div id="admPartidosLista"></div>
         <div id="admPartidosLlave" style="display:none"></div>
+        <div id="admPartidosTabla" style="display:none"></div>
       </div>
     </div>
 
