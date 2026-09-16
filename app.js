@@ -1499,7 +1499,20 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   const sinPareja = inscBase.filter((i) => !enPareja.has(i.jugador_id));
 
   const contParejas = document.getElementById(contParejasId);
-  contParejas.innerHTML = parejasBase.map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>';
+  // Panel del admin: las que todavía no tienen el pago de los DOS
+  // confirmado van primero -- son las que hay que perseguir, no algo que
+  // haya que encontrar scrolleando (pedido del club tras pagos tardíos).
+  // Reusa jugador1_pago/jugador2_pago, que ya existían en el HTML de cada
+  // fila (parejaRowHtml) pero venían siempre en blanco por un bug de la
+  // función de Supabase (ver fix_pago_en_parejas_publicas.sql).
+  const parejasOrdenadas = editable
+    ? [...parejasBase].sort((a, b) => (a.jugador1_pago && a.jugador2_pago ? 1 : 0) - (b.jugador1_pago && b.jugador2_pago ? 1 : 0))
+    : parejasBase;
+  const pagas = editable ? parejasBase.filter((p) => p.jugador1_pago && p.jugador2_pago).length : 0;
+  const resumenPagoHtml = editable && parejasBase.length
+    ? `<p class="match-meta" style="margin-bottom:8px">💳 ${pagas} de ${parejasBase.length} parejas con el pago confirmado${pagas < parejasBase.length ? " — las que faltan no entran al fixture hasta confirmarlas" : ""}.</p>`
+    : "";
+  contParejas.innerHTML = resumenPagoHtml + (parejasOrdenadas.map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
   if (editable) {
     contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -3928,8 +3941,23 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id));
   if (parejasSinPartido.length < 2) { toast("Todas las parejas ya tienen un partido de fase de grupos asignado"); return; }
 
+  // Solo entran al cuadro las parejas con el pago de LOS DOS jugadores
+  // confirmado (✅ en "Inscripciones y parejas") -- pedido del club después
+  // de que en el último torneo entrara gente que terminó pagando tarde. Las
+  // que faltan quedan afuera del fixture (avisadas, no perdidas): en cuanto
+  // se les confirme el pago, el próximo click de este botón las suma solas,
+  // sin tocar nada de lo ya armado.
+  const parejasPendientesPago = parejasSinPartido.filter((p) => !(p.jugador1_pago && p.jugador2_pago));
+  const parejasListas = parejasSinPartido.filter((p) => p.jugador1_pago && p.jugador2_pago);
+  if (parejasListas.length < 2) {
+    toast(parejasPendientesPago.length
+      ? `Ninguna pareja tiene el pago de los dos confirmado todavía (${parejasPendientesPago.length} pendiente${parejasPendientesPago.length === 1 ? "" : "s"}) — confirmalo en "Inscripciones y parejas" antes de armar el fixture.`
+      : "Armá primero al menos 2 parejas");
+    return;
+  }
+
   const { data: torneo } = await sb.from("torneos").select("*").eq("id", torneoGestionId).single();
-  const grupos = agruparPorCategoria(parejasSinPartido);
+  const grupos = agruparPorCategoria(parejasListas);
   const formatoGrupos = torneo.fase_grupos_formato === "grupos";
   let totalGenerados = 0;
   for (const categoria of Object.keys(grupos)) {
@@ -3947,7 +3975,7 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
     totalGenerados += generados;
   }
 
-  toast(`Se armó el fixture: ${totalGenerados} partidos (todavía sin cancha ni horario). Ahora usá "Generar calendario".`);
+  toast(`Se armó el fixture: ${totalGenerados} partidos (todavía sin cancha ni horario)${parejasPendientesPago.length ? ` — quedaron ${parejasPendientesPago.length} pareja(s) afuera por pago pendiente` : ""}. Ahora usá "Generar calendario".`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
   } finally {
