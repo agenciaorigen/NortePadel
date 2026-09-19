@@ -726,12 +726,37 @@ function descargarCanvas(canvas, nombreArchivo) {
   }
 }
 
-function fondoImagenExport(ctx, w, h) {
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "#132a20");
-  grad.addColorStop(1, "#05080A");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+// Recorta y dibuja "cover" (llena el rectángulo sin deformar la foto,
+// recortando el sobrante) -- mismo criterio que ya usa el círculo del
+// campeón con su propia foto, generalizado para pintar el fondo entero.
+function dibujarImagenCover(ctx, img, x, y, w, h) {
+  const escala = Math.max(w / img.width, h / img.height);
+  const anchoRecorte = w / escala, altoRecorte = h / escala;
+  const sx = (img.width - anchoRecorte) / 2, sy = (img.height - altoRecorte) / 2;
+  ctx.drawImage(img, sx, sy, anchoRecorte, altoRecorte, x, y, w, h);
+}
+
+// fotoFondo (opcional): foto real de cancha/pelota ya cargada con
+// cargarImagenParaCanvas. Se oscurece con un degradé para que el título y la
+// lista se sigan leyendo bien encima. Sin foto, queda el degradé liso de
+// siempre (fallback si algún día no está disponible el archivo).
+function fondoImagenExport(ctx, w, h, fotoFondo) {
+  if (fotoFondo) {
+    dibujarImagenCover(ctx, fotoFondo, 0, 0, w, h);
+    const oscuro = ctx.createLinearGradient(0, 0, 0, h);
+    oscuro.addColorStop(0, "rgba(5,8,10,.88)");
+    oscuro.addColorStop(0.22, "rgba(5,8,10,.5)");
+    oscuro.addColorStop(0.6, "rgba(5,8,10,.7)");
+    oscuro.addColorStop(1, "rgba(5,8,10,.92)");
+    ctx.fillStyle = oscuro;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "#132a20");
+    grad.addColorStop(1, "#05080A");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
   const brillo = ctx.createRadialGradient(w / 2, 0, 0, w / 2, 0, w);
   brillo.addColorStop(0, "rgba(111,224,138,.22)");
   brillo.addColorStop(1, "rgba(111,224,138,0)");
@@ -783,7 +808,8 @@ async function exportarRankingTop20() {
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
-  fondoImagenExport(ctx, W, H);
+  const fondo = await cargarImagenParaCanvas("ranking-bg-top20.jpg");
+  fondoImagenExport(ctx, W, H, fondo);
   encabezadoImagenExport(ctx, W, categoria, "🏆 TOP 20 · RANKING");
 
   const inicioLista = 360;
@@ -793,7 +819,7 @@ async function exportarRankingTop20() {
     const y = inicioLista + idx * altoFila;
     const posicion = idx + 1;
     if (idx % 2 === 0) {
-      ctx.fillStyle = "rgba(255,255,255,.035)";
+      ctx.fillStyle = "rgba(255,255,255,.07)";
       ctx.fillRect(60, y, W - 120, altoFila - 6);
     }
     ctx.textAlign = "left";
@@ -813,9 +839,9 @@ async function exportarRankingTop20() {
   descargarCanvas(canvas, `ranking-${categoria.replace(/\s+/g, "-").toLowerCase()}-top20.png`);
 }
 
-function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, W, H) {
+function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) {
   ctx.clearRect(0, 0, W, H);
-  fondoImagenExport(ctx, W, H);
+  fondoImagenExport(ctx, W, H, fotoFondo);
   encabezadoImagenExport(ctx, W, categoria, "🏆 CAMPEÓN DE LA CATEGORÍA");
 
   const cx = W / 2, cy = 640, radio = 260;
@@ -866,14 +892,19 @@ async function exportarRankingCampeon() {
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
-  const foto = await cargarImagenParaCanvas(campeon.foto_url);
-  dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, W, H);
+  const [foto, fondo] = await Promise.all([
+    cargarImagenParaCanvas(campeon.foto_url),
+    cargarImagenParaCanvas("ranking-bg-campeon.jpg")
+  ]);
+  dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fondo, W, H);
   const nombreArchivo = `campeon-${categoria.replace(/\s+/g, "-").toLowerCase()}.png`;
   const ok = descargarCanvas(canvas, nombreArchivo);
   if (!ok && foto) {
     // canvas "manchado" pese al crossOrigin (CORS raro del hosting de la foto):
-    // se reintenta directamente sin foto en vez de dejar al usuario sin nada.
-    dibujarCampeonEnCanvas(ctx, campeon, categoria, null, W, H);
+    // se reintenta directamente sin foto de jugador en vez de dejar al usuario
+    // sin nada (el fondo de cancha, al ser un archivo propio del sitio, no
+    // tiene este problema).
+    dibujarCampeonEnCanvas(ctx, campeon, categoria, null, fondo, W, H);
     descargarCanvas(canvas, nombreArchivo);
     toast("Se exportó sin la foto (no se pudo leer por permisos de imagen)");
   }
@@ -1049,6 +1080,18 @@ async function cargarMejoresPorCategoria() {
   renderMejoresPorCategoria();
 }
 
+// Cuántas tarjetas entran por página: no un 2 fijo (en desktop, con el ancho
+// completo, quedaban solo 2 tarjetas angostas y mucho hueco vacío a los
+// costados) -- se calcula según el ancho real disponible, con ~230px por
+// tarjeta como medida cómoda para que la foto de fondo no quede ni muy
+// chica ni muy estirada. Nunca menos de 2 (así queda igual que antes en
+// mobile) ni más de 6 (para no volver las tarjetas ilegibles de angostas).
+function tarjetasPorPagina(anchoDisponible) {
+  const ANCHO_TARJETA = 230, GAP = 10;
+  const cantidad = Math.floor((anchoDisponible + GAP) / (ANCHO_TARJETA + GAP));
+  return Math.max(2, Math.min(6, cantidad || 2));
+}
+
 function renderMejoresPorCategoria() {
   const mejores = cacheMejoresCategoria;
   const banda = document.getElementById("mejoresCategoriaCard");
@@ -1070,10 +1113,16 @@ function renderMejoresPorCategoria() {
         </div>
       </div>`;
   };
-  const paginas = [];
-  for (let i = 0; i < mejores.length; i += 2) paginas.push(mejores.slice(i, i + 2));
   const track = document.getElementById("mejoresCategoriaTrack");
-  track.innerHTML = paginas.map((pag) => `<div class="destacados-grid">${pag.map(tarjetaHtml).join("")}</div>`).join("");
+  const porPagina = tarjetasPorPagina(track.clientWidth);
+  // mismo número de columnas en todas las páginas (así las tarjetas no cambian
+  // de ancho entre una página llena y la última, que puede venir incompleta);
+  // si hay menos categorías que "porPagina", se achica a esa cantidad para no
+  // dejar una sola página con columnas vacías forzadas.
+  const columnas = Math.min(porPagina, mejores.length);
+  const paginas = [];
+  for (let i = 0; i < mejores.length; i += porPagina) paginas.push(mejores.slice(i, i + porPagina));
+  track.innerHTML = paginas.map((pag) => `<div class="destacados-grid" style="grid-template-columns:repeat(${columnas},1fr)">${pag.map(tarjetaHtml).join("")}</div>`).join("");
 
   track.querySelectorAll(".destacado-card[data-jugador-id]").forEach((card) => {
     card.addEventListener("click", () => abrirPerfilJugador(card.dataset.jugadorId));
@@ -5756,7 +5805,11 @@ document.getElementById("campeonesContenido")?.addEventListener("scroll", () => 
 document.getElementById("mejoresCategoriaTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosScroll("mejoresCategoriaTrack", "mejoresCategoriaDots")));
 window.addEventListener("resize", () => requestAnimationFrame(() => {
   actualizarPuntosScroll("campeonesContenido", "campeonesDots");
-  actualizarPuntosScroll("mejoresCategoriaTrack", "mejoresCategoriaDots");
+  // acá se re-renderiza entero (no solo los puntos): a diferencia de Campeones,
+  // la cantidad de tarjetas por página de "Mejores de cada categoría" depende
+  // del ancho disponible (ver tarjetasPorPagina), así que un cambio de ancho
+  // (rotar el celular, achicar la ventana) puede cambiar cuántas entran.
+  renderMejoresPorCategoria();
 }));
 
 async function cargarSponsorsTorneo() {

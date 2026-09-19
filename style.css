@@ -1385,11 +1385,11 @@ body.is-admin #btnAdminPanel { display: flex; }
   .match-pair-destacado .match-meta { margin-top: 18px; padding-top: 16px; }
 
   .destacados-band { padding: 24px 26px 28px; }
-  /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
-     foto de fondo (background-size:cover) termina agrandada/recortada de más
-     -- se limita el ancho del carrusel para que la proporción se mantenga
-     parecida a la del celular. */
-  .destacados-track { max-width: 620px; margin: 0 auto; }
+  /* antes esto tenía un max-width fijo de 620px (pensado para 2 tarjetas) y en
+     pantallas anchas dejaba mucho hueco vacío a los costados -- ahora la
+     cantidad de tarjetas por página se calcula sola según el ancho real (ver
+     tarjetasPorPagina en app.js), así que el carrusel usa todo el ancho de la
+     banda en vez de un tope fijo. */
   .destacado-card { min-height: 240px; padding: 20px; }
   .destacado-stat strong { font-size: 34px; }
   .destacado-info strong { font-size: 21px; }
