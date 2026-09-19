@@ -541,8 +541,15 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   color: var(--muted);
   margin: 0 0 14px;
 }
-.destacados-grid {
+/* carrusel horizontal (scroll-snap) de a 2 categorías por página -- cada
+   .destacados-grid es una página del carrusel de #mejoresCategoriaTrack */
+.destacados-track {
   position: relative; z-index: 1;
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+}
+.destacados-track::-webkit-scrollbar { display: none; }
+.destacados-grid {
+  flex: 0 0 100%; scroll-snap-align: start;
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
 }
 
@@ -570,10 +577,6 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 }
 .destacado-card.vacio::before { content: none; }
 .destacado-card.vacio .destacado-icono { font-size: 26px; margin-bottom: 6px; opacity: .8; }
-/* jugador del mes: ahora es siempre 1 sola tarjeta que rota (Jugador/Jugadora
-   por día), en mobile y escritorio -- 1 sola columna en vez de las 2 de
-   siempre con un hueco vacío al lado (ver renderJugadorDelMes en app.js) */
-.destacados-grid.destacados-grid-banner { grid-template-columns: 1fr; }
 .destacado-tag {
   position: relative; z-index: 1; align-self: flex-start;
   background: rgba(21,24,24,.8);
@@ -1384,27 +1387,12 @@ body.is-admin #btnAdminPanel { display: flex; }
   .destacados-band { padding: 24px 26px 28px; }
   /* en pantallas anchas el contenedor le da mucho ancho a cada tarjeta y la
      foto de fondo (background-size:cover) termina agrandada/recortada de más
-     -- se limita el ancho de la grilla para que la proporción se mantenga
+     -- se limita el ancho del carrusel para que la proporción se mantenga
      parecida a la del celular. */
-  .destacados-grid { max-width: 620px; }
+  .destacados-track { max-width: 620px; margin: 0 auto; }
   .destacado-card { min-height: 240px; padding: 20px; }
   .destacado-stat strong { font-size: 34px; }
   .destacado-info strong { font-size: 21px; }
-
-  /* banner único de jugador del mes (ver renderJugadorDelMes en app.js):
-     misma tarjeta .destacado-card de siempre, en una sola columna ancha
-     (grid-template-columns ya es 1fr siempre, ver regla base). */
-  .destacados-grid.destacados-grid-banner { max-width: none; }
-  .destacados-grid-banner .destacado-card {
-    /* banner ancho y bajo: con background-position:center (regla base) la
-       foto quedaba recortada justo por la cabeza -- acá se sube el foco a
-       la parte superior de la imagen (donde suele estar la cara) y se le
-       da más alto a la tarjeta para que el recorte sea menos agresivo */
-    min-height: 280px; background-position: center 15%;
-    flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 26px;
-  }
-  .destacados-grid-banner .destacado-stat strong { font-size: 44px; }
-  .destacados-grid-banner .destacado-info strong { font-size: 26px; }
 
   .pj-stats strong { font-size: clamp(26px, 2.4vw, 40px); }
 

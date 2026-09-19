@@ -529,7 +529,7 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
   cargarRanking();
-  cargarJugadorDelMes();
+  cargarMejoresPorCategoria();
   if (torneoActualId) renderInscribirme();
   } finally {
     btn.disabled = false;
@@ -627,6 +627,7 @@ async function cargarRanking() {
     cont.innerHTML = "";
     document.querySelector("#tablaRanking tbody").innerHTML = "";
     document.getElementById("rankingVacio").style.display = "block";
+    ultimoRankingExport = null;
     return;
   }
 
@@ -667,6 +668,7 @@ async function cargarRanking() {
 
   const completa = todos.filter((j) => j.categoria === categoriaRankingActual)
     .sort((a, b) => b.puntos_ranking - a.puntos_ranking);
+  ultimoRankingExport = { categoria: categoriaRankingActual, lista: completa };
 
   const tbody = document.querySelector("#tablaRanking tbody");
   tbody.innerHTML = "";
@@ -696,6 +698,189 @@ async function cargarRanking() {
     tbody.appendChild(tr);
   });
 }
+
+// ============================================================
+// EXPORTAR RANKING COMO IMAGEN (para redes — tamaño Historia de Instagram,
+// 1080x1920). Solo admin, botones en la propia pantalla de Ranking. Se arma
+// con la lista que cargarRanking() ya calculó (ultimoRankingExport) -- no se
+// pide de nuevo a Supabase. Todo con Canvas nativo, sin librerías nuevas.
+// ============================================================
+let ultimoRankingExport = null; // { categoria, lista } -- lo actualiza cargarRanking()
+
+function descargarCanvas(canvas, nombreArchivo) {
+  try {
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombreArchivo;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function fondoImagenExport(ctx, w, h) {
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#132a20");
+  grad.addColorStop(1, "#05080A");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  const brillo = ctx.createRadialGradient(w / 2, 0, 0, w / 2, 0, w);
+  brillo.addColorStop(0, "rgba(111,224,138,.22)");
+  brillo.addColorStop(1, "rgba(111,224,138,0)");
+  ctx.fillStyle = brillo;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function encabezadoImagenExport(ctx, w, categoria, etiqueta) {
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#6FE08A";
+  ctx.font = "700 30px Manrope";
+  ctx.fillText(etiqueta, w / 2, 130);
+  ctx.fillStyle = "#EAF1EE";
+  ctx.font = "900 76px 'Playfair Display'";
+  ctx.fillText("NORTE PADEL", w / 2, 220);
+  ctx.fillStyle = "#9BB0A7";
+  ctx.font = "600 34px Manrope";
+  ctx.fillText(categoria, w / 2, 280);
+}
+
+function piePaginaImagenExport(ctx, w, h) {
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#9BB0A7";
+  ctx.font = "600 22px Manrope";
+  const fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
+  ctx.fillText(`Ranking al ${fecha}`, w / 2, h - 50);
+}
+
+// crossOrigin="anonymous": si Supabase Storage no responde con headers CORS,
+// el navegador dispara onerror (no deja el canvas "manchado") -- por eso alcanza
+// con este resolve(null) para el fallback de iniciales, sin try/catch extra.
+function cargarImagenParaCanvas(url) {
+  return new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function exportarRankingTop20() {
+  if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para exportar"); return; }
+  await document.fonts.ready;
+  const { categoria, lista } = ultimoRankingExport;
+  const top = lista.slice(0, 20);
+  const W = 1080, H = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  fondoImagenExport(ctx, W, H);
+  encabezadoImagenExport(ctx, W, categoria, "🏆 TOP 20 · RANKING");
+
+  const inicioLista = 360;
+  const altoFila = (H - inicioLista - 120) / 20;
+  const colorPosicion = (pos) => pos === 1 ? "#ffd700" : pos === 2 ? "#c9d3e0" : pos === 3 ? "#ff9d5c" : "#EAF1EE";
+  top.forEach((j, idx) => {
+    const y = inicioLista + idx * altoFila;
+    const posicion = idx + 1;
+    if (idx % 2 === 0) {
+      ctx.fillStyle = "rgba(255,255,255,.035)";
+      ctx.fillRect(60, y, W - 120, altoFila - 6);
+    }
+    ctx.textAlign = "left";
+    ctx.fillStyle = colorPosicion(posicion);
+    ctx.font = "800 34px Manrope";
+    ctx.fillText(String(posicion).padStart(2, "0"), 90, y + altoFila / 2 + 12);
+    ctx.fillStyle = "#EAF1EE";
+    ctx.font = "700 34px Manrope";
+    ctx.fillText(`${j.nombre} ${j.apellido}`, 175, y + altoFila / 2 + 12);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#6FE08A";
+    ctx.font = "800 34px Manrope";
+    ctx.fillText(String(j.puntos_ranking), W - 90, y + altoFila / 2 + 12);
+  });
+
+  piePaginaImagenExport(ctx, W, H);
+  descargarCanvas(canvas, `ranking-${categoria.replace(/\s+/g, "-").toLowerCase()}-top20.png`);
+}
+
+function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, W, H) {
+  ctx.clearRect(0, 0, W, H);
+  fondoImagenExport(ctx, W, H);
+  encabezadoImagenExport(ctx, W, categoria, "🏆 CAMPEÓN DE LA CATEGORÍA");
+
+  const cx = W / 2, cy = 640, radio = 260;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  if (foto) {
+    const lado = Math.min(foto.width, foto.height);
+    const sx = (foto.width - lado) / 2, sy = (foto.height - lado) / 2;
+    ctx.drawImage(foto, sx, sy, lado, lado, cx - radio, cy - radio, radio * 2, radio * 2);
+  } else {
+    ctx.fillStyle = "#0F7A46";
+    ctx.fillRect(cx - radio, cy - radio, radio * 2, radio * 2);
+    ctx.fillStyle = "#EAF1EE";
+    ctx.textAlign = "center";
+    ctx.font = "900 160px Manrope";
+    ctx.fillText(`${campeon.nombre[0] || ""}${campeon.apellido[0] || ""}`, cx, cy + 55);
+  }
+  ctx.restore();
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "#6FE08A";
+  ctx.beginPath();
+  ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#EAF1EE";
+  ctx.font = "900 68px 'Playfair Display'";
+  ctx.fillText(`${campeon.nombre} ${campeon.apellido}`, cx, cy + radio + 130);
+  ctx.fillStyle = "#6FE08A";
+  ctx.font = "800 92px Manrope";
+  ctx.fillText(String(campeon.puntos_ranking), cx, cy + radio + 250);
+  ctx.fillStyle = "#9BB0A7";
+  ctx.font = "700 30px Manrope";
+  ctx.fillText("PUNTOS", cx, cy + radio + 290);
+
+  piePaginaImagenExport(ctx, W, H);
+}
+
+async function exportarRankingCampeon() {
+  if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para exportar"); return; }
+  await document.fonts.ready;
+  const { categoria, lista } = ultimoRankingExport;
+  const campeon = lista[0];
+  const W = 1080, H = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const foto = await cargarImagenParaCanvas(campeon.foto_url);
+  dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, W, H);
+  const nombreArchivo = `campeon-${categoria.replace(/\s+/g, "-").toLowerCase()}.png`;
+  const ok = descargarCanvas(canvas, nombreArchivo);
+  if (!ok && foto) {
+    // canvas "manchado" pese al crossOrigin (CORS raro del hosting de la foto):
+    // se reintenta directamente sin foto en vez de dejar al usuario sin nada.
+    dibujarCampeonEnCanvas(ctx, campeon, categoria, null, W, H);
+    descargarCanvas(canvas, nombreArchivo);
+    toast("Se exportó sin la foto (no se pudo leer por permisos de imagen)");
+  }
+}
+
+document.getElementById("btnExportarTop20")?.addEventListener("click", exportarRankingTop20);
+document.getElementById("btnExportarCampeon")?.addEventListener("click", exportarRankingCampeon);
 
 // ============================================================
 // PERFIL PÚBLICO DE JUGADOR (foto grande, stats, torneos ganados)
@@ -844,68 +1029,57 @@ function iconoReloj() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="
 function iconoTrofeo() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a3 3 0 0 0 3 4"/><path d="M16 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3"/><path d="M9 20h6"/><path d="M10 16h4l.5 4h-5l.5-4Z"/></svg>'; }
 function iconoCalendarioChico() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg>'; }
 
-const TAG_DESTACADO = { Damas: "Jugadora del mes", Caballeros: "Jugador del mes" };
-let cacheJugadorDelMes = null;
-async function cargarJugadorDelMes() {
-  const { data } = await sb.rpc("jugador_del_mes_publico");
-  const porGenero = { Damas: null, Caballeros: null };
-  (data || []).forEach((row) => { if (row.genero in porGenero) porGenero[row.genero] = row; });
-  cacheJugadorDelMes = porGenero;
-  renderJugadorDelMes();
+// "Mejores de cada categoría": reemplaza al viejo "Jugador/Jugadora del mes"
+// (una sola tarjeta que rotaba por género). Reutiliza ranking_categoria_publico()
+// -- la misma RPC de Ranking/heroPosición -- y de ahí saca el puntaje más alto
+// de cada categoría; no hace falta una RPC nueva. Se muestran de a 2 por
+// pantalla (como pidió el club, porque con todas juntas quedaba muy largo),
+// en un carrusel horizontal con scroll-snap + puntos (mismo patrón que ya usan
+// Campeones y el hero: actualizarPuntosScroll).
+let cacheMejoresCategoria = null;
+async function cargarMejoresPorCategoria() {
+  const { data } = await sb.rpc("ranking_categoria_publico");
+  const mejorPorCategoria = new Map();
+  (data || []).forEach((j) => {
+    const actual = mejorPorCategoria.get(j.categoria);
+    if (!actual || j.puntos_ranking > actual.puntos_ranking) mejorPorCategoria.set(j.categoria, j);
+  });
+  cacheMejoresCategoria = [...mejorPorCategoria.values()]
+    .sort((a, b) => a.categoria.localeCompare(b.categoria, "es", { numeric: true }));
+  renderMejoresPorCategoria();
 }
 
-// Se elige UNA de las dos filas que ya trae la RPC (que siempre puede traer
-// hasta una por género): si hay las dos, se rota por día del mes para no
-// dejar siempre al mismo género afuera; si solo hay una, se usa esa. Antes
-// esto era solo para el banner único de escritorio y en mobile se mostraban
-// siempre las 2 tarjetas juntas; ahora rota igual en mobile (Jugador y
-// Jugadora también se van turnando ahí). Sin tocar la RPC ni schema.sql.
-function renderJugadorDelMes() {
-  const porGenero = cacheJugadorDelMes;
-  if (!porGenero) return;
-  const contenedor = document.getElementById("jugadorDelMesContenido");
-  // ahora siempre es 1 sola tarjeta que rota (antes esta clase era solo para
-  // el banner ancho de escritorio; en mobile pasaba de grid 2 columnas a 1
-  // con las 2 tarjetas de siempre) -- se agrega siempre, el tamaño grande
-  // de banner sigue siendo solo de escritorio (ver @media min-width:960px)
-  contenedor.classList.add("destacados-grid-banner");
+function renderMejoresPorCategoria() {
+  const mejores = cacheMejoresCategoria;
+  const banda = document.getElementById("mejoresCategoriaCard");
+  if (!mejores) return;
+  if (mejores.length === 0) { banda.style.display = "none"; return; }
+  banda.style.display = "block";
 
-  const generoRotado = new Date().getDate() % 2 === 0 ? "Caballeros" : "Damas";
-  const generoElegido = porGenero[generoRotado] ? generoRotado : (porGenero.Damas ? "Damas" : "Caballeros");
-  const generos = [generoElegido];
-
-  contenedor.innerHTML = generos.map((genero) => {
-    const row = porGenero[genero];
-    if (!row) {
-      return `
-        <div class="destacado-card vacio">
-          <div class="destacado-icono">🎾</div>
-          <div class="destacado-info">
-            <strong>${TAG_DESTACADO[genero]}</strong>
-            <span>Aún sin asignar</span>
-          </div>
-        </div>`;
-    }
-    const fondo = row.foto_url ? `style="background-image:url('${row.foto_url}');cursor:pointer"` : `style="cursor:pointer"`;
+  const tarjetaHtml = (j) => {
+    const fondo = j.foto_url ? `style="background-image:url('${j.foto_url}')"` : "";
     return `
-      <div class="destacado-card" data-jugador-id="${row.jugador_id}" ${fondo}>
-        <div class="destacado-tag">⭐ ${TAG_DESTACADO[genero]}</div>
+      <div class="destacado-card" data-jugador-id="${j.id}" ${fondo}>
+        <div class="destacado-tag">🏆 ${escapeHtml(j.categoria)}</div>
         <div class="destacado-stat">
-          <strong>${row.puntos_ranking}</strong>
+          <strong>${j.puntos_ranking}</strong>
           <span>puntos</span>
         </div>
         <div class="destacado-info">
-          <strong>${escapeHtml(row.nombre)} ${escapeHtml(row.apellido)}</strong>
-          <span>${row.categoria}${row.motivo ? " · " + escapeHtml(row.motivo) : ""}</span>
+          <strong>${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}</strong>
         </div>
       </div>`;
-  }).join("");
+  };
+  const paginas = [];
+  for (let i = 0; i < mejores.length; i += 2) paginas.push(mejores.slice(i, i + 2));
+  const track = document.getElementById("mejoresCategoriaTrack");
+  track.innerHTML = paginas.map((pag) => `<div class="destacados-grid">${pag.map(tarjetaHtml).join("")}</div>`).join("");
 
-  document.querySelectorAll("#jugadorDelMesContenido .destacado-card[data-jugador-id]").forEach((card) => {
+  track.querySelectorAll(".destacado-card[data-jugador-id]").forEach((card) => {
     card.addEventListener("click", () => abrirPerfilJugador(card.dataset.jugadorId));
   });
+  actualizarPuntosScroll("mejoresCategoriaTrack", "mejoresCategoriaDots");
 }
-window.matchMedia("(min-width: 960px)").addEventListener("change", renderJugadorDelMes);
 
 // tira rotativa de "ascendieron este mes" en Inicio; si son pocos igual da vueltas
 // despacio, y si son muchos alcanza para no amontonarlos todos en pantalla a la vez
@@ -1135,7 +1309,6 @@ document.getElementById("btnDestacarJugador").addEventListener("click", async ()
   if (error) { toast("Error: " + error.message); return; }
   toast("Jugador del mes actualizado");
   document.getElementById("jdmMotivo").value = "";
-  cargarJugadorDelMes();
   } finally {
     btn.disabled = false;
   }
@@ -5575,7 +5748,11 @@ function actualizarPuntosScroll(trackId, dotsId) {
   dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot, i) => dot.classList.toggle("active", i === activo));
 }
 document.getElementById("campeonesContenido")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosScroll("campeonesContenido", "campeonesDots")));
-window.addEventListener("resize", () => requestAnimationFrame(() => actualizarPuntosScroll("campeonesContenido", "campeonesDots")));
+document.getElementById("mejoresCategoriaTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosScroll("mejoresCategoriaTrack", "mejoresCategoriaDots")));
+window.addEventListener("resize", () => requestAnimationFrame(() => {
+  actualizarPuntosScroll("campeonesContenido", "campeonesDots");
+  actualizarPuntosScroll("mejoresCategoriaTrack", "mejoresCategoriaDots");
+}));
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");
@@ -5870,7 +6047,7 @@ async function init() {
     cargarComplejos(),
     cargarInicio(),
     cargarUltimosProximos(),
-    cargarJugadorDelMes(),
+    cargarMejoresPorCategoria(),
     cargarCampeones(),
     cargarAscendidos(),
     cargarSponsors(),
