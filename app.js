@@ -595,6 +595,7 @@ async function manejarCambioSesion(session) {
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
   calcularTorneoDestacado();
   cargarHeroPosicion();
+  cargarMiProximoPartido();
   cargarMisUltimosPartidos();
   if (torneoActualId) refrescarDetalleTorneo();
   if (FEATURE_JUGAR_HABILITADA) renderJugar();
@@ -1033,6 +1034,28 @@ async function cargarCampeones() {
 
   document.querySelectorAll("#campeonesContenido .campeon-nombre-link").forEach((el) => {
     el.addEventListener("click", () => abrirPerfilJugador(el.dataset.jugadorId));
+  });
+  actualizarPuntosScroll("campeonesContenido", "campeonesDots");
+}
+
+// "Tu próximo partido": igual que "Tus últimos partidos" (mismo criterio de
+// solo-con-sesión-iniciada y misma tarjeta reutilizada), pero el que sigue sin
+// jugarse -- así el jugador ve de entrada cuándo y contra quién juega, sin
+// tener que ir a buscarlo a Torneos.
+async function cargarMiProximoPartido() {
+  const wrap = document.getElementById("inicioMiProximoWrap");
+  if (!miJugador) { wrap.style.display = "none"; return; }
+  const { data } = await sb.rpc("mi_proximo_partido_publico", { p_jugador_id: miJugador.id });
+  if (!data || data.length === 0) { wrap.style.display = "none"; return; }
+  wrap.style.display = "block";
+  document.getElementById("inicioMiProximoGrid").innerHTML = data.map((p) => `
+    <div>
+      <div class="match-meta meta-caption">${escapeHtml(p.torneo_nombre)}${p.categoria ? " · " + escapeHtml(p.categoria) : ""}</div>
+      ${llavePartidoCardHtml(p)}
+    </div>
+  `).join("");
+  document.querySelectorAll("#inicioMiProximoGrid [data-abrir-partido]").forEach((el) => {
+    el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
 }
 
@@ -1734,6 +1757,27 @@ document.getElementById("btnMostrarBuscarJugador")?.addEventListener("click", ()
   document.getElementById("buscarJugadorAdmin").focus();
 });
 
+// Ascenso de categoría: se lleva la mitad de los puntos de la categoría vieja,
+// sumados a lo que ya tuviera cargado en la nueva (si ya había jugado ahí antes),
+// y la categoría vieja se borra del ranking. La usan tanto el botón "Ascender" de
+// cada ficha como "Aprobar" en Solicitudes de categoría (pedido por el jugador).
+async function ejecutarAscenso(jugadorId, puntosCategoriaVieja, categoriaVieja, categoriaNueva) {
+  const { data: filaExistente } = await sb.from("ranking_categoria").select("puntos_ranking")
+    .eq("jugador_id", jugadorId).eq("categoria", categoriaNueva).maybeSingle();
+  const puntosNuevos = (Number(puntosCategoriaVieja) || 0) / 2 + Number(filaExistente?.puntos_ranking || 0);
+  const { error } = await sb.from("jugadores")
+    .update({ categoria: categoriaNueva, categoria_pendiente: null, puntos_ranking: puntosNuevos })
+    .eq("id", jugadorId);
+  if (error) return { error };
+  await sb.from("ranking_categoria").upsert(
+    { jugador_id: jugadorId, categoria: categoriaNueva, puntos_ranking: puntosNuevos, updated_at: new Date().toISOString() },
+    { onConflict: "jugador_id,categoria" }
+  );
+  await sb.from("ranking_categoria").delete().eq("jugador_id", jugadorId).eq("categoria", categoriaVieja);
+  await sb.from("historial_categoria").insert({ jugador_id: jugadorId, categoria_anterior: categoriaVieja, categoria_nueva: categoriaNueva });
+  return { puntosNuevos };
+}
+
 // tarjetas editables (nombre, apellido, categoría, puntos) para corregir errores de registro
 // Solo aparecen jugadores después de buscar (para no listar a todo el club de una), tal cual "Crear torneo"
 function renderListaJugadoresAdmin() {
@@ -1839,6 +1883,7 @@ function renderListaJugadoresAdmin() {
     div.insertAdjacentHTML("beforeend", `
       <div class="row" style="margin-top:8px;gap:8px">
         <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
+        <button type="button" class="secondary small btnAscenderJugador">⬆ Ascender</button>
         <button type="button" class="secondary small btnBlanquearClave">🔑 Blanquear clave</button>
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
@@ -1872,6 +1917,31 @@ function renderListaJugadoresAdmin() {
       toast("Jugador actualizado");
       cargarJugadoresAdmin();
       cargarRanking();
+      } finally {
+        this.disabled = false;
+      }
+    });
+    // Ascender: usa la categoría elegida en el selector de arriba como destino.
+    // Solo actúa si esa categoría es realmente más alta (según "orden" en categorías);
+    // para bajar de categoría o corregirla sin dividir puntos, sigue estando "Guardar".
+    div.querySelector(".btnAscenderJugador").addEventListener("click", async function () {
+      if (this.disabled) return;
+      const categoriaNueva = div.querySelector(".jaCategoria").value;
+      if (categoriaNueva === j.categoria) { toast("Elegí arriba, en el selector de categoría, a cuál asciende"); return; }
+      if (cacheCategorias.length === 0) await cargarCategorias();
+      const ordenPorNombre = Object.fromEntries(cacheCategorias.map((c) => [c.nombre, c.orden]));
+      if ((ordenPorNombre[categoriaNueva] ?? 0) <= (ordenPorNombre[j.categoria] ?? 0)) {
+        toast(`${categoriaNueva} no es una categoría más alta que ${j.categoria} — para eso usá Guardar`);
+        return;
+      }
+      if (!confirm(`¿Ascender a ${j.nombre} ${j.apellido} de ${j.categoria} a ${categoriaNueva}? Se lleva la mitad de sus puntos (${j.puntos_ranking} → ${Number(j.puntos_ranking) / 2}) y se lo saca del ranking de ${j.categoria}.`)) return;
+      this.disabled = true;
+      try {
+        const { error, puntosNuevos } = await ejecutarAscenso(j.id, j.puntos_ranking, j.categoria, categoriaNueva);
+        if (error) { toast("Error: " + error.message); return; }
+        toast(`Ascendió a ${categoriaNueva} con ${puntosNuevos} puntos`);
+        cargarJugadoresAdmin();
+        cargarRanking();
       } finally {
         this.disabled = false;
       }
@@ -1953,11 +2023,28 @@ function renderSolicitudesCategoria(jugadores) {
       if (this.disabled) return;
       this.disabled = true;
       try {
-      const { error } = await sb.from("jugadores").update({ categoria: j.categoria_pendiente, categoria_pendiente: null }).eq("id", j.id);
-      if (error) { toast("Error: " + error.message); return; }
-      // queda registrado para poder mostrar "ascendieron este mes" en Inicio
-      await sb.from("historial_categoria").insert({ jugador_id: j.id, categoria_anterior: j.categoria, categoria_nueva: j.categoria_pendiente });
-      toast("Categoría aprobada");
+      if (cacheCategorias.length === 0) await cargarCategorias();
+      const categoriaVieja = j.categoria;
+      const categoriaNueva = j.categoria_pendiente;
+      const ordenPorNombre = Object.fromEntries(cacheCategorias.map((c) => [c.nombre, c.orden]));
+      const esAscenso = (ordenPorNombre[categoriaNueva] ?? 0) > (ordenPorNombre[categoriaVieja] ?? 0);
+
+      if (esAscenso) {
+        const { error, puntosNuevos } = await ejecutarAscenso(j.id, j.puntos_ranking, categoriaVieja, categoriaNueva);
+        if (error) { toast("Error: " + error.message); return; }
+        toast(`Ascendió a ${categoriaNueva} con ${puntosNuevos} puntos`);
+      } else {
+        // Descenso o cambio lateral: se mantienen los puntos tal cual.
+        const { error } = await sb.from("jugadores").update({ categoria: categoriaNueva, categoria_pendiente: null }).eq("id", j.id);
+        if (error) { toast("Error: " + error.message); return; }
+        await sb.from("ranking_categoria").upsert(
+          { jugador_id: j.id, categoria: categoriaNueva, puntos_ranking: j.puntos_ranking, updated_at: new Date().toISOString() },
+          { onConflict: "jugador_id,categoria" }
+        );
+        // queda registrado para poder mostrar "ascendieron este mes" en Inicio
+        await sb.from("historial_categoria").insert({ jugador_id: j.id, categoria_anterior: categoriaVieja, categoria_nueva: categoriaNueva });
+        toast("Categoría aprobada");
+      }
       cargarJugadoresAdmin();
       cargarRanking();
       } finally {
@@ -4627,7 +4714,7 @@ function llavePartidoCardHtml(p) {
   const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "a definir");
   const puedeCargarResultado = isAdmin && p.estado !== "jugado";
   return `
-    <div class="llave-partido" data-abrir-partido="${p.id}" style="cursor:pointer" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
+    <div class="llave-partido" data-abrir-partido="${p.id}" data-slot="${p.slot_cuadro || ""}" style="cursor:pointer" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
       <div class="llave-fecha">
         <span>${iconoReloj()} ${horario}</span>
         <span style="display:flex;align-items:center;gap:6px">
@@ -4722,10 +4809,15 @@ function renderPartidosLlave(containerId, partidos) {
   // lado de la otra en el mismo scroll horizontal (con snap en mobile, ver
   // .llave-scroll/.llave-columna) -- se recorren deslizando a la derecha en
   // vez de tener que elegir una pestaña arriba.
+  // O1, O2, O3... en ese orden de arriba a abajo (antes quedaban en el orden que
+  // devolviera la consulta) -- así la columna se lee igual que en la plantilla del
+  // cuadro, y las líneas conectoras (dibujarConectoresLlave) quedan prolijas.
+  const ordenarPorSlot = (lista) => [...lista].sort((a, b) =>
+    (Number(a.slot_cuadro?.slice(1)) || 0) - (Number(b.slot_cuadro?.slice(1)) || 0));
   const columnaHtml = (col) => `
       <div class="llave-columna">
         ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
-        ${col.partidos.map((p) => llavePartidoCardHtml(p)).join("")}
+        ${ordenarPorSlot(col.partidos).map((p) => llavePartidoCardHtml(p)).join("")}
       </div>`;
   // Zona: sus columnas (una por zona) van apiladas en VERTICAL, una debajo de
   // la otra -- no una al lado de la otra como las fases (pedido explícito: los
@@ -4743,7 +4835,66 @@ function renderPartidosLlave(containerId, partidos) {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
   wireCargaResultado(cont);
+  // se guarda para poder volver a trazar las líneas si cambia el ancho de
+  // pantalla (dibujarConectoresLlave usa posiciones ya renderizadas, así que
+  // un resize las deja desalineadas si no se recalculan con los mismos datos)
+  cont._partidosLlave = partidos;
+  dibujarConectoresLlave(cont, partidos);
 }
+
+// Líneas conectoras estilo "cuadro de torneo" (cada partido, unido con el/los
+// partidos de los que sale su pareja) -- se apoya en la misma plantilla que ya
+// arma los cruces del cuadro propio del club (PLANTILLAS_CUADRO/
+// proyeccionCuadroCompleto, en matching.js), así no hay que duplicar esa lógica:
+// para cada cruce de la plantilla ("C1" sale de "GZ1" y "PZ3") busca las dos
+// tarjetas reales por su data-slot y traza una línea en ángulo entre ellas. Si el
+// torneo no usa el cuadro propio del club (formato "grupos" clásico, sin
+// slot_cuadro) o el tamaño no tiene plantilla, no dibuja nada -- se ve como
+// antes, columnas sueltas sin líneas.
+function dibujarConectoresLlave(cont, partidos) {
+  const llave = cont.querySelector(".llave");
+  cont.querySelector(".llave-conectores")?.remove();
+  const nZonas = partidos.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === "Z").length;
+  if (!llave || !nZonas || !PLANTILLAS_CUADRO[nZonas]) return;
+
+  const base = llave.getBoundingClientRect();
+  const rectRelativo = (el) => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top - base.top, bottom: r.bottom - base.top, left: r.left - base.left, right: r.right - base.left };
+  };
+
+  const trazos = [];
+  proyeccionCuadroCompleto(nZonas).forEach(({ slot, refA, refB }) => {
+    const destino = cont.querySelector(`.llave-partido[data-slot="${slot}"]`);
+    if (!destino) return;
+    [refA, refB].forEach((ref) => {
+      const origen = cont.querySelector(`.llave-partido[data-slot="${ref.slice(1)}"]`);
+      if (!origen) return;
+      const rO = rectRelativo(origen), rD = rectRelativo(destino);
+      const x1 = rO.right, y1 = (rO.top + rO.bottom) / 2;
+      const x2 = rD.left, y2 = (rD.top + rD.bottom) / 2;
+      const xMedio = (x1 + x2) / 2;
+      trazos.push(`M${x1},${y1} H${xMedio} V${y2} H${x2}`);
+    });
+  });
+  if (!trazos.length) return;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "llave-conectores");
+  svg.setAttribute("width", llave.scrollWidth);
+  svg.setAttribute("height", llave.scrollHeight);
+  svg.innerHTML = trazos.map((d) => `<path d="${d}" class="llave-conector-linea" />`).join("");
+  llave.prepend(svg);
+}
+// las líneas se calculan en base a posiciones ya renderizadas (getBoundingClientRect):
+// si cambia el ancho de pantalla hay que recalcularlas, con los mismos datos que
+// ya se usaron para el último render de cada contenedor (ver cont._partidosLlave).
+window.addEventListener("resize", () => requestAnimationFrame(() => {
+  ["pubResultadosLlave", "admPartidosLlave"].forEach((id) => {
+    const cont = document.getElementById(id);
+    if (cont?._partidosLlave) dibujarConectoresLlave(cont, cont._partidosLlave);
+  });
+}));
 
 // ---------- Torneo (pantalla única: Categoría → Etapa → partidos) ----------
 // Calendario y Resultados eran dos pantallas separadas que mostraban casi lo
@@ -5396,6 +5547,35 @@ document.getElementById("heroCarouselTrack")?.addEventListener("pointerdown", ()
 document.getElementById("heroCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("heroCarouselTrack", "heroCarouselDots")));
 document.getElementById("destacadoCarouselTrack")?.addEventListener("pointerdown", () => reiniciarAutoplayCarrusel("destacadoCarouselTrack"));
 document.getElementById("destacadoCarouselTrack")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosCarrusel("destacadoCarouselTrack", "destacadoCarouselDots", true)));
+
+// Puntitos de scroll (distinto de actualizarPuntosCarrusel de arriba: ese es para
+// carruseles de slides fijas de 100% de ancho -- acá el track tiene muchas
+// tarjetas chicas seguidas, así que cada "punto" representa una pantalla completa
+// de scroll, no una tarjeta) -- lo usa la tira de Campeones, para reemplazar la
+// barra de scroll nativa por algo consistente con el resto de la app.
+function actualizarPuntosScroll(trackId, dotsId) {
+  const track = document.getElementById(trackId);
+  const dotsWrap = document.getElementById(dotsId);
+  if (!track || !dotsWrap) return;
+  const paginas = Math.max(1, Math.ceil(track.scrollWidth / (track.clientWidth || 1)));
+  dotsWrap.style.display = paginas <= 1 ? "none" : "";
+  if (dotsWrap.dataset.cantidad !== String(paginas)) {
+    dotsWrap.dataset.cantidad = String(paginas);
+    dotsWrap.innerHTML = Array.from({ length: paginas }, (_, i) =>
+      `<button type="button" class="hero-carousel-dot" data-pagina="${i}" aria-label="Ir a la página ${i + 1} de campeones"></button>`
+    ).join("");
+    dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot) => {
+      dot.addEventListener("click", () => {
+        track.scrollTo({ left: track.clientWidth * Number(dot.dataset.pagina), behavior: "smooth" });
+      });
+    });
+  }
+  const maxScroll = track.scrollWidth - track.clientWidth;
+  const activo = maxScroll > 0 ? Math.round((track.scrollLeft / maxScroll) * (paginas - 1)) : 0;
+  dotsWrap.querySelectorAll(".hero-carousel-dot").forEach((dot, i) => dot.classList.toggle("active", i === activo));
+}
+document.getElementById("campeonesContenido")?.addEventListener("scroll", () => requestAnimationFrame(() => actualizarPuntosScroll("campeonesContenido", "campeonesDots")));
+window.addEventListener("resize", () => requestAnimationFrame(() => actualizarPuntosScroll("campeonesContenido", "campeonesDots")));
 
 async function cargarSponsorsTorneo() {
   const cont = document.getElementById("dtSponsors");

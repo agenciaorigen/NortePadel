@@ -621,7 +621,8 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 }
 .flyer-destacado-info span { font-size: 12px; color: #d8dbdb; }
 
-.campeones-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.campeones-strip { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; }
+.campeones-strip::-webkit-scrollbar { display: none; }
 .campeon-card {
   flex-shrink: 0; width: 140px; text-align: center;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;
@@ -770,7 +771,12 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    angosta al lado de las demás, en vez de amontonarlos en una sola. Las
    fases van una al lado de la otra en la misma fila/scroll (ver
    renderPartidosLlave). */
-.llave { display: flex; align-items: flex-start; gap: 40px; }
+.llave { display: flex; align-items: flex-start; gap: 40px; position: relative; }
+/* líneas conectoras estilo "cuadro de torneo" (ver dibujarConectoresLlave en
+   app.js) -- overlay del tamaño de todo el contenido de .llave, sin capturar
+   clicks (las tarjetas siguen siendo las que reciben el click). */
+.llave-conectores { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.llave-conector-linea { fill: none; stroke: var(--border); stroke-width: 2px; }
 .llave-fase { display: flex; flex-direction: column; gap: 14px; }
 .llave-fase-titulo {
   /* NO center: con muchas columnas (9 zonas...) el título centrado en todo el
@@ -1337,7 +1343,7 @@ body.is-admin #btnAdminPanel { display: flex; }
   nav.tabbar button.active .icon { background: none; }
 
   .app-body {
-    max-width: 1100px;
+    max-width: 1440px;
     margin: 0 auto;
     padding: 32px 40px 60px;
   }
@@ -1436,7 +1442,11 @@ body.is-admin #btnAdminPanel { display: flex; }
   /* el panel admin necesita más aire que el resto del sitio (sidebar +
      contenido con formularios largos) -- se ensancha SOLO cuando view-admin
      es la vista activa, sin tocar el ancho de ninguna otra pantalla. */
-  .app-body:has(#view-admin.active) { max-width: 1360px; }
+  .app-body:has(#view-admin.active) { max-width: 1600px; }
+  /* la llave de un cuadro grande necesita todo el ancho posible (varias fases
+     una al lado de la otra) -- se ensancha a todo el viewport SOLO cuando
+     Resultados/Llave es la vista activa, mismo criterio que el panel admin. */
+  .app-body:has(#view-torneo-resultados.active) { max-width: none; }
 
   #view-admin.view.active { display: block; }
   #admShell { display: flex; align-items: flex-start; gap: 0; }

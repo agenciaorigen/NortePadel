@@ -135,9 +135,13 @@
       </div>
     </div>
 
-    <!-- Solo si hay sesión iniciada (ver cargarMisUltimosPartidos en app.js) --
-         reutiliza la misma tarjeta de partido que "Últimos resultados"/Llave. -->
+    <!-- Solo si hay sesión iniciada (ver cargarMiProximoPartido/cargarMisUltimosPartidos
+         en app.js) -- reutiliza la misma tarjeta de partido que "Últimos resultados"/Llave. -->
     <div class="seccion" id="inicioMisPartidosWrap" style="display:none">
+      <div id="inicioMiProximoWrap" style="display:none">
+        <h3>Tu próximo partido</h3>
+        <div class="inicio-partidos-grid" id="inicioMiProximoGrid"></div>
+      </div>
       <h3>Tus últimos partidos</h3>
       <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
     </div>
@@ -183,6 +187,7 @@
     <div class="seccion" id="campeonesCard" style="display:none">
       <h3>🏆 Campeones</h3>
       <div class="campeones-strip" id="campeonesContenido"></div>
+      <div class="hero-carousel-dots visible" id="campeonesDots"></div>
     </div>
 
     <div class="seccion">
