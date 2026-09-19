@@ -4832,7 +4832,12 @@ function wireCargaResultado(cont) {
       if (partidoActualizado?.slot_cuadro) {
         // si esto alimenta una fase ya armada del cuadro de zonas, que el
         // rival de esa fase se actualice solo en vez de quedar trabado con
-        // el resultado viejo (ver propagarCuadro)
+        // el resultado viejo (ver propagarCuadro). OJO: propagarCuadro puede
+        // marcar la categoría "finalizada" ella sola (p.ej. si la Final se
+        // arma por walkover) sin que este botón haya sido el de la Final --
+        // por eso actualizarEstadoTorneoPorFases() se llama SIEMPRE más abajo,
+        // no solo dentro del if de "Final" (antes el torneo podía quedar
+        // trabado en "en curso" con todos los campeones ya definidos).
         const { avisos } = await propagarCuadro(partidoActualizado.categoria, partidoActualizado.torneo_id);
         avisos.forEach((a) => toast(a));
       }
@@ -4844,9 +4849,9 @@ function wireCargaResultado(cont) {
         // falta volver a apretar "Generar siguiente fase" para que el torneo
         // deje de figurar "en curso" (ver actualizarEstadoTorneoPorFases)
         await sb.from("torneo_categorias").update({ estado_fase: "finalizada" }).eq("torneo_id", partidoActualizado.torneo_id).eq("categoria", partidoActualizado.categoria);
-        await actualizarEstadoTorneoPorFases(partidoActualizado.torneo_id);
         cargarCampeones();
       }
+      await actualizarEstadoTorneoPorFases(partidoActualizado.torneo_id);
       } finally {
         btn.disabled = false;
       }
