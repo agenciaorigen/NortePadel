@@ -598,6 +598,10 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 /* ---------- Flyer destacado (próximo torneo) ---------- */
 .flyer-destacado {
   position: relative;
+  max-width: 420px; /* sin este límite, en pantallas anchas el afiche (que sigue el
+    ancho del contenedor con aspect-ratio 4/5) terminaba ocupando casi dos pantallas
+    de alto — acá queda del tamaño de una tarjeta destacada, no de un cartel gigante */
+  margin-left: auto; margin-right: auto;
   aspect-ratio: 4 / 5; /* ver comentario de .torneo-card-flyer: la mayoría de los
     afiches son verticales, esta forma evita recortarlos sin dejar franjas vacías */
   border-radius: var(--radius-lg);
@@ -615,7 +619,10 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .flyer-destacado::before {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,.82), transparent 45%);
+  /* franja inferior bien opaca (no un simple degradé desde 0) para tapar del todo
+     el texto/logos que suelen tener los afiches en su pie, así no se pisan con el
+     nombre del torneo que ponemos encima */
+  background: linear-gradient(0deg, rgba(0,0,0,.94) 0%, rgba(0,0,0,.94) 25%, transparent 55%);
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
@@ -1436,10 +1443,11 @@ body.is-admin #btnAdminPanel { display: flex; }
      contenido con formularios largos) -- se ensancha SOLO cuando view-admin
      es la vista activa, sin tocar el ancho de ninguna otra pantalla. */
   .app-body:has(#view-admin.active) { max-width: 1600px; }
-  /* la llave de un cuadro grande necesita todo el ancho posible (varias fases
-     una al lado de la otra) -- se ensancha a todo el viewport SOLO cuando
-     Resultados/Llave es la vista activa, mismo criterio que el panel admin. */
-  .app-body:has(#view-torneo-resultados.active) { max-width: none; }
+  /* OJO: acá hubo un .app-body:has(#view-torneo-resultados.active){max-width:none}
+     que ensanchaba TODA la vista de un torneo (héroe, banners, etc.), no solo el
+     cuadro -- en pantallas grandes se veía "muy ancho" incluso antes de que hubiera
+     cuadro armado. Se sacó porque .llave-scroll ya tiene su propio scroll lateral
+     (ver más abajo) y no necesita que el contenedor de toda la página se agrande. */
 
   #view-admin.view.active { display: block; }
   #admShell { display: flex; align-items: flex-start; gap: 0; }

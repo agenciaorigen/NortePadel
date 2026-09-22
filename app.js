@@ -2301,6 +2301,7 @@ function badgeEstadoTorneo(t) {
   if (estaEnVivo(t)) return `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>`;
   if (t.estado === "inscripcion") return `<span class="badge solid">Inscripción abierta</span>`;
   if (t.estado === "inscripcion_cerrada") return `<span class="badge orange">Inscripción cerrada</span>`;
+  if (t.estado === "en_curso") return `<span class="badge solid">En curso</span>`;
   if (t.estado === "cancelado") return `<span class="badge orange">Cancelado</span>`;
   return `<span class="badge">${t.estado === "finalizado" ? "Finalizado" : t.estado}</span>`;
 }
@@ -2346,7 +2347,10 @@ async function cargarTorneos() {
     div.className = "match-card torneo-card-poster" + (t.flyer_url ? " torneo-card-flyer" : "");
     div.style.cursor = "pointer";
     if (t.flyer_url) {
-      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.92), rgba(5,7,10,.55) 65%), radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%), url('${t.flyer_url}')`;
+      // franja inferior bien opaca (no un degradé que ya arranca transparente) para tapar
+      // del todo el texto/logos del pie del afiche, que si no se pisa con el nombre y la
+      // sede del torneo que van montados encima
+      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.97) 0%, rgba(5,7,10,.97) 32%, rgba(5,7,10,.55) 65%), radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%), url('${t.flyer_url}')`;
     }
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
