@@ -70,6 +70,7 @@ let syncingDesdeHash = false; // evita el loop cambiarVista → navegarA → has
 // "info" junta lo que antes eran Categorías + Jugadores + datos de sede.
 const PANTALLAS_TORNEO = {
   "": { view: "torneo-resultados", label: "Torneo" },
+  fotos: { view: "torneo-fotos", label: "Fotos" },
   info: { view: "torneo-info", label: "Info" }
 };
 // estas no van en el mini-nav (se llega a ellas desde un botón puntual, no
@@ -3199,6 +3200,7 @@ async function refrescarDetalleTorneo() {
 
   await actualizarAccesoInscripcion();
   await cargarSponsorsTorneo();
+  await cargarFotosTorneo();
 
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id, complejos(nombre))").eq("torneo_id", torneoActualId);
   ultimasCanchasTorneo = tc || [];
@@ -3419,6 +3421,7 @@ const SECCIONES_GESTION = {
   canchas: { id: "admSeccionCanchas", label: "Canchas del torneo" },
   bloqueos: { id: "admSeccionBloqueos", label: "Bloqueos de cancha" },
   puntaje: { id: "admSeccionPuntaje", label: "Puntaje para el ranking" },
+  fotos: { id: "admSeccionFotos", label: "Fotos" },
   partidos: { id: "admSeccionPartidos", label: "Partidos" }
 };
 function renderAdminGestionSubnav() {
@@ -3659,6 +3662,7 @@ async function cargarGestionTorneo(id) {
   renderDiagnosticoTorneo(insc || [], parejas || [], partidos || []);
 
   await cargarBloqueosCancha();
+  await cargarFotosTorneoAdmin();
   renderPartidosAdmin(partidos || [], tc || [], parejas || []);
 }
 
@@ -5997,6 +6001,79 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 });
 
 // ============================================================
+// FOTOS DEL TORNEO (galería pública, solo el admin sube/borra)
+// ============================================================
+// admin=true agrega el botón de borrar; reutiliza el mismo overlay/lightbox
+// que ya usan las fotos de jugador (ver abrirFotoGrande más abajo).
+function fotoTorneoItemHtml(foto, admin) {
+  const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  return `<div class="foto-item">
+    <img src="${foto.url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${foto.url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+    ${borrar}
+  </div>`;
+}
+
+async function cargarFotosTorneo() {
+  const cont = document.getElementById("dtFotosGaleria");
+  const vacio = document.getElementById("dtFotosVacio");
+  if (!cont || !torneoActualId) return;
+  const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
+  const fotos = data || [];
+  cont.innerHTML = fotos.map((f) => fotoTorneoItemHtml(f, false)).join("");
+  if (vacio) vacio.style.display = fotos.length ? "none" : "block";
+}
+
+async function cargarFotosTorneoAdmin() {
+  const cont = document.getElementById("admFotosLista");
+  if (!cont || !torneoGestionId) return;
+  const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
+  const fotos = data || [];
+  cont.innerHTML = fotos.length
+    ? fotos.map((f) => fotoTorneoItemHtml(f, true)).join("")
+    : '<p class="empty">Todavía no subiste ninguna foto de este torneo.</p>';
+  cont.querySelectorAll(".btnQuitarFoto").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const { error } = await sb.from("torneo_fotos").delete().eq("id", btn.dataset.id);
+        if (error) { toast("Error: " + error.message); return; }
+        toast("Foto eliminada");
+        cargarFotosTorneoAdmin();
+        if (torneoActualId === torneoGestionId) cargarFotosTorneo();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+document.getElementById("btnSubirFotosTorneo").addEventListener("click", async () => {
+  const btn = document.getElementById("btnSubirFotosTorneo");
+  if (btn.disabled || !torneoGestionId) return;
+  const input = document.getElementById("admFotosArchivos");
+  const archivos = Array.from(input.files || []);
+  if (!archivos.length) { toast("Elegí una o más fotos"); return; }
+  btn.disabled = true;
+  try {
+    for (const archivo of archivos) {
+      const path = `${torneoGestionId}/${Date.now()}-${archivo.name}`;
+      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, archivo);
+      if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
+      const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl });
+      if (error) toast("Error guardando " + archivo.name + ": " + error.message);
+    }
+    toast("Fotos subidas");
+    input.value = "";
+    cargarFotosTorneoAdmin();
+    if (torneoActualId === torneoGestionId) cargarFotosTorneo();
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ============================================================
 // NOTICIAS (novedades del club en Inicio + botón a Instagram)
 // ============================================================
 function renderNoticiaCard(n) {
@@ -6160,12 +6237,39 @@ document.getElementById("notifOverlay").addEventListener("click", (e) => {
 // futuro en la página, sin tener que reengancharlo cada vez que se re-renderiza algo
 function abrirFotoGrande(fotoUrl) {
   document.getElementById("fotoGrandeImg").src = fotoUrl;
+  document.getElementById("fotoGrandeDescargar").href = fotoUrl;
   document.getElementById("fotoGrandeOverlay").style.display = "flex";
 }
 function cerrarFotoGrande() {
   document.getElementById("fotoGrandeOverlay").style.display = "none";
   document.getElementById("fotoGrandeImg").src = "";
+  document.getElementById("fotoGrandeDescargar").href = "";
 }
+// La foto vive en Supabase Storage (otro origen), así que el atributo
+// download del <a> no alcanza para forzar la descarga en la mayoría de los
+// navegadores — bajan el archivo con fetch y lo disparan como blob local,
+// todo con APIs nativas del navegador, sin librerías nuevas.
+document.getElementById("fotoGrandeDescargar").addEventListener("click", async (e) => {
+  e.preventDefault();
+  const url = e.currentTarget.href;
+  if (!url) return;
+  const textoOriginal = e.currentTarget.textContent;
+  e.currentTarget.textContent = "Descargando...";
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const tmp = document.createElement("a");
+    tmp.href = objUrl;
+    tmp.download = url.split("/").pop().split("?")[0] || "foto.jpg";
+    tmp.click();
+    URL.revokeObjectURL(objUrl);
+  } catch {
+    window.open(url, "_blank");
+  } finally {
+    e.currentTarget.textContent = textoOriginal;
+  }
+});
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-foto-grande]");
   if (el) abrirFotoGrande(el.dataset.fotoGrande);

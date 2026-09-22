@@ -48,8 +48,11 @@
 </div>
 
 <div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none">
-  <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">✕ Cerrar</button>
-  <img id="fotoGrandeImg" src="" alt="Foto ampliada del jugador" />
+  <div class="fotogrande-acciones">
+    <a href="" download id="fotoGrandeDescargar" class="secondary small">⬇ Descargar</a>
+    <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">✕ Cerrar</button>
+  </div>
+  <img id="fotoGrandeImg" src="" alt="Foto ampliada" />
 </div>
 
 <!-- Detalle de un partido puntual (se abre al tocar una tarjeta en Calendario o
@@ -363,6 +366,16 @@
       <div class="pill-row" id="resFiltroGeneroPills"></div>
       <select id="resFiltroCategoria"></select>
       <div id="pubResultadosLlave" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- FOTOS: galería del torneo, solo el admin sube (ver "Administrar este
+       torneo" > Fotos) — cualquiera puede verlas y descargarlas. -->
+  <section id="view-torneo-fotos" class="view">
+    <div class="card">
+      <h3>Fotos del torneo</h3>
+      <div id="dtFotosGaleria" class="fotos-galeria"></div>
+      <p class="empty" id="dtFotosVacio" style="display:none">Todavía no hay fotos subidas de este torneo.</p>
     </div>
   </section>
 
@@ -773,6 +786,15 @@
           <div><label for="prDieciseisavos">Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
         </div>
         <button class="secondary small" id="btnGuardarPuntosTorneo" style="margin-top:10px">Guardar puntaje</button>
+      </div>
+
+      <div class="card card-accent" id="admSeccionFotos">
+        <h2>Fotos del torneo</h2>
+        <p class="match-meta" style="margin-bottom:6px">Las fotos que subas acá aparecen en la pestaña "Fotos" del torneo, donde cualquiera las puede ver y descargar.</p>
+        <div id="admFotosLista" class="fotos-galeria"></div>
+        <label style="margin-top:10px" for="admFotosArchivos">Subir fotos</label>
+        <input type="file" id="admFotosArchivos" accept="image/*" multiple />
+        <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
       </div>
       </div>
 
