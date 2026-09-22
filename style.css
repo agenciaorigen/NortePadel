@@ -817,11 +817,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   color: var(--muted); margin: 0 0 2px;
 }
 .llave-partido {
-  /* --bg-elev (no --card) a propósito: la tarjeta del partido vive DENTRO de un
-     .card que ya es --card, y con el mismo fondo que su contenedor quedaba todo
-     plano (solo se notaba un borde al 14% de opacidad). Con --bg-elev se ve como
-     una ranura hundida, sin sumar ningún color nuevo a la paleta. */
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
   box-shadow: var(--shadow-sm);
 }
 .llave-fecha {
@@ -834,10 +830,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .llave-sets { display: flex; gap: 4px; flex-shrink: 0; }
 .llave-set {
   min-width: 22px; text-align: center; font-size: 12.5px; font-weight: 700; line-height: 1.7;
-  /* --card (no --bg-elev): la tarjeta del partido ahora usa --bg-elev de fondo
-     (ver .llave-partido), así que el chip necesita el tono más claro para
-     seguir notándose como una "ficha" encima, no fundirse con la tarjeta */
-  border-radius: 7px; background: var(--card); color: var(--muted); font-variant-numeric: tabular-nums;
+  border-radius: 7px; background: var(--bg-elev); color: var(--muted); font-variant-numeric: tabular-nums;
 }
 /* ganador resaltado en el verde de marca (--accent), igual que el resto de la app */
 .llave-fila.ganador .llave-pareja { color: var(--accent-bright); font-weight: 800; }
@@ -1177,6 +1170,16 @@ nav.tabbar .icon { position: relative; }
 .flyer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .flyer-grid img { width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border); }
 
+/* ---------- En vivo: video de YouTube (ver cargarEnVivo en app.js) ---------- */
+.video-embed-16-9 {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #000;
+}
+.video-embed-16-9 iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
 /* ---------- Noticias ---------- */
 .noticia-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
 .noticia-card:last-child { border-bottom: none; }
@@ -1450,10 +1453,11 @@ body.is-admin #btnAdminPanel { display: flex; }
      contenido con formularios largos) -- se ensancha SOLO cuando view-admin
      es la vista activa, sin tocar el ancho de ninguna otra pantalla. */
   .app-body:has(#view-admin.active) { max-width: 1600px; }
-  /* la llave de un cuadro grande necesita todo el ancho posible (varias fases
-     una al lado de la otra) -- se ensancha a todo el viewport SOLO cuando
-     Resultados/Llave es la vista activa, mismo criterio que el panel admin. */
-  .app-body:has(#view-torneo-resultados.active) { max-width: none; }
+  /* OJO: acá hubo un .app-body:has(#view-torneo-resultados.active){max-width:none}
+     que ensanchaba TODA la vista de un torneo (héroe, banners, etc.), no solo el
+     cuadro -- en pantallas grandes se veía "muy ancho" incluso antes de que hubiera
+     cuadro armado. Se sacó porque .llave-scroll ya tiene su propio scroll lateral
+     (ver más abajo) y no necesita que el contenedor de toda la página se agrande. */
 
   #view-admin.view.active { display: block; }
   #admShell { display: flex; align-items: flex-start; gap: 0; }

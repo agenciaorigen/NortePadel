@@ -456,6 +456,28 @@
     </div>
   </section>
 
+  <!-- EN VIVO: video de YouTube (cargado a mano en Config, ver cfgYoutubeEnVivo) +
+       partidos que se están jugando ahora / próximos del torneo en curso hoy.
+       Reutiliza calcularTorneoDestacado()/partidos_publicos() y la misma tarjeta
+       de partido de siempre (llavePartidoCardHtml) -- ver cargarEnVivo() en app.js. -->
+  <section id="view-en-vivo" class="view">
+    <div class="card">
+      <h2>En vivo</h2>
+      <div class="video-embed-16-9" id="enVivoVideoWrap" style="display:none"></div>
+      <p class="empty" id="enVivoSinVideo" style="display:none">No hay transmisión en este momento.</p>
+    </div>
+    <div class="seccion" id="enVivoPartidosWrap" style="display:none">
+      <div id="enVivoJugandoWrap" style="display:none">
+        <h3>🔴 Jugándose ahora</h3>
+        <div class="inicio-partidos-grid" id="enVivoJugandoGrid"></div>
+      </div>
+      <div id="enVivoProximosWrap" style="display:none">
+        <h3>Próximos partidos</h3>
+        <div class="inicio-partidos-grid" id="enVivoProximosGrid"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- PERFIL PÚBLICO DE UN JUGADOR (se abre desde ranking / campeones / jugador del mes) -->
   <section id="view-perfil-jugador" class="view">
     <div class="card">
@@ -788,6 +810,8 @@
       <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
       <label for="cfgInstagram">Instagram (link al perfil)</label>
       <input id="cfgInstagram" placeholder="https://instagram.com/tu_club" />
+      <label for="cfgYoutubeEnVivo">Link de YouTube en vivo (pegalo cuando arranques a transmitir con OBS, borralo cuando termines)</label>
+      <input id="cfgYoutubeEnVivo" placeholder="https://www.youtube.com/watch?v=..." />
       <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
     </div>
 
@@ -929,6 +953,10 @@
   <button data-view="ranking" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
     Ranking
+  </button>
+  <button data-view="en-vivo" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9L17 14"/></svg></span>
+    En vivo
   </button>
   <!-- Perfil ya no se repite acá: el ícono de arriba (#btnPerfil) es el único
        acceso, así no hay dos caminos al mismo lugar. Admin/Config se muestra acá

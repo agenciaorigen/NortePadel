@@ -24,6 +24,7 @@ let cacheEtiquetas = []; // etiquetas_jugador — uso interno del admin, con col
 let cacheRankingCategoriaAdmin = {}; // jugador_id -> [{categoria, puntos_ranking, partidos_jugados, partidos_ganados}], para el bloque "categorías de ranking" del admin
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
+let torneoEnCursoId = null; // solo si HOY cae dentro de sus fechas (a diferencia de torneoDestacadoId, no cae al próximo) -- ver cargarEnVivo()
 let ultimosPartidos = [];
 // true si alguna categoría del torneo abierto ya tiene calendario (cancha+horario
 // asignados) o terminó — fuente de verdad para mostrar Calendario/Resultados
@@ -148,6 +149,7 @@ async function despacharRuta() {
     if (!raiz) { cambiarVista("inicio"); return; }
     if (raiz === "torneos") { cambiarVista("torneos"); return; }
     if (raiz === "ranking") { cambiarVista("ranking"); return; }
+    if (raiz === "en-vivo") { cambiarVista("en-vivo"); return; }
     if (raiz === "perfil") { cambiarVista("perfil"); return; }
     if (raiz === "jugar" && FEATURE_JUGAR_HABILITADA) { cambiarVista("jugar"); return; }
     if (raiz === "admin") {
@@ -1226,6 +1228,48 @@ function renderInicioPartidosGrid(wrapId, gridId, items, onClick) {
   grid.querySelectorAll(".llave-partido").forEach((el) => { el.onclick = onClick; });
 }
 
+// admite pegar cualquier link común de YouTube (watch?v=, youtu.be/, /live/, /embed/)
+// y se queda solo con el ID de 11 caracteres, para no depender de que el club
+// pegue justo el formato "correcto" -- si no matchea nada, no hay transmisión.
+function extraerIdYoutube(url) {
+  const m = String(url || "").match(/(?:v=|youtu\.be\/|\/live\/|\/embed\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : "";
+}
+
+// "En vivo": video (cargado a mano en Config, ver btnGuardarConfig) + partidos del
+// torneo que cae dentro de HOY (no el "destacado" de cargarUltimosProximos, que
+// también apunta al próximo torneo aunque todavía no haya arrancado). Reutiliza
+// partidos_publicos() y la misma tarjeta de siempre (llavePartidoCardHtml).
+async function cargarEnVivo() {
+  const videoId = extraerIdYoutube(configApp.youtube_en_vivo);
+  const wrapVideo = document.getElementById("enVivoVideoWrap");
+  const sinVideo = document.getElementById("enVivoSinVideo");
+  if (videoId) {
+    wrapVideo.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}" title="Transmisión en vivo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+    wrapVideo.style.display = "block";
+    sinVideo.style.display = "none";
+  } else {
+    wrapVideo.innerHTML = "";
+    wrapVideo.style.display = "none";
+    sinVideo.style.display = "block";
+  }
+
+  await calcularTorneoDestacado(); // idempotente -- asegura torneoEnCursoId sin depender del orden de carga en init()
+  const wrapPartidos = document.getElementById("enVivoPartidosWrap");
+  if (!torneoEnCursoId) { wrapPartidos.style.display = "none"; return; }
+  const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoEnCursoId });
+  const partidos = data || [];
+  const ahora = new Date();
+  const jugandoAhora = partidos.filter((p) => p.estado === "en_juego");
+  const proximos = partidos.filter((p) => p.horario && p.estado === "programado" && new Date(p.horario) >= ahora)
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 6);
+
+  if (jugandoAhora.length === 0 && proximos.length === 0) { wrapPartidos.style.display = "none"; return; }
+  wrapPartidos.style.display = "block";
+  renderInicioPartidosGrid("enVivoJugandoWrap", "enVivoJugandoGrid", jugandoAhora, () => abrirTorneo(torneoEnCursoId, ""));
+  renderInicioPartidosGrid("enVivoProximosWrap", "enVivoProximosGrid", proximos, () => abrirTorneo(torneoEnCursoId, ""));
+}
+
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
   if (!miJugador) { card.style.display = "none"; return; }
@@ -1344,6 +1388,7 @@ async function calcularTorneoDestacado() {
   const enCurso = (torneos || []).find((t) => t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy);
   const proximo = (torneos || []).filter((t) => t.fecha_inicio > hoy).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
   torneoDestacadoId = (enCurso || proximo)?.id || null;
+  torneoEnCursoId = enCurso?.id || null;
 }
 
 document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
@@ -1925,8 +1970,10 @@ async function cargarConfig() {
   (data || []).forEach((r) => { configApp[r.clave] = r.valor; });
   const inputWsp = document.getElementById("cfgWhatsapp");
   const inputIg = document.getElementById("cfgInstagram");
+  const inputYt = document.getElementById("cfgYoutubeEnVivo");
   if (inputWsp) inputWsp.value = configApp.whatsapp_numero || "";
   if (inputIg) inputIg.value = configApp.instagram_url || "";
+  if (inputYt) inputYt.value = configApp.youtube_en_vivo || "";
 }
 
 document.getElementById("btnGuardarConfig").addEventListener("click", async () => {
@@ -1936,14 +1983,17 @@ document.getElementById("btnGuardarConfig").addEventListener("click", async () =
   try {
   const whatsapp = document.getElementById("cfgWhatsapp").value.trim().replace(/\D/g, "");
   const instagram = document.getElementById("cfgInstagram").value.trim();
+  const youtubeEnVivo = document.getElementById("cfgYoutubeEnVivo").value.trim();
   const { error } = await sb.from("config").upsert([
     { clave: "whatsapp_numero", valor: whatsapp || null },
-    { clave: "instagram_url", valor: instagram || null }
+    { clave: "instagram_url", valor: instagram || null },
+    { clave: "youtube_en_vivo", valor: youtubeEnVivo || null }
   ], { onConflict: "clave" });
   if (error) { toast("Error: " + error.message); return; }
   toast("Configuración guardada");
   await cargarConfig();
   cargarNoticias();
+  cargarEnVivo();
   if (torneoActualId) refrescarDetalleTorneo();
   } finally {
     btn.disabled = false;
@@ -6180,5 +6230,8 @@ async function init() {
     cargarConfig(),
     cargarNoticias()
   ]);
+  // después del bloque de arriba, no adentro: necesita que cargarConfig() ya haya
+  // llenado configApp (el link de YouTube vive ahí) antes de leerlo
+  cargarEnVivo();
 }
 init();
