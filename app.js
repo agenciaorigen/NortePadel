@@ -104,7 +104,6 @@ function cambiarVista(nombre, ruta) {
   // cambiarVista("admin") por su cuenta (ver despacharRuta) — sin este chequeo,
   // ese segundo llamado deshacía el modo enfocado apenas se activaba.
   if (nombre === "admin" && !adminFocoTorneoActivo) {
-    document.getElementById("admSelectorTorneoCard").style.display = "block";
     mostrarConfigGeneral(true);
     document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
     mostrarSeccionConfigGeneral(seccionConfigActiva);
@@ -692,9 +691,9 @@ async function cargarRanking() {
     const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
     tr.innerHTML = `<td class="${posClass}">${posicion}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} ${badgeMaster}</span></div></td>
-      <td><strong>${j.puntos_ranking}</strong></td>
-      <td>${j.partidos_jugados}</td>
-      <td>${j.partidos_ganados}</td>`;
+      <td><strong class="ranking-puntos">${j.puntos_ranking}</strong></td>
+      <td class="ranking-secundario">${j.partidos_jugados}</td>
+      <td class="ranking-secundario">${j.partidos_ganados}</td>`;
     tr.style.cursor = "pointer";
     tr.addEventListener("click", () => abrirPerfilJugador(j.id));
     tbody.appendChild(tr);
@@ -2397,10 +2396,11 @@ async function cargarTorneos() {
     div.className = "match-card torneo-card-poster" + (t.flyer_url ? " torneo-card-flyer" : "");
     div.style.cursor = "pointer";
     if (t.flyer_url) {
-      // franja inferior bien opaca (no un degradé que ya arranca transparente) para tapar
-      // del todo el texto/logos del pie del afiche, que si no se pisa con el nombre y la
-      // sede del torneo que van montados encima
-      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.97) 0%, rgba(5,7,10,.97) 32%, rgba(5,7,10,.55) 65%), radial-gradient(120% 100% at 85% -10%, rgba(15,158,150,.28), transparent 55%), url('${t.flyer_url}')`;
+      // velo parejo en TODA la tarjeta (no solo una franja abajo): el afiche del club
+      // sigue viéndose y reconociéndose, pero su propia tipografía/color pasan a
+      // "textura de fondo" en vez de competir con el nombre/sede que pone la app encima
+      // -- ver mockup-tarjeta-torneo (opción B, la elegida) para el porqué.
+      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.86), rgba(5,7,10,.86)), url('${t.flyer_url}')`;
     }
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
@@ -3443,6 +3443,7 @@ function mostrarSeccionGestion(clave) {
 // apenas se entraba. Mismo mecanismo acá (mapa clave->id + una función que
 // muestra solo esa una): nunca más de una a la vez.
 let seccionConfigActiva = "club";
+let enPantallaTorneoSelector = false; // "Torneo en gestión" del menú lateral, sin elegir torneo todavía (ver mostrarSeccionTorneoSelector)
 const SECCIONES_CONFIG_GENERAL = {
   club: { id: "admCfgClub", label: "Configuración del club" },
   complejos: { id: "admCfgComplejos", label: "Canchas y predios" },
@@ -3456,6 +3457,10 @@ const SECCIONES_CONFIG_GENERAL = {
 };
 function mostrarSeccionConfigGeneral(clave) {
   seccionConfigActiva = clave;
+  enPantallaTorneoSelector = false;
+  // "Torneo en gestión" (el selector suelto) queda en su propia pantalla, separada
+  // de Configuración general -- ver mostrarSeccionTorneoSelector.
+  document.getElementById("admSelectorTorneoCard").style.display = "none";
   // en mobile no hay sidebar (ver #admSidebar en style.css) ni ningún otro
   // nav para volver a elegir sección -- ahí "Configuración general" sigue
   // mostrando las 9 cards juntas, como siempre. Achicar a una sola solo
@@ -3464,6 +3469,18 @@ function mostrarSeccionConfigGeneral(clave) {
   Object.entries(SECCIONES_CONFIG_GENERAL).forEach(([key, info]) => {
     document.getElementById(info.id).style.display = (!esDesktop || key === clave) ? "block" : "none";
   });
+  sincronizarAdmSidebar();
+}
+
+// "Torneo en gestión" sin elegir todavía: pantalla propia, separada de
+// Configuración general (antes el selector quedaba arriba de TODAS las
+// secciones de config general a la vez, lo cual confundía -- ver charla que
+// llevó a este cambio).
+function mostrarSeccionTorneoSelector() {
+  enPantallaTorneoSelector = true;
+  mostrarConfigGeneral(false);
+  document.getElementById("admGestionTorneoWrap").style.display = "none";
+  document.getElementById("admSelectorTorneoCard").style.display = "block";
   sincronizarAdmSidebar();
 }
 
@@ -3481,7 +3498,7 @@ document.querySelectorAll("#admSidebar > .adm-side-item").forEach((btn) => {
     } else if (torneoGestionId) {
       cargarGestionTorneo(torneoGestionId);
     } else {
-      document.getElementById("admSelectorTorneoCard").scrollIntoView({ behavior: "smooth", block: "start" });
+      mostrarSeccionTorneoSelector();
     }
   });
 });
@@ -3490,12 +3507,16 @@ function sincronizarAdmSidebar() {
   const sidebar = document.getElementById("admSidebar");
   if (!sidebar) return;
   const enGestion = document.getElementById("admGestionTorneoWrap").style.display !== "none";
+  // "activo" en el ítem de menú "Torneo en gestión" tanto si ya hay un torneo cargado
+  // como si se está viendo el selector suelto (enPantallaTorneoSelector) -- las dos son
+  // parte de la misma sección, separada de Configuración general.
+  const enSeccionTorneo = enGestion || enPantallaTorneoSelector;
   sidebar.querySelectorAll(":scope > .adm-side-item").forEach((btn) => {
-    btn.classList.toggle("active", enGestion ? btn.dataset.admNav === "torneo" : btn.dataset.admNav === "config-general");
+    btn.classList.toggle("active", enSeccionTorneo ? btn.dataset.admNav === "torneo" : btn.dataset.admNav === "config-general");
   });
 
   renderSubnavLateral("admSidebarSubnav", SECCIONES_GESTION, seccionGestionActiva, enGestion, mostrarSeccionGestion, "seccion-gestion", "seccionGestion");
-  renderSubnavLateral("admSidebarSubnavConfig", SECCIONES_CONFIG_GENERAL, seccionConfigActiva, !enGestion, mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
+  renderSubnavLateral("admSidebarSubnavConfig", SECCIONES_CONFIG_GENERAL, seccionConfigActiva, !enSeccionTorneo, mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
 }
 
 // Pinta uno de los dos sub-menús de la sidebar (el de "Torneo en gestión" o
@@ -3536,6 +3557,7 @@ async function cargarGestionTorneo(id) {
   // que se llegó acá (el selector de esta misma pantalla, o "Administrar
   // este torneo" desde el propio torneo).
   adminFocoTorneoActivo = true;
+  enPantallaTorneoSelector = false;
   document.getElementById("admSelectorTorneoCard").style.display = "none";
   mostrarConfigGeneral(false);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
@@ -3694,11 +3716,9 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
   adminFocoTorneoActivo = false;
   torneoGestionId = null;
   torneoGestionData = null;
-  document.getElementById("admGestionTorneoWrap").style.display = "none";
   document.getElementById("admSelectTorneoGestion").value = "";
-  document.getElementById("admSelectorTorneoCard").style.display = "block";
-  mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
+  mostrarSeccionTorneoSelector(); // vuelve al selector suelto, no a Configuración general -- venía de gestionar ESTE torneo
   await cargarTorneos();
   avisarActualizacionEnVivo();
   } finally {
@@ -4994,10 +5014,15 @@ function llavePartidoCardHtml(p) {
     : "horario a definir";
   const local = p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "a definir");
   const puedeCargarResultado = isAdmin && p.estado !== "jugado";
+  // mismo badge/punto pulsante que ya usa badgeEstadoTorneo para el torneo en curso
+  // (.badge.live/.live-dot, ver style.css) -- así un partido "en_juego" se distingue
+  // solo con clases que ya existían, sin css nuevo para el badge en sí. Se ve en todos
+  // lados donde se usa esta tarjeta (Llave, En vivo, Inicio) porque es la misma función.
+  const enVivoAhora = p.estado === "en_juego";
   return `
-    <div class="llave-partido" data-abrir-partido="${p.id}" data-slot="${p.slot_cuadro || ""}" style="cursor:pointer" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
+    <div class="llave-partido ${enVivoAhora ? "en-vivo-ahora" : ""}" data-abrir-partido="${p.id}" data-slot="${p.slot_cuadro || ""}" style="cursor:pointer" tabindex="0" role="button" aria-label="Ver detalle: ${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}">
       <div class="llave-fecha">
-        <span>${iconoReloj()} ${horario}</span>
+        <span>${enVivoAhora ? '<span class="badge live"><span class="live-dot"></span>EN VIVO</span> ' : ""}${iconoReloj()} ${horario}</span>
         <span style="display:flex;align-items:center;gap:6px">
           ${p.slot_cuadro ? `<span>${p.slot_cuadro}</span>` : ""}
           ${puedeCargarResultado ? `<button type="button" class="btnTogglePartidoAdmin" data-p="${p.id}" title="Cargar resultado" aria-label="Cargar resultado">✏️</button>` : ""}
@@ -5209,10 +5234,8 @@ document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", (
   torneoGestionData = null;
   document.getElementById("admGestionTorneoWrap").style.display = "none";
   document.getElementById("admSelectTorneoGestion").value = "";
-  document.getElementById("admSelectorTorneoCard").style.display = "block";
-  mostrarConfigGeneral(true);
   document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-  mostrarSeccionConfigGeneral(seccionConfigActiva);
+  mostrarSeccionConfigGeneral(seccionConfigActiva); // esconde admSelectorTorneoCard por su cuenta
 });
 
 // Atajo pedido por el club: desde "Administrar este torneo" poder cargar/ver

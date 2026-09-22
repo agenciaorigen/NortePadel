@@ -66,7 +66,8 @@ body::after {
 
 h1, h2, h3, button,
 .pj-stats strong, .destacado-stat strong, .destacado-info strong,
-.hero-club-widget strong, .games-bar-nums {
+.hero-club-widget strong, .games-bar-nums,
+.ranking-puntos, .llave-set {
   font-family: "Big Shoulders Display", "Manrope", -apple-system, sans-serif;
   font-weight: 700;
 }
@@ -249,6 +250,12 @@ tr:first-child td { font-weight: 700; }
 #tablaRanking th { border-bottom: 2px solid rgba(var(--accent-rgb),.4); }
 #tablaRanking td { padding: 12px 6px; border-bottom: 1px solid var(--border); }
 #tablaRanking tr:last-child td { border-bottom: none; }
+/* el puntaje es el dato que importa -- pasa a la misma voz "scoreboard" que ya
+   usan los números grandes de "Mejores de cada categoría" (Big Shoulders Display,
+   ver arriba) en vez de un <strong> del mismo cuerpo que el resto de la fila.
+   PJ/PG bajan un escalón (chicos y mudos) para no pesar lo mismo que el puntaje. */
+.ranking-puntos { font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ranking-secundario { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 
 /* podio: la fila entera de los primeros 3 puestos se tiñe con su color de
    medalla (usa las clases pos-1/2/3 que ya emite cargarRanking(), sin
@@ -619,10 +626,10 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .flyer-destacado::before {
   content: "";
   position: absolute; inset: 0;
-  /* franja inferior bien opaca (no un simple degradé desde 0) para tapar del todo
-     el texto/logos que suelen tener los afiches en su pie, así no se pisan con el
-     nombre del torneo que ponemos encima */
-  background: linear-gradient(0deg, rgba(0,0,0,.94) 0%, rgba(0,0,0,.94) 25%, transparent 55%);
+  /* velo parejo en toda la tarjeta, no solo abajo -- mismo cambio que .torneo-card-flyer
+     en app.js (opción B del mockup): el afiche pasa a ser textura de fondo en vez de
+     competir con el nombre del torneo que ponemos encima. */
+  background: rgba(0,0,0,.8);
 }
 .flyer-destacado-info { position: relative; z-index: 1; }
 .flyer-destacado-info strong {
@@ -790,7 +797,12 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    app.js) -- overlay del tamaño de todo el contenido de .llave, sin capturar
    clicks (las tarjetas siguen siendo las que reciben el click). */
 .llave-conectores { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
-.llave-conector-linea { fill: none; stroke: var(--border); stroke-width: 2px; }
+/* antes usaban --border (rgba casi transparente, pensado para hairlines de card,
+   no para líneas que hay que poder seguir con la vista): con esa opacidad las líneas
+   existían en el DOM pero no se veían. --accent-3 ya es el color de "fase eliminatoria"
+   (ver .llave-fase-titulo más abajo) -- mismo tono, ahora también en las líneas que
+   conectan esas fases entre sí. */
+.llave-conector-linea { fill: none; stroke: var(--accent-3); stroke-width: 2px; opacity: .55; }
 .llave-fase { display: flex; flex-direction: column; gap: 14px; }
 .llave-fase-titulo {
   /* NO center: con muchas columnas (9 zonas...) el título centrado en todo el
@@ -817,8 +829,19 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   color: var(--muted); margin: 0 0 2px;
 }
 .llave-partido {
-  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
+  /* --bg-elev, no --card: .card (el panel que contiene la llave) ya usa --card,
+     así que con el mismo tono la tarjeta de partido se perdía contra su fondo --
+     ver .llave-set más abajo, que pasa a --card para no perder contraste al revés. */
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 10px;
   box-shadow: var(--shadow-sm);
+}
+/* partido "en_juego": mismo ámbar que ya usa el badge/punto pulsante "EN VIVO"
+   (--accent-2, ver .badge.live/.live-dot) -- ahora también como borde/resplandor
+   de la tarjeta entera, para que salte a la vista en una llave o grilla con
+   muchos partidos a la vez. Sin animación nueva: el punto del badge ya pulsa. */
+.llave-partido.en-vivo-ahora {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 1px rgba(var(--accent-2-rgb),.4), 0 10px 24px -8px rgba(var(--accent-2-rgb),.55);
 }
 .llave-fecha {
   display: flex; justify-content: space-between; align-items: center;
@@ -830,7 +853,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
 .llave-sets { display: flex; gap: 4px; flex-shrink: 0; }
 .llave-set {
   min-width: 22px; text-align: center; font-size: 12.5px; font-weight: 700; line-height: 1.7;
-  border-radius: 7px; background: var(--bg-elev); color: var(--muted); font-variant-numeric: tabular-nums;
+  border-radius: 7px; background: var(--card); color: var(--muted); font-variant-numeric: tabular-nums;
 }
 /* ganador resaltado en el verde de marca (--accent), igual que el resto de la app */
 .llave-fila.ganador .llave-pareja { color: var(--accent-bright); font-weight: 800; }
