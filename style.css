@@ -1108,6 +1108,7 @@ nav.tabbar .icon { position: relative; }
    se note de un vistazo que es una proyección y no un partido de verdad */
 .tabla-cuadro-proyectada td { color: var(--muted); font-style: italic; }
 .tabla-cuadro-proyectada .badge { opacity: .6; }
+.tabla-cuadro-proyectada-aviso { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
 
 /* tarjeta "Partidos" (Lista / Calendario / Llave) con fondo tipo póster */
 .card.partidos-poster {

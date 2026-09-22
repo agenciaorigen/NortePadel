@@ -5074,10 +5074,15 @@ function renderPartidosLlave(containerId, partidos) {
 // arma los cruces del cuadro propio del club (PLANTILLAS_CUADRO/
 // proyeccionCuadroCompleto, en matching.js), así no hay que duplicar esa lógica:
 // para cada cruce de la plantilla ("C1" sale de "GZ1" y "PZ3") busca las dos
-// tarjetas reales por su data-slot y traza una línea en ángulo entre ellas. Si el
-// torneo no usa el cuadro propio del club (formato "grupos" clásico, sin
-// slot_cuadro) o el tamaño no tiene plantilla, no dibuja nada -- se ve como
-// antes, columnas sueltas sin líneas.
+// tarjetas reales por su data-slot y traza una línea en ángulo entre ellas. Las
+// líneas arrancan recién en la primera ronda de eliminación (Octavos o
+// Dieciseisavos, según corresponda al tamaño del cuadro): un ref que apunta a
+// una Zona ("GZ1", "PZ3", ...) no se conecta, así que Zonas nunca queda unida
+// por una línea, aunque algún cruce de una ronda posterior (p.ej. Octavos con
+// 9+ zonas) siga saliendo directo de una Zona por un bye. Si el torneo no usa
+// el cuadro propio del club (formato "grupos" clásico, sin slot_cuadro) o el
+// tamaño no tiene plantilla, no dibuja nada -- se ve como antes, columnas
+// sueltas sin líneas.
 function dibujarConectoresLlave(cont, partidos) {
   const llave = cont.querySelector(".llave");
   cont.querySelector(".llave-conectores")?.remove();
@@ -5095,6 +5100,7 @@ function dibujarConectoresLlave(cont, partidos) {
     const destino = cont.querySelector(`.llave-partido[data-slot="${slot}"]`);
     if (!destino) return;
     [refA, refB].forEach((ref) => {
+      if (ref[1] === "Z") return; // no conectar con Zonas, solo entre rondas de eliminación
       const origen = cont.querySelector(`.llave-partido[data-slot="${ref.slice(1)}"]`);
       if (!origen) return;
       const rO = rectRelativo(origen), rD = rectRelativo(destino);
@@ -5520,6 +5526,41 @@ function wireAccionesPartidoAdmin(cont) {
       }
     });
   });
+
+  // arma a mano, ya mismo, un cruce que la plantilla del cuadro todavía no
+  // generó automáticamente (fila proyectada tipo "Ganador Z1 vs Perdedor Z7"
+  // en la vista Tabla) — mismo inserte que hace generarSiguienteRondaCuadro
+  // para una ronda entera, pero acá para un solo slot elegido a mano, así se
+  // puede corregir un error o adelantar un cruce sin esperar a "Generar
+  // siguiente fase". Solo aplica a slots que todavía no existen como partido
+  // real (ver filaProyectadaHtml, en renderPartidosTabla).
+  cont.querySelectorAll(".btnArmarCruceManual").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+      const slot = btn.dataset.slot;
+      const nombreRonda = btn.dataset.ronda;
+      const p1 = cont.querySelector(`.selectArmarCruce1[data-slot="${slot}"]`).value;
+      const p2 = cont.querySelector(`.selectArmarCruce2[data-slot="${slot}"]`).value;
+      if (!p1 || !p2 || p1 === p2) { toast("Elegí dos parejas distintas"); return; }
+      const categoria = partidosCategoriaFiltro;
+      const { error } = await sb.from("partidos").insert({
+        torneo_id: torneoGestionId, categoria, ronda: RONDA_DISPLAY_CUADRO[nombreRonda] || nombreRonda,
+        slot_cuadro: slot, pareja1_id: p1, pareja2_id: p2, estado: "programado"
+      });
+      if (error) { toast("Error: " + error.message); return; }
+      // por si esta era la última pieza que faltaba de su ronda y otro cruce
+      // de la misma ronda ya estaba armado con un rival provisorio distinto
+      await propagarCuadro(categoria, torneoGestionId);
+      toast("Cruce armado");
+      avisarActualizacionEnVivo();
+      refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 // vista "tabla": el cuadro de zonas como planilla real — una fila por cruce
@@ -5600,12 +5641,17 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
   // como partido real (falta que se jueguen las zonas u otras rondas previas)
   // pero que ya se sabe, por la plantilla, quién entraría a cada cruce — ej.
   // "Octavos 1: Ganador Z1 vs Perdedor Z7". Solo aplica al formato del club
-  // (cuadro_zonas); no son editables porque todavía no existen como partido.
+  // (cuadro_zonas). El ✏️ deja armar el cruce YA, a mano, eligiendo las dos
+  // parejas — para corregir un error o adelantarlo sin esperar a que
+  // "Generar siguiente fase" lo resuelva solo (ver btnArmarCruceManual, en
+  // wireAccionesPartidoAdmin).
   const nZonas = partidos.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === "Z").length;
   const slotsYaArmados = new Set(partidos.map((p) => p.slot_cuadro).filter(Boolean));
   const proyectadas = nZonas
     ? proyeccionCuadroCompleto(nZonas).filter((f) => !slotsYaArmados.has(f.slot))
     : [];
+  const categoriaTabla = partidos[0]?.categoria;
+  const parejasCategoriaTabla = parejasTorneo.filter((pj) => pj.categoria === categoriaTabla);
   const filaProyectadaHtml = (f) => `
     <tr class="tabla-cuadro-fila tabla-cuadro-proyectada">
       <td class="tabla-cuadro-slot">${escapeHtml(f.slot)}</td>
@@ -5615,8 +5661,25 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
       <td>—</td>
       <td>—</td>
       <td class="tabla-cuadro-meta">a definir</td>
-      <td></td>
-    </tr>`;
+      <td>${parejasCategoriaTabla.length ? `<button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${f.slot}" title="Armar a mano" aria-label="Armar ${escapeHtml(f.slot)} a mano">✏️</button>` : ""}</td>
+    </tr>
+    ${parejasCategoriaTabla.length ? `
+    <tr class="tabla-cuadro-editrow" data-fila-edicion="${f.slot}" style="display:none">
+      <td colspan="8">
+        <p class="tabla-cuadro-proyectada-aviso">Todavía no se generó este cruce automáticamente (falta algún resultado anterior). Elegí las dos parejas para armarlo ya — por ejemplo, para corregir un error sin esperar a "Generar siguiente fase".</p>
+        <div class="match-actions">
+          <select class="selectArmarCruce1" data-slot="${f.slot}" data-ronda="${f.ronda}">
+            <option value="">Pareja 1…</option>
+            ${parejasCategoriaTabla.map((pj) => `<option value="${pj.id}">${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
+          </select>
+          <select class="selectArmarCruce2" data-slot="${f.slot}" data-ronda="${f.ronda}">
+            <option value="">Pareja 2…</option>
+            ${parejasCategoriaTabla.map((pj) => `<option value="${pj.id}">${escapeHtml(pj.jugador1_nombre)} / ${escapeHtml(pj.jugador2_nombre)}</option>`).join("")}
+          </select>
+          <button class="secondary small btnArmarCruceManual" data-slot="${f.slot}" data-ronda="${f.ronda}">Armar cruce</button>
+        </div>
+      </td>
+    </tr>` : ""}`;
 
   cont.innerHTML = `
     <div class="tabla-cuadro-scroll">

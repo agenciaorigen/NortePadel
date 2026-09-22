@@ -372,6 +372,13 @@ alter table partidos add column if not exists grupo int; -- número de grupo den
 -- alimenta (ganador y, si corresponde, perdedor), en vez de tener que
 -- adivinarlo por orden de creación.
 alter table partidos add column if not exists slot_cuadro text;
+-- Texto de resguardo ("Ganador Z1", "Perdedor Z3") para un casillero del
+-- cuadro que todavía no tiene pareja real asignada (pareja1_id/pareja2_id en
+-- null) -- partidos_publicos() lo muestra en vez del nombre real mientras el
+-- cruce siga sin resolver (ver el coalesce de esa función, más abajo).
+-- propagarCuadro (matching.js) los vacía apenas resuelve el cruce de verdad.
+alter table partidos add column if not exists pareja1_nombre_manual text;
+alter table partidos add column if not exists pareja2_nombre_manual text;
 
 -- ---------- FLYERS ----------
 create table if not exists flyers (
@@ -925,8 +932,8 @@ create or replace function partidos_publicos(p_torneo_id uuid) returns table (
   select pa.id, pa.ronda, pa.categoria, pa.grupo, pa.slot_cuadro, pa.horario, pa.estado, pa.sets,
     pa.cancha_id, c.nombre, comp.nombre,
     pa.pareja1_id, pa.pareja2_id, pa.ganador_pareja_id,
-    coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, '?'),
-    coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, '?'),
+    coalesce(j1a.nombre || ' ' || j1a.apellido || ' / ' || j1b.nombre || ' ' || j1b.apellido, pa.pareja1_nombre_manual, '?'),
+    coalesce(j2a.nombre || ' ' || j2a.apellido || ' / ' || j2b.nombre || ' ' || j2b.apellido, pa.pareja2_nombre_manual, '?'),
     j1a.nombre, j1a.apellido, j1a.foto_url, j1b.nombre, j1b.apellido, j1b.foto_url,
     j2a.nombre, j2a.apellido, j2a.foto_url, j2b.nombre, j2b.apellido, j2b.foto_url,
     pa.created_at
