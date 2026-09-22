@@ -774,7 +774,11 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
    angosta al lado de las demás, en vez de amontonarlos en una sola. Las
    fases van una al lado de la otra en la misma fila/scroll (ver
    renderPartidosLlave). */
-.llave { display: flex; align-items: flex-start; gap: 40px; position: relative; }
+/* centrado vertical (no flex-start): las fases de eliminación tienen cada vez
+   menos partidos que Zona, y con todo arrancando arriba las líneas conectoras
+   quedaban con caídas verticales enormes y descentradas -- centrar cada
+   bloque de fase contra la altura total achica esas distancias. */
+.llave { display: flex; align-items: center; gap: 40px; position: relative; }
 /* líneas conectoras estilo "cuadro de torneo" (ver dibujarConectoresLlave en
    app.js) -- overlay del tamaño de todo el contenido de .llave, sin capturar
    clicks (las tarjetas siguen siendo las que reciben el click). */
