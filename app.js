@@ -2070,9 +2070,11 @@ async function cargarConfig() {
   configApp = {};
   (data || []).forEach((r) => { configApp[r.clave] = r.valor; });
   const inputWsp = document.getElementById("cfgWhatsapp");
+  const inputWspFotos = document.getElementById("cfgWhatsappFotos");
   const inputIg = document.getElementById("cfgInstagram");
   const inputYt = document.getElementById("cfgYoutubeEnVivo");
   if (inputWsp) inputWsp.value = configApp.whatsapp_numero || "";
+  if (inputWspFotos) inputWspFotos.value = configApp.whatsapp_fotos || "";
   if (inputIg) inputIg.value = configApp.instagram_url || "";
   if (inputYt) inputYt.value = configApp.youtube_en_vivo || "";
 }
@@ -2083,10 +2085,12 @@ document.getElementById("btnGuardarConfig").addEventListener("click", async () =
   btn.disabled = true;
   try {
   const whatsapp = document.getElementById("cfgWhatsapp").value.trim().replace(/\D/g, "");
+  const whatsappFotos = document.getElementById("cfgWhatsappFotos").value.trim().replace(/\D/g, "");
   const instagram = document.getElementById("cfgInstagram").value.trim();
   const youtubeEnVivo = document.getElementById("cfgYoutubeEnVivo").value.trim();
   const { error } = await sb.from("config").upsert([
     { clave: "whatsapp_numero", valor: whatsapp || null },
+    { clave: "whatsapp_fotos", valor: whatsappFotos || null },
     { clave: "instagram_url", valor: instagram || null },
     { clave: "youtube_en_vivo", valor: youtubeEnVivo || null }
   ], { onConflict: "clave" });
@@ -6151,7 +6155,7 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 // inscripción) y el club se la manda/vende por fuera del sitio.
 function fotoTorneoItemHtml(foto, admin) {
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
-  const pedirOriginal = (!admin && configApp.whatsapp_numero)
+  const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
     ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${foto.url}" aria-label="Pedir esta foto en calidad original">📩 Original</button>`
     : "";
   return `<div class="foto-item">
@@ -6463,10 +6467,11 @@ document.addEventListener("click", (e) => {
 // sitio), así el club sabe cuál es sin que la persona tenga que describirla.
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-pedir-foto]");
-  if (!el || !configApp.whatsapp_numero) return;
+  const numero = configApp.whatsapp_fotos || configApp.whatsapp_numero;
+  if (!el || !numero) return;
   const t = cacheTorneos.find((x) => x.id === torneoActualId);
   const mensaje = `Hola! Quiero pedir esta foto de "${t?.nombre || "el torneo"}" en calidad original: ${el.dataset.pedirFoto}`;
-  window.open(`https://wa.me/${configApp.whatsapp_numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
 });
 document.addEventListener("keydown", (e) => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-foto-grande]")) {
