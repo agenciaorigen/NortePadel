@@ -266,7 +266,21 @@ tr:first-child td { font-weight: 700; }
    usan los números grandes de "Mejores de cada categoría" (Big Shoulders Display,
    ver arriba) en vez de un <strong> del mismo cuerpo que el resto de la fila.
    PJ/PG bajan un escalón (chicos y mudos) para no pesar lo mismo que el puntaje. */
-.ranking-puntos { font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+/* número de puesto: la voz "scoreboard" de la marca */
+.ranking-pos { font-family: var(--font-display); font-size: 22px; font-weight: 800; font-style: italic; font-variant-numeric: tabular-nums; width: 40px; }
+.badge.badge-master { color: #ffd700; border-color: rgba(255,215,0,.55); background: rgba(255,215,0,.08); }
+/* mi propia fila (con sesión iniciada) -- gana a la franja dorada del Master */
+#tablaRanking tr.fila-mia td { background: rgba(var(--accent-rgb),.10); }
+#tablaRanking tr.fila-mia td:first-child { border-left: 3px solid var(--accent); color: var(--accent-bright); }
+/* en celular la foto grande del top 10 baja un poco (el alto de 72px
+   partía los nombres en dos renglones) -- !important porque avatarHtml()
+   fija el tamaño inline */
+@media (max-width: 480px) {
+  #tablaRanking .avatar-master { width: 56px !important; height: 56px !important; }
+}
+.ranking-leyenda { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.ranking-leyenda-marca { flex-shrink: 0; width: 10px; height: 10px; margin-top: 4px; border-radius: 2px; background: #ffd700; }
+.ranking-puntos { font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
 .ranking-secundario { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 
 /* podio: la fila entera de los primeros 3 puestos se tiñe con su color de
@@ -981,18 +995,20 @@ body:has(#view-torneo-resultados.active) .torneo-context-top h2,
 body:has(#view-torneo-resultados.active) #dtEstado { display: none; }
 #dtEstado { margin: 0; }
 /* Torneo / Fotos / Info: pestañas de transmisión (subrayado lima), no chips */
-#torneoSubnav.pill-row {
+#torneoSubnav.pill-row, .pill-row.tabs-linea {
   margin-top: 8px; gap: 22px; padding-bottom: 0;
   border-bottom: 1px solid var(--border);
 }
-#torneoSubnav .pill {
+.pill-row.tabs-linea { margin: 0 0 14px; }
+.pill-row.tabs-linea:empty { display: none; }
+#torneoSubnav .pill, .tabs-linea .pill {
   background: none; border: none; border-radius: 0;
   padding: 10px 0 9px; border-bottom: 2px solid transparent; margin-bottom: -1px;
   font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
   color: var(--muted);
 }
-#torneoSubnav .pill:hover { color: var(--text); }
-#torneoSubnav .pill.active { background: none; color: var(--text); border-bottom-color: var(--accent); }
+#torneoSubnav .pill:hover, .tabs-linea .pill:hover { color: var(--text); }
+#torneoSubnav .pill.active, .tabs-linea .pill.active { background: none; color: var(--text); border-bottom-color: var(--accent); }
 
 /* ---------- Buscador de pareja ---------- */
 .suggest-list { position: relative; }
@@ -1512,6 +1528,17 @@ body.is-admin #btnAdminPanel { display: flex; }
   .evento-info { padding: 32px 36px; justify-content: center; }
   .evento-nombre { font-size: 52px; }
 }
+
+/* encabezado de pantalla (Ranking, En vivo): título grande de circuito en
+   vez de un <h2> chico adentro de una caja */
+.pagina-head { margin: 6px 0 18px; }
+.pagina-head h2 { margin: 0; font-size: 46px; font-style: italic; line-height: .9; display: flex; align-items: center; gap: 12px; }
+.pagina-head h2 .live-dot { width: 12px; height: 12px; margin: 0; }
+/* el punto que late solo aparece si de verdad hay transmisión o partidos
+   jugándose (si no, "En vivo" con un punto encendido promete algo que no hay) */
+#view-en-vivo .pagina-head .live-dot { display: none; }
+#view-en-vivo:has(#enVivoVideoWrap[style*="block"], #enVivoJugandoWrap[style*="block"]) .pagina-head .live-dot { display: inline-block; }
+@media (min-width: 960px) { .pagina-head h2 { font-size: 68px; } }
 
 /* ============================================================
    MI PERFIL: área privada del jugador. Se separa del circuito público

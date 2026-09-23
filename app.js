@@ -694,10 +694,12 @@ async function cargarRanking() {
     const fotoGrande = posicion <= 10;
     const tr = document.createElement("tr");
     if (clasificaMaster) tr.className = "fila-master";
+    // la fila propia (si hay sesión) se resalta, para encontrarse de un vistazo
+    if (miJugador && j.id === miJugador.id) tr.classList.add("fila-mia");
     const posClass = posicion <= 3 ? `pos-${posicion}` : "";
     const avatarClass = fotoGrande ? "avatar-master" : "";
-    const badgeMaster = clasificaMaster ? `<span class="badge" style="color:#ffd700;border-color:#ffd700">Master</span>` : "";
-    tr.innerHTML = `<td class="${posClass}">${posicion}</td>
+    const badgeMaster = clasificaMaster ? `<span class="badge badge-master">Master</span>` : "";
+    tr.innerHTML = `<td class="ranking-pos ${posClass}">${posicion}</td>
       <td><div style="display:flex;align-items:center;gap:8px">${avatarHtml(j.foto_url, fotoGrande ? 72 : 30, avatarClass)}<span>${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} ${badgeMaster}</span></div></td>
       <td><strong class="ranking-puntos">${j.puntos_ranking}</strong></td>
       <td class="ranking-secundario">${j.partidos_jugados}</td>

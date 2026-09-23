@@ -465,10 +465,12 @@
 
   <!-- RANKING -->
   <section id="view-ranking" class="view">
-    <div class="card">
-      <h2>Ranking por categoría</h2>
-      <p class="match-meta" style="margin-bottom:6px;color:#ffd700">Los resaltados en amarillo (primeros 20 de su categoría) clasifican al Master de fin de año — los primeros 10, además, se destacan con foto grande.</p>
-      <div class="pill-row" id="generoRankingPills"></div>
+    <div class="pagina-head">
+      <p class="perfil-eyebrow">Circuito Norte Padel</p>
+      <h2>Ranking</h2>
+    </div>
+    <div class="card card-ranking">
+      <div class="pill-row tabs-linea" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
       <div class="pill-row admin-only" style="margin-bottom:10px">
         <button type="button" class="secondary small" id="btnExportarTop20">Exportar Top 20 (imagen)</button>
@@ -479,6 +481,7 @@
         <tbody></tbody>
       </table>
       <p class="empty" id="rankingVacio" style="display:none">Todavía no hay jugadores con puntos.</p>
+      <p class="ranking-leyenda"><span class="ranking-leyenda-marca" aria-hidden="true"></span>Los primeros 20 de cada categoría (marcados en dorado) clasifican al Master de fin de año. Los primeros 10, además, se destacan con foto grande.</p>
     </div>
   </section>
 
@@ -487,8 +490,11 @@
        Reutiliza calcularTorneoDestacado()/partidos_publicos() y la misma tarjeta
        de partido de siempre (llavePartidoCardHtml) -- ver cargarEnVivo() en app.js. -->
   <section id="view-en-vivo" class="view">
+    <div class="pagina-head">
+      <p class="perfil-eyebrow">Circuito Norte Padel</p>
+      <h2><span class="live-dot" aria-hidden="true"></span>En vivo</h2>
+    </div>
     <div class="card">
-      <h2>En vivo</h2>
       <div class="video-embed-16-9" id="enVivoVideoWrap" style="display:none"></div>
       <p class="empty" id="enVivoSinVideo" style="display:none">No hay transmisión en este momento.</p>
     </div>
