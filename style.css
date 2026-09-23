@@ -1575,6 +1575,11 @@ body.is-admin #btnAdminPanel { display: flex; }
 .ficha-jugador-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .ficha-jugador-acciones button { width: 100%; }
 .perfil-cuenta-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.perfil-privacidad { margin: 16px 0 8px; font-size: 12.5px; line-height: 1.5; }
+.perfil-privacidad a, .fotos-aviso a, .check-legal a, .inicio-footer-legal a { color: var(--accent-bright); }
+.check-legal { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); cursor: pointer; }
+.check-legal input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; accent-color: var(--accent); }
+.fotos-aviso { margin-top: 14px; font-size: 12.5px; }
 
 /* ============================================================
    ESCRITORIO: nav horizontal arriba + una sola columna de contenido

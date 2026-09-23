@@ -1,0 +1,5 @@
+# Carpetas privadas: NO se suben a GitHub ni se publican en elnortepadel.com
+# (scripts SQL con datos de jugadores, capturas del panel, archivos viejos y
+# los archivos que genera Claude). Quedan solo en esta computadora.
+_privado/
+Claude outputs/

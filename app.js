@@ -239,6 +239,42 @@ function idDesdeDatalist(inputId) {
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+// Direcciones de imágenes (fotos de perfil, flyers, logos, fotos del torneo):
+// solo https, y los caracteres que podrían romper un atributo o un url('...')
+// de CSS se codifican (%20, %28...: el navegador pide exactamente el mismo
+// archivo). Una foto de perfil la puede escribir el propio jugador en la base,
+// así que no se confía en el valor: si no es https, se trata como "sin foto".
+function urlSegura(u) {
+  const s = String(u ?? "").trim();
+  if (!/^https:\/\//i.test(s)) return "";
+  return s.replace(/[\s"'()<>\\]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"));
+}
+// Links que se abren al tocar (auspiciantes, noticias, Instagram): solo http(s),
+// nunca "javascript:" ni otros esquemas, y escapados para el atributo.
+function hrefSeguro(u) {
+  const s = String(u ?? "").trim();
+  return /^https?:\/\//i.test(s) ? escapeHtml(s) : "";
+}
+// Imagen que no carga: se esconde (o, con data-si-falla="texto", se reemplaza
+// por su texto alternativo). Reemplaza a los onerror="..." que había escritos
+// dentro del HTML, que la política de seguridad del sitio (CSP) ya no permite.
+document.addEventListener("error", (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.siFalla) return;
+  if (img.dataset.siFalla === "texto") {
+    img.replaceWith(Object.assign(document.createElement("span"), { className: "sponsor-caption", textContent: img.alt }));
+  } else if (img.id === "fotoPreview") {
+    mostrarFotoPreview(null);
+  } else {
+    img.style.display = "none";
+  }
+}, true);
+// clave provisoria al azar (para "Blanquear clave"): 10 caracteres sin los que
+// se confunden a la vista (0/O, 1/l/I)
+function claveProvisoria() {
+  const letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from(crypto.getRandomValues(new Uint32Array(10)), (n) => letras[n % letras.length]).join("");
+}
 
 // Etiqueta compartida para buscar un jugador por nombre en cualquier datalist
 // (alta de pareja nueva, reemplazo de un jugador en una pareja existente...).
@@ -283,6 +319,11 @@ document.getElementById("btnSignup").addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
   if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
+  if (password.length < 8) { document.getElementById("authError").textContent = "La contraseña tiene que tener al menos 8 caracteres."; return; }
+  if (!document.getElementById("chkAceptoTerminos").checked) {
+    document.getElementById("authError").textContent = "Para crear la cuenta tenés que aceptar la Política de privacidad y los Términos.";
+    return;
+  }
   const { error } = await sb.auth.signUp({ email, password });
   if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
   toast("Cuenta creada. Ahora completá tu perfil de jugador");
@@ -295,6 +336,15 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
 });
 
 document.getElementById("btnMiPerfilRanking").addEventListener("click", () => cambiarVista("ranking"));
+// Derecho a pedir la supresión de los datos (Ley 25.326): abre WhatsApp con
+// el pedido ya escrito; el club da de baja la cuenta desde Gestión.
+document.getElementById("btnPedirBaja").addEventListener("click", () => {
+  const numero = String(configApp.whatsapp_numero || "").replace(/\D/g, "");
+  if (!numero) { toast("El club todavía no cargó su WhatsApp: pedile la baja en persona."); return; }
+  const quien = miJugador ? `${miJugador.nombre} ${miJugador.apellido}` : "un jugador";
+  const mensaje = `Hola! Soy ${quien} (usuario ${currentUser?.email || "—"}). Quiero pedir la baja de mi cuenta de Norte Padel y que borren mis datos personales.`;
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
+});
 document.getElementById("btnEditarPerfil").addEventListener("click", () => {
   editandoPerfil = true;
   renderVistaPerfil();
@@ -552,7 +602,8 @@ document.getElementById("btnGuardarClaveNueva").addEventListener("click", async 
   const c2 = document.getElementById("nuevaClave2").value;
   const err = document.getElementById("claveNuevaError");
   err.textContent = "";
-  if (c1.length < 6) { err.textContent = "La contraseña debe tener al menos 6 caracteres."; return; }
+  if (c1.length < 8) { err.textContent = "La contraseña tiene que tener al menos 8 caracteres."; return; }
+  if (/^padel20\d\d$/i.test(c1)) { err.textContent = "Esa es la clave provisoria: elegí una propia."; return; }
   if (c1 !== c2) { err.textContent = "Las dos contraseñas no coinciden."; return; }
 
   const { error } = await sb.auth.updateUser({ password: c1 });
@@ -975,7 +1026,7 @@ async function abrirPerfilJugador(jugadorId) {
   cont.innerHTML = (torneosGanados || []).length > 0
     ? torneosGanados.map((t) => `
       <div class="pj-torneo-item">
-        <div><strong>${iconoTrofeo()} ${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
+        <div><strong>${iconoTrofeo()} ${escapeHtml(t.torneo_nombre)}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
         <span class="match-meta">${t.fecha || ""}</span>
       </div>`).join("")
     : '<p class="empty">Todavía no ganó ningún torneo.</p>';
@@ -1001,7 +1052,7 @@ async function abrirPerfilJugador(jugadorId) {
   cardSub.style.display = cantPlata > 0 ? "block" : "none";
   contSub.innerHTML = (finalesPerdidas || []).map((t) => `
     <div class="pj-torneo-item">
-      <div><strong>${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
+      <div><strong>${escapeHtml(t.torneo_nombre)}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
       <span class="match-meta">${t.fecha || ""}</span>
     </div>`).join("");
 }
@@ -1045,7 +1096,7 @@ async function cargarInicio() {
     .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   destacado.innerHTML = `
     <article class="evento-torneo" tabindex="0" role="button" aria-label="Ver ${escapeHtml(primero.nombre)}">
-      <div class="evento-flyer" style="background-image:url('${primero.flyer_url}')"></div>
+      <div class="evento-flyer" style="background-image:url('${urlSegura(primero.flyer_url)}')"></div>
       <div class="evento-info">
         <div class="evento-estado">${badgeEstadoTorneo(primero)}</div>
         <h3 class="evento-nombre">${escapeHtml(primero.nombre)}</h3>
@@ -1065,7 +1116,7 @@ async function cargarInicio() {
 
   resto.forEach((t) => {
     const div = document.createElement("div");
-    div.innerHTML = `<img src="${t.flyer_url}" alt="${t.nombre}" loading="lazy" style="cursor:pointer" /><div class="match-meta meta-caption">${t.nombre}</div>`;
+    div.innerHTML = `<img src="${urlSegura(t.flyer_url)}" alt="${escapeHtml(t.nombre)}" loading="lazy" style="cursor:pointer" /><div class="match-meta meta-caption">${escapeHtml(t.nombre)}</div>`;
     div.querySelector("img").addEventListener("click", () => abrirTorneo(t.id));
     grid.appendChild(div);
   });
@@ -1080,12 +1131,13 @@ async function cargarInicio() {
 // silueta de trazo para jugadores sin foto (antes era el emoji 🎾)
 const ICONO_JUGADOR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="50%" height="50%" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>';
 function avatarHtml(fotoUrl, size, extraClass, ampliable) {
+  fotoUrl = urlSegura(fotoUrl);
   const s = size || 44;
   const clickable = ampliable && fotoUrl;
   const cls = (extraClass ? ` ${extraClass}` : "") + (clickable ? " avatar-clickable" : "");
   const dataAttr = clickable ? ` data-foto-grande="${fotoUrl}" tabindex="0" role="button" aria-label="Ver foto en grande"` : "";
   const img = fotoUrl
-    ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'"${dataAttr} />`
+    ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" data-si-falla="ocultar"${dataAttr} />`
     : `<div class="avatar avatar-placeholder${cls}" style="width:${s}px;height:${s}px">${ICONO_JUGADOR_SVG}</div>`;
   if (!clickable) return img;
   const iconoLupa = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="10" cy="10" r="6.5"/><path d="M10 7.2v5.6M7.2 10h5.6"/><path d="M15 15l5.5 5.5"/></svg>`;
@@ -1147,7 +1199,7 @@ function renderMejoresPorCategoria() {
   banda.style.display = "block";
 
   const tarjetaHtml = (j) => {
-    const fondo = j.foto_url ? `style="background-image:url('${j.foto_url}')"` : "";
+    const fondo = urlSegura(j.foto_url) ? `style="background-image:url('${urlSegura(j.foto_url)}')"` : "";
     return `
       <div class="destacado-card" data-jugador-id="${j.id}" ${fondo}>
         <div class="destacado-tag">${escapeHtml(j.categoria)}</div>
@@ -1290,7 +1342,7 @@ async function cargarEnVivo() {
   const wrapVideo = document.getElementById("enVivoVideoWrap");
   const sinVideo = document.getElementById("enVivoSinVideo");
   if (videoId) {
-    wrapVideo.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}" title="Transmisión en vivo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+    wrapVideo.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}" title="Transmisión en vivo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
     wrapVideo.style.display = "block";
     sinVideo.style.display = "none";
   } else {
@@ -2238,7 +2290,7 @@ function renderListaJugadoresAdmin() {
         <label for="jaEtiqueta-${j.id}" class="match-meta" style="margin:0">Etiqueta:</label>
         <select id="jaEtiqueta-${j.id}" class="jaEtiqueta">${opcionesEtiqueta}</select>
       </div>
-      <div class="match-meta">${j.email || ""} ${j.telefono || ""}</div>
+      <div class="match-meta">${escapeHtml(j.email || "")} ${escapeHtml(j.telefono || "")}</div>
       <div class="ja-ranking-extra" style="margin-top:8px">
         <div class="match-meta">Categorías de ranking (puede estar en más de una a la vez):</div>
         <div class="jaRankingLista"></div>
@@ -2378,9 +2430,9 @@ function renderListaJugadoresAdmin() {
     // pegada acá) que valida que quien llama es admin y recién ahí resetea.
     div.querySelector(".btnBlanquearClave").addEventListener("click", async () => {
       if (!j.email) { toast("Este jugador no tiene usuario/email cargado"); return; }
-      const nuevaClave = prompt(`Nueva clave para ${j.nombre} ${j.apellido} (usuario: ${j.email}):`, "padel2026");
+      const nuevaClave = prompt(`Nueva clave provisoria para ${j.nombre} ${j.apellido} (usuario: ${j.email}). Pasásela por privado; al entrar le va a pedir que la cambie:`, claveProvisoria());
       if (!nuevaClave) return;
-      if (nuevaClave.length < 6) { toast("La clave debe tener al menos 6 caracteres"); return; }
+      if (nuevaClave.length < 8) { toast("La clave debe tener al menos 8 caracteres"); return; }
       const { data, error } = await sb.functions.invoke("admin-reset-password", { body: { email: j.email, nuevaClave } });
       if (error || data?.error) { toast("Error: " + (data?.error || error.message)); return; }
       toast(`Clave de ${j.nombre} ${j.apellido} blanqueada — se la pide cambiar al entrar`);
@@ -2439,7 +2491,7 @@ function renderSolicitudesCategoria(jugadores) {
   solicitudes.forEach((j) => {
     const div = document.createElement("div");
     div.className = "match-card";
-    div.innerHTML = `<div class="match-teams">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} <span class="badge">${j.categoria} → ${j.categoria_pendiente}</span></div>
+    div.innerHTML = `<div class="match-teams">${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)} <span class="badge">${escapeHtml(j.categoria)} → ${escapeHtml(j.categoria_pendiente)}</span></div>
       <div class="match-meta" style="display:flex;gap:8px;margin-top:8px">
         <button class="secondary small btnAprobarCategoria">Aprobar</button>
         <button class="secondary small danger btnRechazarCategoria">Rechazar</button>
@@ -2534,7 +2586,7 @@ async function cargarTorneos() {
   if (spTorneo) {
     const valorPrevio = spTorneo.value;
     spTorneo.innerHTML = '<option value="">General (todos los torneos)</option>' +
-      cacheTorneos.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join("");
+      cacheTorneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join("");
     if (valorPrevio) spTorneo.value = valorPrevio;
   }
 
@@ -2544,7 +2596,7 @@ async function cargarTorneos() {
   if (selGestion) {
     const valorPrevio = selGestion.value;
     selGestion.innerHTML = '<option value="">Elegí un torneo</option>' +
-      cacheTorneos.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join("");
+      cacheTorneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join("");
     if (valorPrevio) selGestion.value = valorPrevio;
   }
   renderAdminListaTorneos();
@@ -2564,7 +2616,7 @@ async function cargarTorneos() {
       // sigue viéndose y reconociéndose, pero su propia tipografía/color pasan a
       // "textura de fondo" en vez de competir con el nombre/sede que pone la app encima
       // -- ver mockup-tarjeta-torneo (opción B, la elegida) para el porqué.
-      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.86), rgba(5,7,10,.86)), url('${t.flyer_url}')`;
+      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.86), rgba(5,7,10,.86)), url('${urlSegura(t.flyer_url)}')`;
     }
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
@@ -2573,11 +2625,11 @@ async function cargarTorneos() {
     const maps = linkMapsComplejo(t.complejos);
     div.innerHTML = `
       <div class="torneo-card-header">
-        <span class="torneo-nombre">${t.nombre}</span>
+        <span class="torneo-nombre">${escapeHtml(t.nombre)}</span>
         ${badgeEstadoTorneo(t)}
       </div>
       <div class="torneo-lugar">
-        ${iconoPin()} <span>${t.complejos?.nombre || "sin complejo"}</span>
+        ${iconoPin()} <span>${escapeHtml(t.complejos?.nombre || "sin complejo")}</span>
         ${maps ? `<a href="${maps}" target="_blank" rel="noopener" class="torneo-maps-link">Ver ubicación ↗</a>` : ""}
       </div>
       <div class="match-meta meta-caption">${categorias} · desde ${t.fecha_inicio}</div>
@@ -6301,13 +6353,12 @@ function renderSponsorItem(s, caption, admin) {
   // Hace falta escapar las dos capas por separado y en este orden — si sólo
   // se escapara una, una comilla doble en el nombre rompe el atributo, o una
   // barra invertida rompe el escape de la comilla simple del string JS.
-  const nombreJs = String(s.nombre ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const onerror = escapeHtml(`this.replaceWith(Object.assign(document.createElement('span'),{className:'sponsor-caption',textContent:'${nombreJs}'}))`);
-  const contenido = `<img src="${s.logo_url}" alt="${escapeHtml(s.nombre)}" loading="lazy" onerror="${onerror}" />` +
+  // si el logo no carga, se muestra el nombre del auspiciante en su lugar (ver data-si-falla)
+  const contenido = `<img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" />` +
     (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
   const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "");
-  const item = s.link_url
-    ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
+  const item = hrefSeguro(s.link_url)
+    ? `<a href="${hrefSeguro(s.link_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
     : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
   // En admin el logo va aparte del botón de borrar (nunca adentro del <a>,
   // que ya es clickeable y abre el link del auspiciante).
@@ -6536,10 +6587,10 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 function fotoTorneoItemHtml(foto, admin) {
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
   const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
-    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${foto.url}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
+    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${urlSegura(foto.url)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
     : "";
   return `<div class="foto-item">
-    <img src="${foto.url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${foto.url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+    <img src="${urlSegura(foto.url)}" alt="Foto del torneo" loading="lazy" data-foto-grande="${urlSegura(foto.url)}" tabindex="0" role="button" aria-label="Ver foto en grande" />
     ${borrar}
     ${pedirOriginal}
   </div>`;
@@ -6645,9 +6696,9 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
 // NOTICIAS (novedades del club en Inicio + botón a Instagram)
 // ============================================================
 function renderNoticiaCard(n) {
-  const imagen = n.imagen_url ? `<img src="${n.imagen_url}" alt="${escapeHtml(n.titulo)}" loading="lazy" onerror="this.style.display='none'" />` : "";
+  const imagen = urlSegura(n.imagen_url) ? `<img src="${urlSegura(n.imagen_url)}" alt="${escapeHtml(n.titulo)}" loading="lazy" data-si-falla="ocultar" />` : "";
   const contenido = `${imagen}<strong>${escapeHtml(n.titulo)}</strong>${n.texto ? `<p>${escapeHtml(n.texto)}</p>` : ""}` +
-    (n.link ? `<a href="${n.link}" target="_blank" rel="noopener noreferrer" class="link-btn">Ver más →</a>` : "");
+    (hrefSeguro(n.link) ? `<a href="${hrefSeguro(n.link)}" target="_blank" rel="noopener noreferrer" class="link-btn">Ver más →</a>` : "");
   return `<div class="noticia-card">${contenido}</div>`;
 }
 
@@ -6657,7 +6708,7 @@ async function cargarNoticias() {
   const card = document.getElementById("noticiasCard");
   const ig = document.getElementById("noticiasInstagram");
   if (configApp.instagram_url) {
-    ig.innerHTML = `<a href="${configApp.instagram_url}" target="_blank" rel="noopener noreferrer" class="secondary small">Seguinos en Instagram</a>`;
+    ig.innerHTML = `<a href="${hrefSeguro(configApp.instagram_url)}" target="_blank" rel="noopener noreferrer" class="secondary small">Seguinos en Instagram</a>`;
   } else {
     ig.innerHTML = "";
   }
@@ -6770,7 +6821,7 @@ async function abrirNotificaciones() {
           : `class="match-card${n.leido ? "" : " match-card-jugado"}"`;
         return `
       <${tag} ${atributos} style="margin-bottom:8px;text-align:left;width:100%">
-        <div style="font-size:13px">${n.mensaje}</div>
+        <div style="font-size:13px">${escapeHtml(n.mensaje)}</div>
         <div class="match-meta" style="margin-top:4px">${new Date(n.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}${!n.leido ? ' · <span class="badge orange">nueva</span>' : ""}${puedeNavegar ? " · Tocá para ver →" : ""}</div>
       </${tag}>`;
       }).join("")

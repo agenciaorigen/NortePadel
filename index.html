@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
 <meta name="theme-color" content="#07090B" />
+<!-- Política de seguridad del contenido: solo se ejecutan scripts del propio
+     sitio (nada inyectado ni de otros dominios) y los datos solo viajan a
+     Supabase. Si algún día se suma otro servicio, hay que agregarlo acá. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://utrgavidbaczabxkirwo.supabase.co wss://utrgavidbaczabxkirwo.supabase.co; frame-src https://www.youtube-nocookie.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
 <!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
      abre como acceso directo al navegador, no como app a pantalla completa -->
 <meta name="mobile-web-app-capable" content="yes" />
@@ -29,9 +34,9 @@
     <h2>Cambiá tu contraseña</h2>
     <p class="match-meta">Tu cuenta se creó con una clave provisoria. Elegí una nueva antes de seguir.</p>
     <label for="nuevaClave1">Nueva contraseña</label>
-    <input id="nuevaClave1" type="password" autocomplete="new-password" minlength="6" required />
+    <input id="nuevaClave1" type="password" autocomplete="new-password" minlength="8" required />
     <label for="nuevaClave2">Repetila</label>
-    <input id="nuevaClave2" type="password" autocomplete="new-password" minlength="6" required />
+    <input id="nuevaClave2" type="password" autocomplete="new-password" minlength="8" required />
     <button class="primary" id="btnGuardarClaveNueva" style="margin-top:10px;width:100%">Guardar y continuar</button>
     <p class="match-meta" id="claveNuevaError"></p>
   </div>
@@ -223,7 +228,7 @@
     <footer class="inicio-footer">
       <p class="inicio-footer-marca">NORTE <span>PADEL</span></p>
       <p>Movimiento. Disciplina. Resultado.</p>
-      <p class="inicio-footer-legal">© Norte Padel · Circuito de pádel</p>
+      <p class="inicio-footer-legal">© Norte Padel · Circuito de pádel · <a href="privacidad.html">Privacidad y términos</a></p>
     </footer>
   </section>
 
@@ -322,6 +327,7 @@
       <h3>Fotos del torneo</h3>
       <div id="dtFotosGaleria" class="fotos-galeria"></div>
       <p class="empty" id="dtFotosVacio" style="display:none">Todavía no hay fotos subidas de este torneo.</p>
+      <p class="match-meta fotos-aviso">¿Aparecés en una foto y preferís que no esté publicada? Escribinos por WhatsApp y la sacamos. Más info en <a href="privacidad.html#imagenes" target="_blank" rel="noopener">Privacidad</a>.</p>
     </div>
   </section>
 
@@ -498,6 +504,10 @@
       <label for="authPassword">Contraseña</label>
       <input id="authPassword" type="password" autocomplete="current-password" />
       <button class="primary" id="btnLogin">Ingresar</button>
+      <label class="check-legal" for="chkAceptoTerminos">
+        <input type="checkbox" id="chkAceptoTerminos" />
+        <span>Para crear una cuenta nueva: leí y acepto la <a href="privacidad.html" target="_blank" rel="noopener">Política de privacidad y los Términos de uso</a>.</span>
+      </label>
       <button class="secondary" id="btnSignup" style="margin-top:10px;width:100%">Crear cuenta nueva</button>
       <p class="match-meta" id="authError"></p>
     </div>
@@ -505,7 +515,7 @@
     <div class="card" id="completarPerfilCard" style="display:none">
       <h2>Completá tu perfil de jugador</h2>
       <div style="text-align:center;margin-bottom:14px">
-        <img id="fotoPreview" alt="Tu foto de perfil" class="avatar avatar-grande" style="display:none;margin:0 auto" onerror="mostrarFotoPreview(null)" />
+        <img id="fotoPreview" alt="Tu foto de perfil" class="avatar avatar-grande" style="display:none;margin:0 auto" data-si-falla="preview" />
         <div id="fotoPlaceholder" class="avatar avatar-grande avatar-placeholder" style="margin:0 auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="45%" height="45%" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg></div>
         <label for="jFoto">Foto de perfil</label>
         <input id="jFoto" type="file" accept="image/*" />
@@ -578,6 +588,8 @@
           <button class="secondary small" id="btnEditarPerfil">Editar mis datos y horarios</button>
           <button class="secondary small danger" id="btnLogout">Cerrar sesión</button>
         </div>
+        <p class="match-meta perfil-privacidad">Tus datos se usan solo para organizar el circuito (ver <a href="privacidad.html" target="_blank" rel="noopener">Privacidad</a>). Podés pedir que los corrijamos o que borremos tu cuenta cuando quieras.</p>
+        <button type="button" class="secondary small" id="btnPedirBaja">Pedir la baja de mi cuenta</button>
       </div>
     </div>
   </section>
@@ -1170,7 +1182,10 @@
      la vuelta extra de jsdelivr resolviendo cuál es la última 2.x en cada carga.
      defer en las 4: así se descargan en paralelo (antes se esperaba a que bajara
      el SDK de Supabase, entero, antes de siquiera empezar a pedir app.js). -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.114.0/dist/umd/supabase.min.js" defer></script>
+<!-- Supabase 2.114.0 servido desde el propio sitio (vendor/supabase.js, copia
+     exacta del paquete oficial de npm): así no se ejecuta código de terceros y
+     la política de seguridad (CSP, arriba) puede permitir solo scripts propios. -->
+<script src="vendor/supabase.js" defer></script>
 <script src="config.js" defer></script>
 <script src="matching.js" defer></script>
 <script src="app.js" defer></script>

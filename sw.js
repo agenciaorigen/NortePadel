@@ -1,10 +1,12 @@
-const CACHE = "norte-padel-v131";
+const CACHE = "norte-padel-v132";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./config.js",
   "./app.js",
+  "./vendor/supabase.js",
+  "./privacidad.html",
   "./matching.js",
   "./manifest.json",
   "./icon-192.png",
