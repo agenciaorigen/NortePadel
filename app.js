@@ -6187,6 +6187,36 @@ async function cargarFotosTorneoAdmin() {
   });
 }
 
+// Una foto de celular puede pesar 5-8MB a resolución completa -- eso ni hace
+// falta para verla en pantalla ni para descargarla, y multiplicado por
+// varias fotos deja el torneo pesadísimo para cargar. Antes de subir se
+// redimensiona (máximo 1920px del lado más largo, de sobra para verla
+// grande o descargarla) y se recomprime a JPEG calidad 0.82 con el Canvas
+// nativo del navegador -- sin librerías, y sin pérdida de calidad visible.
+// Si por lo que sea el navegador no puede procesarla, sube el archivo
+// original antes que no subir nada.
+function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxLado || height > maxLado) {
+        if (width > height) { height = Math.round((height * maxLado) / width); width = maxLado; }
+        else { width = Math.round((width * maxLado) / height); height = maxLado; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob || archivo), "image/jpeg", calidad);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
+    img.src = url;
+  });
+}
+
 document.getElementById("btnSubirFotosTorneo").addEventListener("click", async () => {
   const btn = document.getElementById("btnSubirFotosTorneo");
   if (btn.disabled || !torneoGestionId) return;
@@ -6194,10 +6224,15 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
   const archivos = Array.from(input.files || []);
   if (!archivos.length) { toast("Elegí una o más fotos"); return; }
   btn.disabled = true;
+  const textoOriginal = btn.textContent;
   try {
-    for (const archivo of archivos) {
-      const path = `${torneoGestionId}/${Date.now()}-${archivo.name}`;
-      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, archivo);
+    for (let i = 0; i < archivos.length; i++) {
+      const archivo = archivos[i];
+      btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
+      const comprimida = await comprimirFoto(archivo);
+      const nombreBase = archivo.name.replace(/\.[^.]+$/, "");
+      const path = `${torneoGestionId}/${Date.now()}-${nombreBase}.jpg`;
+      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg" });
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
       const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl });
@@ -6209,6 +6244,7 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
     if (torneoActualId === torneoGestionId) cargarFotosTorneo();
   } finally {
     btn.disabled = false;
+    btn.textContent = textoOriginal;
   }
 });
 
