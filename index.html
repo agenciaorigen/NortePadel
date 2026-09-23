@@ -52,12 +52,16 @@
   </div>
 </div>
 
-<div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none">
+<div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none" role="dialog" aria-modal="true" aria-label="Foto ampliada">
   <div class="fotogrande-acciones">
+    <span id="fotoGrandeContador" class="fotogrande-contador" aria-live="polite"></span>
+    <button type="button" class="primary small" id="fotoGrandePedir" hidden>Pedir original</button>
     <a href="" download id="fotoGrandeDescargar" class="secondary small">Descargar</a>
     <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">Cerrar</button>
   </div>
+  <button type="button" class="fotogrande-nav" id="fotoGrandeAnterior" aria-label="Foto anterior" hidden>‹</button>
   <img id="fotoGrandeImg" src="" alt="Foto ampliada" />
+  <button type="button" class="fotogrande-nav" id="fotoGrandeSiguiente" aria-label="Foto siguiente" hidden>›</button>
 </div>
 
 <!-- Detalle de un partido puntual (se abre al tocar una tarjeta en Calendario o

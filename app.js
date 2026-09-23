@@ -6895,13 +6895,41 @@ document.getElementById("notifOverlay").addEventListener("click", (e) => {
 // ---------- Foto ampliada (lightbox): tocar la foto de un jugador para verla grande ----------
 // listener delegado sobre document — cubre cualquier avatarHtml(..., true) presente o
 // futuro en la página, sin tener que reengancharlo cada vez que se re-renderiza algo
-function abrirFotoGrande(fotoUrl) {
-  document.getElementById("fotoGrandeImg").src = fotoUrl;
-  document.getElementById("fotoGrandeDescargar").href = fotoUrl;
-  document.getElementById("fotoGrandeOverlay").style.display = "flex";
+// Si la foto es de una galería de torneo, el visor pasa a modo galería:
+// flechas, ←/→, deslizar con el dedo, contador y "Pedir original".
+let galeriaFotos = [], galeriaPos = 0, fotoGrandeOrigen = null;
+function abrirFotoGrande(el) {
+  const galeria = el.closest(".fotos-galeria");
+  galeriaFotos = galeria ? [...galeria.querySelectorAll("[data-foto-grande]")] : [];
+  galeriaPos = galeriaFotos.indexOf(el);
+  fotoGrandeOrigen = el;
+  const overlay = document.getElementById("fotoGrandeOverlay");
+  overlay.classList.toggle("es-galeria", !!galeria);
+  document.getElementById("fotoGrandeAnterior").hidden = document.getElementById("fotoGrandeSiguiente").hidden = galeriaFotos.length < 2;
+  mostrarFotoGrande(el);
+  overlay.style.display = "flex";
+  document.getElementById("btnCerrarFotoGrande").focus();
+}
+function mostrarFotoGrande(el) {
+  const url = el.dataset.fotoGrande;
+  document.getElementById("fotoGrandeImg").src = url;
+  document.getElementById("fotoGrandeDescargar").href = url;
+  const pedir = el.parentElement.querySelector("[data-pedir-foto]");
+  const btnPedir = document.getElementById("fotoGrandePedir");
+  btnPedir.hidden = !pedir;
+  btnPedir.dataset.pedirFoto = pedir ? pedir.dataset.pedirFoto : "";
+  document.getElementById("fotoGrandeContador").textContent = galeriaFotos.length > 1 ? `${galeriaPos + 1} / ${galeriaFotos.length}` : "";
+  const siguiente = galeriaFotos[galeriaPos + 1];
+  if (siguiente) new Image().src = siguiente.dataset.fotoGrande; // precarga la próxima
+}
+function moverGaleria(paso) {
+  if (galeriaFotos.length < 2) return;
+  galeriaPos = (galeriaPos + paso + galeriaFotos.length) % galeriaFotos.length;
+  mostrarFotoGrande(galeriaFotos[galeriaPos]);
 }
 function cerrarFotoGrande() {
   document.getElementById("fotoGrandeOverlay").style.display = "none";
+  (galeriaFotos[galeriaPos] || fotoGrandeOrigen)?.focus();
   document.getElementById("fotoGrandeImg").src = "";
   document.getElementById("fotoGrandeDescargar").href = "";
 }
@@ -6932,7 +6960,7 @@ document.getElementById("fotoGrandeDescargar").addEventListener("click", async (
 });
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-foto-grande]");
-  if (el) abrirFotoGrande(el.dataset.fotoGrande);
+  if (el) abrirFotoGrande(el);
 });
 // "Pedir original" de una foto del torneo: abre WhatsApp con un mensaje que
 // ya incluye el link de ESA foto puntual (la versión liviana que se ve en el
@@ -6948,7 +6976,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-foto-grande]")) {
     e.preventDefault();
-    abrirFotoGrande(e.target.dataset.fotoGrande);
+    abrirFotoGrande(e.target);
   }
 });
 // Las tarjetas de partido (Planilla/Calendario y Llave) ya abren el detalle
@@ -6966,7 +6994,20 @@ document.getElementById("fotoGrandeOverlay").addEventListener("click", (e) => {
   if (e.target.id === "fotoGrandeOverlay") cerrarFotoGrande();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && document.getElementById("fotoGrandeOverlay").style.display !== "none") cerrarFotoGrande();
+  if (document.getElementById("fotoGrandeOverlay").style.display === "none") return;
+  if (e.key === "Escape") cerrarFotoGrande();
+  else if (e.key === "ArrowLeft") moverGaleria(-1);
+  else if (e.key === "ArrowRight") moverGaleria(1);
+});
+document.getElementById("fotoGrandeAnterior").addEventListener("click", () => moverGaleria(-1));
+document.getElementById("fotoGrandeSiguiente").addEventListener("click", () => moverGaleria(1));
+let toqueInicioX = null;
+document.getElementById("fotoGrandeImg").addEventListener("touchstart", (e) => { toqueInicioX = e.touches[0].clientX; }, { passive: true });
+document.getElementById("fotoGrandeImg").addEventListener("touchend", (e) => {
+  if (toqueInicioX === null) return;
+  const dx = e.changedTouches[0].clientX - toqueInicioX;
+  toqueInicioX = null;
+  if (Math.abs(dx) > 50) moverGaleria(dx < 0 ? 1 : -1);
 });
 
 let canalNotificaciones = null;
