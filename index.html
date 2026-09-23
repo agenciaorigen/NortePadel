@@ -16,13 +16,10 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,700;1,800&family=Manrope:wght@400;500;600;800&family=Bodoni+Moda:opsz,wght@6..96,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,700;1,800&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
 <!-- Barlow Condensed: voz "deportiva" de la marca (titulares, números,
      botones y las imágenes exportables de Top 20 / Campeón) -- rediseño
-     "circuito profesional".
-     Bodoni Moda / Work Sans: identidad propia del panel de administración
-     (rediseño pedido aparte, ver #admSidebar en style.css) -- distinta a
-     Barlow Condensed/Manrope, que son la identidad del resto del sitio. -->
+     "circuito profesional". El panel de Gestión usa las mismas dos letras. -->
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -235,68 +232,10 @@
     <div class="card">
       <div class="torneo-card-header">
         <h2>Torneos</h2>
-        <button type="button" class="secondary small admin-only" id="btnMostrarCrearTorneo">+ Crear torneo</button>
       </div>
       <div id="listaTorneos"></div>
     </div>
 
-    <div class="card admin-only" id="crearTorneoCard" style="display:none">
-      <h2>Crear torneo</h2>
-      <label for="tNombre">Nombre</label>
-      <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
-      <label for="tComplejo">Complejo sede</label>
-      <select id="tComplejo"></select>
-      <label for="tDuracion">Duración partido (min)</label>
-      <input id="tDuracion" type="number" value="90" />
-      <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
-           correctamente asociado por envolver su propio <input>) — no hay un
-           único control al que apuntarle "for" acá. -->
-      <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
-      <div class="check-grid" id="tDiasForm">
-        <label><input type="checkbox" class="chkDiaTorneo" value="4" /> Jue</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="5" /> Vie</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="6" /> Sáb</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="0" /> Dom</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="1" /> Lun</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="2" /> Mar</label>
-        <label><input type="checkbox" class="chkDiaTorneo" value="3" /> Mié</label>
-      </div>
-      <div class="row">
-        <div><label for="tHoraDesde">Horario por defecto, desde</label><input id="tHoraDesde" type="time" /></div>
-        <div><label for="tHoraHasta">Horario por defecto, hasta</label><input id="tHoraHasta" type="time" /></div>
-      </div>
-      <!-- #tHorariosPorDiaForm se llena dinámicamente (app.js) con varios
-           inputs de horario, cada uno con su propio label/id — este label
-           de arriba es la instrucción general del bloque, no de un control. -->
-      <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
-      <div id="tHorariosPorDiaForm"></div>
-      <!-- Único formato que usa el club: zonas de 2 + cuadro de repechaje propio
-           (ver PLANTILLAS_CUADRO en matching.js, transcripto del Excel del club).
-           Ya no se elige -- tFaseGruposFormato queda fijo en "cuadro_zonas". -->
-      <label>Formato de la fase de grupos</label>
-      <p style="color:var(--muted);font-size:13px;margin-top:-6px">
-        <strong>Zonas + repechaje</strong> — zonas de 2 parejas armadas por ranking, con el cuadro de repechaje del club (5 a 28 parejas). Las zonas no se eliminan: ganadora y perdedora de cada zona siguen caminos distintos.
-      </p>
-      <input type="hidden" id="tFaseGruposFormato" value="cuadro_zonas" />
-      <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
-      <div class="check-grid" id="tCategoriasForm"></div>
-      <div class="row">
-        <div>
-          <label for="tFechaInicio">Fecha inicio</label>
-          <input id="tFechaInicio" type="date" />
-        </div>
-        <div>
-          <label for="tFechaFin">Fecha fin</label>
-          <input id="tFechaFin" type="date" />
-        </div>
-      </div>
-      <label for="tCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
-      <input id="tCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
-      <label for="tFlyerArchivo">Flyer del torneo (opcional)</label>
-      <input id="tFlyerArchivo" type="file" accept="image/*" />
-      <button class="primary" id="btnCrearTorneo">Crear torneo</button>
-      <button type="button" class="secondary small" id="btnCancelarCrearTorneo" style="margin-top:8px">Cancelar</button>
-    </div>
   </section>
 
   <!-- JUGAR (reservar cancha para entrenar / jugar con amigos, fuera de los torneos) -->
@@ -658,115 +597,199 @@
         <span class="mark">N</span>
         <span>
           <span class="name">Norte Padel</span>
-          <span class="sub">Panel de administración</span>
+          <span class="sub">Gestión</span>
         </span>
       </div>
-      <button type="button" class="adm-side-item" data-adm-nav="config-general">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>Configuración general</span>
+      <button type="button" class="adm-side-item" data-adm-nav="panel">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h12v-9"/></svg>
+        <span>Inicio</span>
       </button>
-      <div id="admSidebarSubnavConfig" style="display:none"></div>
-      <button type="button" class="adm-side-item" data-adm-nav="torneo">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v4H4zM4 10h16v10H4z"/></svg>
-        <span>Torneo en gestión</span>
+      <button type="button" class="adm-side-item" data-adm-nav="torneos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg>
+        <span>Torneos</span>
       </button>
       <div id="admSidebarSubnav" style="display:none"></div>
+      <button type="button" class="adm-side-item" data-adm-nav="club">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3.2 2.5-5.6 5.5-5.6s5.5 2.4 5.5 5.6"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18 13.6c1.6.7 2.5 2.4 2.5 4.4"/></svg>
+        <span>Club</span>
+      </button>
+      <div id="admSidebarSubnavClub" style="display:none"></div>
+      <button type="button" class="adm-side-item" data-adm-nav="contenido">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+        <span>Contenido</span>
+      </button>
+      <div id="admSidebarSubnavContenido" style="display:none"></div>
     </nav>
 
     <div id="admContenido">
-    <div class="card card-accent" id="admSelectorTorneoCard">
+    <!-- En celular no hay barra lateral: estas pestañas cumplen su función
+         (en escritorio se ocultan, ver style.css). -->
+    <div class="pill-row tabs-linea" id="admAreaNav">
+      <button type="button" class="pill" data-area="panel">Inicio</button>
+      <button type="button" class="pill" data-area="torneos">Torneos</button>
+      <button type="button" class="pill" data-area="club">Club</button>
+      <button type="button" class="pill" data-area="contenido">Contenido</button>
+    </div>
+    <div class="pill-row" id="admGrupoSubnav"></div>
+
+    <!-- PANEL: lo primero que se ve al entrar a Gestión -->
+    <div id="admPanel" style="display:none">
+      <div class="pagina-head">
+        <p class="perfil-eyebrow">Panel del club</p>
+        <h2>Gestión</h2>
+      </div>
+      <div id="admPanelTorneo"></div>
+      <div class="card" id="admPanelPendientesCard">
+        <h3>Para resolver</h3>
+        <div id="admPanelPendientes"><p class="match-meta">Cargando…</p></div>
+      </div>
+      <div class="adm-panel-accesos">
+        <button type="button" class="adm-acceso" data-area="torneos"><strong>Torneos</strong><span>Crear, inscripciones, partidos</span></button>
+        <button type="button" class="adm-acceso" data-area="club"><strong>Club</strong><span>Jugadores, sedes, categorías</span></button>
+        <button type="button" class="adm-acceso" data-area="contenido"><strong>Contenido</strong><span>Noticias, auspiciantes, redes</span></button>
+      </div>
+    </div>
+
+    <!-- TORNEOS: lista + nuevo torneo (asistente) -->
+    <div id="admTorneosLista" style="display:none">
+      <div class="pagina-head adm-head-accion">
+        <div>
+          <p class="perfil-eyebrow">Gestión</p>
+          <h2>Torneos</h2>
+        </div>
+        <button type="button" class="primary" id="btnMostrarCrearTorneo">Nuevo torneo</button>
+      </div>
+      <div class="card admin-only" id="crearTorneoCard" style="display:none">
+        <div class="torneo-card-header">
+          <h2 style="margin:0">Nuevo torneo</h2>
+          <button type="button" class="secondary small" id="btnCancelarCrearTorneo">Cancelar</button>
+        </div>
+        <div class="pasos-barra" id="crearPasosBarra" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <p class="match-meta" id="crearPasoTexto"></p>
+
+        <!-- Paso 1 · Datos -->
+        <div class="crear-paso" data-paso="1">
+          <div class="crear-copiar">
+            <label for="tCopiarDe">Partir de un torneo anterior (opcional)</label>
+            <select id="tCopiarDe"><option value="">No, empezar de cero</option></select>
+            <p class="match-meta">Copia sede, duración, días y horarios, canchas, categorías y costo. No copia inscripciones, partidos, flyer ni puntaje (arranca con el puntaje estándar).</p>
+          </div>
+          <label for="tNombre">Nombre</label>
+          <input id="tNombre" placeholder="Ej: Apertura Norte 2026" />
+          <label for="tComplejo">Complejo sede</label>
+          <select id="tComplejo"></select>
+          <div class="row">
+            <div>
+              <label for="tFechaInicio">Fecha inicio</label>
+              <input id="tFechaInicio" type="date" />
+            </div>
+            <div>
+              <label for="tFechaFin">Fecha fin</label>
+              <input id="tFechaFin" type="date" />
+            </div>
+          </div>
+          <label for="tFlyerArchivo">Flyer del torneo (opcional)</label>
+          <input id="tFlyerArchivo" type="file" accept="image/*" />
+        </div>
+
+        <!-- Paso 2 · Días y horarios -->
+        <div class="crear-paso" data-paso="2" hidden>
+          <label for="tDuracion">Duración partido (min)</label>
+          <input id="tDuracion" type="number" value="90" />
+          <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
+               correctamente asociado por envolver su propio <input>). -->
+          <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
+          <div class="check-grid" id="tDiasForm">
+            <label><input type="checkbox" class="chkDiaTorneo" value="4" /> Jue</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="5" /> Vie</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="6" /> Sáb</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="0" /> Dom</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="1" /> Lun</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="2" /> Mar</label>
+            <label><input type="checkbox" class="chkDiaTorneo" value="3" /> Mié</label>
+          </div>
+          <div class="row">
+            <div><label for="tHoraDesde">Horario por defecto, desde</label><input id="tHoraDesde" type="time" /></div>
+            <div><label for="tHoraHasta">Horario por defecto, hasta</label><input id="tHoraHasta" type="time" /></div>
+          </div>
+          <!-- #tHorariosPorDiaForm se llena dinámicamente (app.js) -->
+          <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
+          <div id="tHorariosPorDiaForm"></div>
+        </div>
+
+        <!-- Paso 3 · Canchas -->
+        <div class="crear-paso" data-paso="3" hidden>
+          <p class="match-meta">Estas son las canchas que se van a sumar al torneo. Después las podés cambiar, agregar o bloquear en la sección Canchas del torneo.</p>
+          <div id="tCanchasPreview"></div>
+        </div>
+
+        <!-- Paso 4 · Categorías y costo -->
+        <div class="crear-paso" data-paso="4" hidden>
+          <label>Formato</label>
+          <p class="match-meta" style="margin-top:-2px">
+            <strong>Zonas + repechaje</strong> — zonas de 2 parejas armadas por ranking, con el cuadro de repechaje del club (5 a 28 parejas).
+          </p>
+          <input type="hidden" id="tFaseGruposFormato" value="cuadro_zonas" />
+          <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategorias">seleccionar todas</button></label>
+          <div class="check-grid" id="tCategoriasForm"></div>
+          <label for="tCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
+          <input id="tCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
+          <p class="match-meta">Puntaje: arranca con el estándar (Campeón 1000, Sub 750, Semifinal 500…). Si esta fecha es especial, lo cambiás en Ajustes › Puntaje.</p>
+          <button class="primary" id="btnCrearTorneo">Crear torneo</button>
+        </div>
+
+        <div class="crear-nav">
+          <button type="button" class="secondary" id="btnCrearAtras">Atrás</button>
+          <button type="button" class="primary" id="btnCrearSiguiente">Siguiente</button>
+        </div>
+      </div>
+      <div id="admListaTorneos"></div>
+    </div>
+
+    <!-- Selector viejo: ya no se muestra (la lista de arriba lo reemplaza), pero
+         se mantiene porque el resto del código lo usa para saber qué torneo
+         está en gestión. -->
+    <div class="card card-accent" id="admSelectorTorneoCard" style="display:none">
       <h2>Torneo en gestión</h2>
       <p class="match-meta" style="margin-bottom:6px">Elegí un torneo para administrar sus inscripciones, parejas, canchas, bloqueos y partidos. La edición de un torneo vive solo acá — la vista pública nunca muestra estas herramientas.</p>
       <select id="admSelectTorneoGestion"><option value="">Elegí un torneo</option></select>
     </div>
 
     <div id="admGestionTorneoWrap" style="display:none">
-      <div class="card card-accent">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <h2 id="admGestionNombre" style="margin:0"></h2>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">Editar torneo</button>
-            <button type="button" class="secondary small" id="btnAuspiciantesTorneo">Auspiciantes</button>
-            <button type="button" class="secondary small danger" id="btnBorrarTorneo">Borrar torneo</button>
-          </div>
+      <div class="adm-torneo-head">
+        <button type="button" class="link-volver" id="admBtnVolverConfigGeneral" style="display:none"><span aria-hidden="true">←</span> Torneos</button>
+        <h2 id="admGestionNombre"></h2>
+        <p class="match-meta" id="admGestionMeta"></p>
+        <div class="adm-torneo-head-estado">
+          <span id="admGestionEstado"></span>
+          <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none"></button>
         </div>
-        <button type="button" class="link-btn" id="admBtnVolverConfigGeneral" style="display:none;margin-top:4px">← Volver a Administración general</button>
-        <p id="admGestionEstado"></p>
-        <button type="button" class="secondary small" id="btnToggleInscripcion" style="display:none;margin-top:6px"></button>
       </div>
 
-      <div class="card card-accent" id="admSeccionResumen">
-        <h3 style="margin-top:0">Dashboard</h3>
+      <div id="admSeccionResumen">
+      <div class="card">
+        <h3 style="margin-top:0">Etapas del torneo</h3>
+        <ol class="etapas-torneo" id="admEtapas"></ol>
+        <div id="admProximoPaso"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Por categoría</h3>
+        <div id="admResumenCategorias"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Números</h3>
         <div class="pj-stats" id="admDashboardStats"></div>
         <h3 style="margin-top:16px">Diagnóstico</h3>
         <p class="match-meta" style="margin-bottom:6px">Chequeo rápido para saber si el torneo quedó bien armado antes de avisarle a la gente.</p>
         <div id="admDiagnostico"></div>
       </div>
-
-      <div class="card card-accent" id="editarTorneoCard" style="display:none">
-        <h2>Editar torneo</h2>
-        <p class="match-meta" id="teAvisoBloqueo" style="display:none">Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
-        <label for="teNombre">Nombre</label>
-        <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
-        <label for="teComplejo">Complejo sede</label>
-        <select id="teComplejo"></select>
-        <label for="teDuracion">Duración partido (min)</label>
-        <input id="teDuracion" type="number" value="90" />
-        <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
-             correctamente asociado por envolver su propio <input>). -->
-        <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
-        <div class="check-grid" id="teDiasForm">
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="4" /> Jue</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="5" /> Vie</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="6" /> Sáb</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="0" /> Dom</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="1" /> Lun</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="2" /> Mar</label>
-          <label><input type="checkbox" class="chkDiaTorneoEdit" value="3" /> Mié</label>
-        </div>
-        <div class="row">
-          <div><label for="teHoraDesde">Horario por defecto, desde</label><input id="teHoraDesde" type="time" /></div>
-          <div><label for="teHoraHasta">Horario por defecto, hasta</label><input id="teHoraHasta" type="time" /></div>
-        </div>
-        <!-- #teHorariosPorDiaForm se llena dinámicamente (app.js) con varios
-             inputs de horario, cada uno con su propio label/id. -->
-        <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
-        <div id="teHorariosPorDiaForm"></div>
-        <label for="teFaseGruposFormato">Formato de la fase de grupos</label>
-        <select id="teFaseGruposFormato">
-          <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
-          <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
-          <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
-        </select>
-        <div class="row" id="teGrupoConfigRow">
-          <div><label for="teTamanoGrupo">Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
-          <div><label for="teAvanzanPorGrupo">Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
-        </div>
-        <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategoriasEdit">seleccionar todas</button></label>
-        <div class="check-grid" id="teCategoriasForm"></div>
-        <div class="row">
-          <div>
-            <label for="teFechaInicio">Fecha inicio</label>
-            <input id="teFechaInicio" type="date" />
-          </div>
-          <div>
-            <label for="teFechaFin">Fecha fin</label>
-            <input id="teFechaFin" type="date" />
-          </div>
-        </div>
-        <label for="teCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
-        <input id="teCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
-        <label for="teFlyerArchivo">Cambiar flyer del torneo (opcional, dejalo vacío para mantener el actual)</label>
-        <input id="teFlyerArchivo" type="file" accept="image/*" />
-        <button class="primary" id="btnGuardarTorneo">Guardar cambios</button>
-        <button type="button" class="secondary small" id="btnCancelarEditarTorneo" style="margin-top:8px">Cancelar</button>
       </div>
 
       <!-- Antes estas 4 cards (Inscripciones/Canchas/Bloqueos/Partidos) iban todas
            seguidas en una sola pantalla larguísima — para cargar un resultado había
            que scrollear más allá de las otras tres. Ahora son secciones con su
            propio pill-nav (mismo patrón que torneoSubnav) y se ve una por vez. -->
-      <div class="pill-row" id="admGestionSubnav" style="margin-bottom:12px"></div>
+      <div class="pill-row tabs-linea" id="admGestionSubnav"></div>
 
       <div class="card card-accent" id="admSeccionInscripciones">
         <h2>Inscripciones y parejas</h2>
@@ -781,7 +804,7 @@
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
 
-      <div id="admSeccionConfiguracion">
+      <div id="admSeccionCanchasYBloqueos">
       <div class="card card-accent" id="admSeccionCanchas">
         <h2>Canchas del torneo</h2>
         <div id="admCanchas"></div>
@@ -821,9 +844,107 @@
         <input id="admBloqueoMotivo" placeholder="Ej: lluvia, mantenimiento" />
         <button class="secondary small" id="admBtnBloquearCancha" style="margin-top:8px">Bloquear horario</button>
       </div>
+      </div>
 
-      <div class="card card-accent" id="admSeccionPuntaje">
-        <h2>Puntaje para el ranking</h2>
+      <div class="card card-accent" id="admSeccionFotos">
+        <h2>Fotos del torneo</h2>
+        <p class="match-meta" style="margin-bottom:6px">Las fotos que subas acá aparecen en la pestaña "Fotos" del torneo, donde cualquiera las puede ver y descargar en calidad liviana (se achican solas al subirlas). Vos conservás la foto original en tu celular/cámara — si alguien la quiere en calidad completa, cada foto tiene un botón "Pedir original" que te escribe por WhatsApp.</p>
+        <div id="admFotosLista" class="fotos-galeria"></div>
+        <label style="margin-top:10px" for="admFotosArchivos">Subir fotos</label>
+        <input type="file" id="admFotosArchivos" accept="image/*" multiple />
+        <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
+      </div>
+
+      <!-- AJUSTES: los mismos campos de siempre ("Editar torneo", puntaje,
+           auspiciantes y borrar), agrupados en bloques plegables con un
+           resumen de lo que tiene cargado cada uno. Un solo guardado para
+           los bloques del torneo (btnGuardarTorneo), igual que antes. -->
+      <div id="admSeccionAjustes">
+      <div id="editarTorneoCard">
+        <p class="match-meta aviso-bloqueo" id="teAvisoBloqueo" style="display:none">Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede, costo y flyer se pueden seguir editando.</p>
+        <details class="ajuste-bloque">
+          <summary><span><b>Datos</b><small id="ajResumenDatos"></small></span></summary>
+          <label for="teNombre">Nombre</label>
+          <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
+          <label for="teComplejo">Complejo sede</label>
+          <select id="teComplejo"></select>
+          <button type="button" class="primary ajuste-guardar">Guardar cambios</button>
+        </details>
+        <details class="ajuste-bloque">
+          <summary><span><b>Fechas y horarios</b><small id="ajResumenFechas"></small></span></summary>
+          <div class="row">
+            <div>
+              <label for="teFechaInicio">Fecha inicio</label>
+              <input id="teFechaInicio" type="date" />
+            </div>
+            <div>
+              <label for="teFechaFin">Fecha fin</label>
+              <input id="teFechaFin" type="date" />
+            </div>
+          </div>
+          <label for="teDuracion">Duración partido (min)</label>
+          <input id="teDuracion" type="number" value="90" />
+          <!-- Label de grupo para los 7 checkboxes de abajo (cada uno ya está
+               correctamente asociado por envolver su propio <input>). -->
+          <label>¿Qué días de la semana se juega? (dejalo sin marcar para usar todos los días del rango)</label>
+        <div class="check-grid" id="teDiasForm">
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="4" /> Jue</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="5" /> Vie</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="6" /> Sáb</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="0" /> Dom</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="1" /> Lun</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="2" /> Mar</label>
+          <label><input type="checkbox" class="chkDiaTorneoEdit" value="3" /> Mié</label>
+        </div>
+          <div class="row">
+            <div><label for="teHoraDesde">Horario por defecto, desde</label><input id="teHoraDesde" type="time" /></div>
+            <div><label for="teHoraHasta">Horario por defecto, hasta</label><input id="teHoraHasta" type="time" /></div>
+          </div>
+          <!-- #teHorariosPorDiaForm se llena dinámicamente (app.js) -->
+          <label>¿Se juega en horarios distintos según el día? (ej: viernes de noche, sábado y domingo desde la mañana) — opcional, dejalo vacío para usar el horario por defecto en ese día</label>
+          <div id="teHorariosPorDiaForm"></div>
+          <button type="button" class="primary ajuste-guardar">Guardar cambios</button>
+        </details>
+        <details class="ajuste-bloque">
+          <summary><span><b>Categorías y formato</b><small id="ajResumenCategorias"></small></span></summary>
+          <label>Formato</label>
+          <p class="match-meta" id="teFormatoFijo"><strong>Zonas + repechaje</strong> — zonas de 2 parejas armadas por ranking, con el cuadro de repechaje del club (5 a 28 parejas).</p>
+          <!-- solo se muestra en torneos viejos que usaron otro formato -->
+          <div id="teFormatoViejoWrap">
+            <select id="teFaseGruposFormato" aria-label="Formato de la fase de grupos">
+              <option value="grupos">Grupos (todos contra todos, nadie queda eliminado en esta etapa)</option>
+              <option value="eliminacion">Eliminación directa (1 partido, el que pierde queda afuera)</option>
+              <option value="cuadro_zonas">Zonas de 2 + cuadro del club (seedeo por ranking, 5 a 28 parejas)</option>
+            </select>
+            <div class="row" id="teGrupoConfigRow">
+              <div><label for="teTamanoGrupo">Parejas por grupo</label><input id="teTamanoGrupo" type="number" value="3" min="2" /></div>
+              <div><label for="teAvanzanPorGrupo">Cuántas avanzan por grupo</label><input id="teAvanzanPorGrupo" type="number" value="2" min="1" /></div>
+            </div>
+          </div>
+          <label>¿Qué categorías compiten? <button type="button" class="link-btn" id="btnTodasCategoriasEdit">seleccionar todas</button></label>
+          <div class="check-grid" id="teCategoriasForm"></div>
+          <button type="button" class="primary ajuste-guardar">Guardar cambios</button>
+        </details>
+        <details class="ajuste-bloque">
+          <summary><span><b>Inscripción y costo</b><small id="ajResumenCosto"></small></span></summary>
+          <label for="teCosto">Costo de inscripción (opcional, dejalo vacío si es gratis)</label>
+          <input id="teCosto" type="number" min="0" step="0.01" placeholder="Ej: 150000" />
+          <p class="match-meta">Para cerrar o reabrir la inscripción usá el botón de arriba, al lado del estado del torneo.</p>
+          <button type="button" class="primary ajuste-guardar">Guardar cambios</button>
+        </details>
+        <details class="ajuste-bloque">
+          <summary><span><b>Flyer y auspiciantes</b><small id="ajResumenFlyer"></small></span></summary>
+          <label for="teFlyerArchivo">Cambiar flyer del torneo (opcional, dejalo vacío para mantener el actual)</label>
+          <input id="teFlyerArchivo" type="file" accept="image/*" />
+          <button type="button" class="primary ajuste-guardar">Guardar cambios</button>
+          <label>Auspiciantes de este torneo</label>
+          <button type="button" class="secondary" id="btnAuspiciantesTorneo">Ver y cargar auspiciantes de este torneo</button>
+        </details>
+        <!-- el guardado real de los bloques de arriba (cada "Guardar cambios" lo dispara) -->
+        <button class="primary" id="btnGuardarTorneo" hidden>Guardar cambios</button>
+      </div>
+      <details class="ajuste-bloque" id="admSeccionPuntaje">
+        <summary><span><b>Puntaje para el ranking</b><small id="ajResumenPuntaje"></small></span></summary>
         <label><input type="checkbox" id="chkTorneoPuntuable" /> Este torneo suma puntos al ranking general</label>
         <p class="match-meta" id="avisoTorneoNoPuntuable" style="display:none">Los partidos de este torneo no suman ni restan puntos de ranking a nadie. Igual se pueden cargar resultados y se ven en el cuadro, como cualquier torneo, pero no impactan el ranking general ni el de categoria.</p>
         <p class="match-meta" id="avisoTorneoPuntuable" style="margin-bottom:6px">Al cargar el resultado de un partido de bracket, la pareja perdedora suma los puntos de la ronda en la que quedo eliminada. En la Final, el ganador suma "Campeon" y el perdedor suma "Sub".</p>
@@ -840,16 +961,12 @@
           <div><label for="prDieciseisavos">Dieciseisavos</label><input id="prDieciseisavos" type="number" /></div>
         </div>
         <button class="secondary small" id="btnGuardarPuntosTorneo" style="margin-top:10px">Guardar puntaje</button>
-      </div>
-
-      <div class="card card-accent" id="admSeccionFotos">
-        <h2>Fotos del torneo</h2>
-        <p class="match-meta" style="margin-bottom:6px">Las fotos que subas acá aparecen en la pestaña "Fotos" del torneo, donde cualquiera las puede ver y descargar en calidad liviana (se achican solas al subirlas). Vos conservás la foto original en tu celular/cámara — si alguien la quiere en calidad completa, cada foto tiene un botón "Pedir original" que te escribe por WhatsApp.</p>
-        <div id="admFotosLista" class="fotos-galeria"></div>
-        <label style="margin-top:10px" for="admFotosArchivos">Subir fotos</label>
-        <input type="file" id="admFotosArchivos" accept="image/*" multiple />
-        <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
-      </div>
+      </details>
+      <details class="ajuste-bloque ajuste-peligro">
+        <summary><span><b>Borrar torneo</b><small>Se borran inscripciones, parejas, partidos y resultados</small></span></summary>
+        <p class="match-meta">No se puede deshacer. Te va a pedir que escribas el nombre del torneo para confirmar.</p>
+        <button type="button" class="secondary small danger" id="btnBorrarTorneo">Borrar este torneo</button>
+      </details>
       </div>
 
       <div class="card partidos-poster" id="admSeccionPartidos">
@@ -881,7 +998,7 @@
          y btnAdministrarEsteTorneo en app.js): esa pantalla queda solo para ESE torneo. -->
     <div id="admConfigGeneralWrap">
     <div class="card card-accent" id="admCfgClub">
-      <h2>Configuración del club</h2>
+      <h2>Contacto y redes</h2>
       <label for="cfgWhatsapp">WhatsApp del club (para coordinar pagos)</label>
       <input id="cfgWhatsapp" placeholder="Ej: 595981234567 (código de país + número, sin + ni espacios)" />
       <label for="cfgWhatsappFotos">WhatsApp para pedidos de fotos originales (dejalo vacío para usar el mismo de arriba)</label>
@@ -976,7 +1093,7 @@
     <div id="admConfigGeneralWrap2">
     <div class="card card-accent" id="admCfgNoticias">
       <h2>Noticias</h2>
-      <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en "Configuración general", el botón para seguirlos aparece ahí mismo.</p>
+      <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en Contenido › Contacto y redes, el botón para seguirlos aparece ahí mismo.</p>
       <label for="ntTitulo">Título</label>
       <input id="ntTitulo" placeholder="Ej: ¡Arrancó la Apertura Norte 2026!" />
       <label for="ntTexto">Texto (opcional)</label>
@@ -1041,9 +1158,9 @@
        en mobile Y desktop, pero solo para admins (ver body.is-admin en style.css)
        — antes en mobile vivía escondido adentro de "Más", que se sacó por no
        tener nada más adentro para el resto de la gente. -->
-  <button id="btnAdminPanel" data-view="admin" class="tab" title="Panel de administrador" aria-label="Administración">
+  <button id="btnAdminPanel" data-view="admin" class="tab" title="Gestión del club" aria-label="Gestión">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.6a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.1.68.3.94.56"/></svg></span>
-    Config
+    Gestión
   </button>
 </nav>
 

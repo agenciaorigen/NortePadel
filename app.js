@@ -105,9 +105,7 @@ function cambiarVista(nombre, ruta) {
   // cambiarVista("admin") por su cuenta (ver despacharRuta) — sin este chequeo,
   // ese segundo llamado deshacía el modo enfocado apenas se activaba.
   if (nombre === "admin" && !adminFocoTorneoActivo) {
-    mostrarConfigGeneral(true);
-    document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-    mostrarSeccionConfigGeneral(seccionConfigActiva);
+    mostrarPanelAdmin();
   } else if (nombre !== "admin") {
     adminFocoTorneoActivo = false;
   }
@@ -2105,7 +2103,7 @@ document.getElementById("btnGuardarPuntosTorneo").addEventListener("click", asyn
     });
     const { error } = await sb.from("torneos").update({ es_puntuable: esPuntuable, puntos_ronda: puntosRonda }).eq("id", torneoGestionId);
     if (error) { toast("Error: " + error.message); return; }
-    if (torneoGestionData) { torneoGestionData.es_puntuable = esPuntuable; torneoGestionData.puntos_ronda = puntosRonda; }
+    if (torneoGestionData) { torneoGestionData.es_puntuable = esPuntuable; torneoGestionData.puntos_ronda = puntosRonda; resumirAjustesTorneo(torneoGestionData); }
     toast("Puntaje guardado");
   } finally {
     btn.disabled = false;
@@ -2549,6 +2547,7 @@ async function cargarTorneos() {
       cacheTorneos.map((t) => `<option value="${t.id}">${t.nombre}</option>`).join("");
     if (valorPrevio) selGestion.value = valorPrevio;
   }
+  renderAdminListaTorneos();
 
   if (!data || data.length === 0) {
     cont.innerHTML = `<p class="empty">Todavía no hay torneos creados.</p>`;
@@ -2678,8 +2677,75 @@ document.getElementById("btnMostrarCrearTorneo").addEventListener("click", () =>
   card.style.display = "block";
   document.querySelectorAll(".chkDiaTorneo:checked").forEach((c) => (c.checked = false));
   document.getElementById("tHorariosPorDiaForm").innerHTML = "";
+  // "Partir de un torneo anterior": cualquier torneo ya creado, el más nuevo primero
+  document.getElementById("tCopiarDe").innerHTML = '<option value="">No, empezar de cero</option>' +
+    cacheTorneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join("");
+  mostrarPasoCrear(1);
   card.scrollIntoView({ behavior: "smooth", block: "start" });
 });
+
+// El formulario de siempre, partido en 4 pasos (mismos campos e ids): solo se
+// muestra un paso por vez; "Crear torneo" (btnCrearTorneo) está en el último.
+const PASOS_CREAR = ["Datos", "Días y horarios", "Canchas", "Categorías y costo"];
+let pasoCrear = 1;
+function mostrarPasoCrear(n) {
+  pasoCrear = n;
+  document.querySelectorAll("#crearTorneoCard .crear-paso").forEach((p) => { p.hidden = Number(p.dataset.paso) !== n; });
+  document.querySelectorAll("#crearPasosBarra span").forEach((barra, i) => barra.classList.toggle("on", i < n));
+  document.getElementById("crearPasoTexto").textContent = `Paso ${n} de ${PASOS_CREAR.length} · ${PASOS_CREAR[n - 1]}`;
+  document.getElementById("btnCrearAtras").style.visibility = n === 1 ? "hidden" : "visible";
+  document.getElementById("btnCrearSiguiente").hidden = n === PASOS_CREAR.length;
+  if (n === 3) renderCanchasPreviewCrear();
+}
+document.getElementById("btnCrearSiguiente").addEventListener("click", () => {
+  if (pasoCrear === 1 && (!document.getElementById("tNombre").value.trim() || !document.getElementById("tFechaInicio").value)) {
+    toast("Completá al menos nombre y fecha de inicio");
+    return;
+  }
+  mostrarPasoCrear(Math.min(pasoCrear + 1, PASOS_CREAR.length));
+});
+document.getElementById("btnCrearAtras").addEventListener("click", () => mostrarPasoCrear(Math.max(pasoCrear - 1, 1)));
+
+// Copia la configuración de un torneo anterior en el formulario (el nombre y
+// las fechas no: son justo lo que cambia de una fecha a otra). El puntaje
+// tampoco: cada torneo nuevo arranca con el estándar de la base.
+document.getElementById("tCopiarDe").addEventListener("change", (e) => {
+  const t = cacheTorneos.find((x) => x.id === e.target.value);
+  if (!t) return;
+  document.getElementById("tComplejo").value = t.complejo_id || "";
+  document.getElementById("tDuracion").value = t.duracion_minutos || 90;
+  const dias = new Set(t.dias_semana || []);
+  document.querySelectorAll(".chkDiaTorneo").forEach((chk) => (chk.checked = dias.has(Number(chk.value))));
+  document.getElementById("tHoraDesde").value = t.hora_desde ? t.hora_desde.slice(0, 5) : "";
+  document.getElementById("tHoraHasta").value = t.hora_hasta ? t.hora_hasta.slice(0, 5) : "";
+  document.getElementById("tHorariosPorDiaForm").innerHTML = "";
+  renderHorariosPorDiaForm("tHorariosPorDiaForm", "chkDiaTorneo", t.horarios_por_dia || {});
+  const categorias = new Set((t.torneo_categorias || []).map((c) => c.categoria));
+  document.querySelectorAll(".chkTorneoCategoria").forEach((chk) => (chk.checked = categorias.has(chk.value)));
+  document.getElementById("tCosto").value = t.costo || "";
+  toast(`Se copió la configuración de "${t.nombre}". Poné el nombre y las fechas nuevas.`);
+});
+
+// Paso 3: qué canchas se van a sumar al crear (mismo criterio que usa
+// btnCrearTorneo: las del torneo copiado si es la misma sede, si no todas las
+// canchas de la sede).
+async function renderCanchasPreviewCrear() {
+  const cont = document.getElementById("tCanchasPreview");
+  const complejoId = document.getElementById("tComplejo").value;
+  if (!complejoId) { cont.innerHTML = '<p class="empty">No elegiste sede en el paso 1: el torneo se crea sin canchas y las agregás después.</p>'; return; }
+  const copia = cacheTorneos.find((x) => x.id === document.getElementById("tCopiarDe").value);
+  let nombres = [];
+  let aclaracion = "";
+  if (copia && copia.complejo_id === complejoId) {
+    const { data } = await sb.from("torneo_canchas").select("canchas(nombre)").eq("torneo_id", copia.id);
+    nombres = (data || []).map((c) => c.canchas?.nombre).filter(Boolean);
+    if (nombres.length) aclaracion = `Con los mismos días y horarios que en "${escapeHtml(copia.nombre)}".`;
+  }
+  if (!nombres.length) nombres = cacheCanchas.filter((c) => c.complejo_id === complejoId).map((c) => c.nombre);
+  cont.innerHTML = nombres.length
+    ? `<div class="chips-canchas">${nombres.map((n) => `<span class="badge">${escapeHtml(n)}</span>`).join("")}</div>${aclaracion ? `<p class="match-meta">${aclaracion}</p>` : ""}`
+    : '<p class="empty">Esa sede todavía no tiene canchas cargadas: agregalas en Club › Sedes y canchas.</p>';
+}
 document.getElementById("btnCancelarCrearTorneo").addEventListener("click", () => {
   document.getElementById("crearTorneoCard").style.display = "none";
 });
@@ -2750,10 +2816,16 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   await sb.from("torneo_categorias").insert(categoriasElegidas.map((categoria) => ({ torneo_id: data.id, categoria })));
 
   if (complejoId) {
-    const canchasDelComplejo = cacheCanchas.filter((c) => c.complejo_id === complejoId);
-    if (canchasDelComplejo.length > 0) {
-      await sb.from("torneo_canchas").insert(canchasDelComplejo.map((c) => ({ torneo_id: data.id, cancha_id: c.id })));
+    // si se partió de un torneo anterior de la misma sede, se copian sus
+    // canchas con los días/horarios que tenían; si no, todas las de la sede
+    const copia = cacheTorneos.find((x) => x.id === document.getElementById("tCopiarDe").value);
+    let filas = null;
+    if (copia && copia.complejo_id === complejoId) {
+      const { data: tcCopia } = await sb.from("torneo_canchas").select("cancha_id, dias_semana, horarios_por_dia").eq("torneo_id", copia.id);
+      if (tcCopia && tcCopia.length) filas = tcCopia.map((c) => ({ torneo_id: data.id, cancha_id: c.cancha_id, dias_semana: c.dias_semana, horarios_por_dia: c.horarios_por_dia }));
     }
+    if (!filas) filas = cacheCanchas.filter((c) => c.complejo_id === complejoId).map((c) => ({ torneo_id: data.id, cancha_id: c.id }));
+    if (filas.length > 0) await sb.from("torneo_canchas").insert(filas);
   }
 
   toast("Torneo creado");
@@ -2761,10 +2833,13 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   document.getElementById("tFlyerArchivo").value = "";
   document.getElementById("tCosto").value = "";
   document.querySelectorAll(".chkTorneoCategoria:checked").forEach((c) => (c.checked = false));
+  document.getElementById("tCopiarDe").value = "";
   document.getElementById("crearTorneoCard").style.display = "none";
-  cargarTorneos();
+  await cargarTorneos();
   cargarInicio();
-  abrirTorneo(data.id);
+  // recién creado: directo a su Resumen en Gestión (etapas + próximo paso)
+  seccionGestionActiva = "resumen";
+  await cargarGestionTorneo(data.id);
   } finally {
     btn.disabled = false;
   }
@@ -3616,14 +3691,16 @@ let seccionGestionActiva = "resumen";
 // entrada, para que la sidebar deje ver una sola cosa por vez y nunca las
 // tres juntas (admSeccionConfiguracion sigue en el HTML como envoltorio sin
 // estilo propio, ya no se referencia acá).
+// Lo que se usa en cada fecha va adelante; lo que se configura una vez
+// (datos, fechas, categorías, costo, puntaje, flyer, borrar) vive en Ajustes.
+// Canchas y bloqueos van juntos: los dos deciden dónde y cuándo se puede jugar.
 const SECCIONES_GESTION = {
   resumen: { id: "admSeccionResumen", label: "Resumen" },
-  inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones y pagos" },
-  canchas: { id: "admSeccionCanchas", label: "Canchas del torneo" },
-  bloqueos: { id: "admSeccionBloqueos", label: "Bloqueos de cancha" },
-  puntaje: { id: "admSeccionPuntaje", label: "Puntaje para el ranking" },
+  inscripciones: { id: "admSeccionInscripciones", label: "Inscripciones" },
+  partidos: { id: "admSeccionPartidos", label: "Partidos" },
+  canchas: { id: "admSeccionCanchasYBloqueos", label: "Canchas" },
   fotos: { id: "admSeccionFotos", label: "Fotos" },
-  partidos: { id: "admSeccionPartidos", label: "Partidos" }
+  ajustes: { id: "admSeccionAjustes", label: "Ajustes" }
 };
 function renderAdminGestionSubnav() {
   const cont = document.getElementById("admGestionSubnav");
@@ -3646,46 +3723,177 @@ function mostrarSeccionGestion(clave) {
 // tenía antes de armar SECCIONES_GESTION: 9 cards mostrándose todas juntas
 // apenas se entraba. Mismo mecanismo acá (mapa clave->id + una función que
 // muestra solo esa una): nunca más de una a la vez.
-let seccionConfigActiva = "club";
-let enPantallaTorneoSelector = false; // "Torneo en gestión" del menú lateral, sin elegir torneo todavía (ver mostrarSeccionTorneoSelector)
+let seccionConfigActiva = "jugadores";
+let enPantallaTorneoSelector = false; // pantalla "Torneos" (lista), sin torneo elegido
+// Gestión se divide en 4 áreas: Inicio (panel), Torneos, Club y Contenido.
+let areaAdmin = "panel";
+// La vieja "Configuración general", repartida en Club (la base que usan todos
+// los torneos) y Contenido (lo que se ve en el sitio). Mismas cards de siempre.
 const SECCIONES_CONFIG_GENERAL = {
-  club: { id: "admCfgClub", label: "Configuración del club" },
-  complejos: { id: "admCfgComplejos", label: "Canchas y predios" },
-  categorias: { id: "admCfgCategorias", label: "Categorías" },
-  etiquetas: { id: "admCfgEtiquetas", label: "Etiquetas de jugadores" },
-  solicitudes: { id: "admCfgSolicitudes", label: "Solicitudes de categoría" },
-  jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes" },
-  auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes" },
-  noticias: { id: "admCfgNoticias", label: "Noticias" },
-  jugadores: { id: "admCfgJugadores", label: "Jugadores registrados" }
+  jugadores: { id: "admCfgJugadores", label: "Jugadores", grupo: "club" },
+  solicitudes: { id: "admCfgSolicitudes", label: "Solicitudes de categoría", grupo: "club" },
+  complejos: { id: "admCfgComplejos", label: "Sedes y canchas", grupo: "club" },
+  categorias: { id: "admCfgCategorias", label: "Categorías", grupo: "club" },
+  etiquetas: { id: "admCfgEtiquetas", label: "Etiquetas", grupo: "club" },
+  noticias: { id: "admCfgNoticias", label: "Noticias", grupo: "contenido" },
+  auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes", grupo: "contenido" },
+  jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes", grupo: "contenido" },
+  club: { id: "admCfgClub", label: "Contacto y redes", grupo: "contenido" }
 };
+const ultimaSeccionDeGrupo = { club: "jugadores", contenido: "noticias" };
+const seccionesDeGrupo = (grupo) =>
+  Object.fromEntries(Object.entries(SECCIONES_CONFIG_GENERAL).filter(([, info]) => info.grupo === grupo));
+
+// Esconde todas las pantallas de Gestión (cada función de abajo prende la suya)
+function ocultarPantallasAdmin() {
+  mostrarConfigGeneral(false);
+  ["admPanel", "admTorneosLista", "admGestionTorneoWrap", "admSelectorTorneoCard"]
+    .forEach((id) => { document.getElementById(id).style.display = "none"; });
+}
+// Salir del torneo en gestión (volver a la lista, al panel, a Club...)
+function soltarTorneoGestion() {
+  adminFocoTorneoActivo = false;
+  torneoGestionId = null;
+  torneoGestionData = null;
+  document.getElementById("admSelectTorneoGestion").value = "";
+  document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
+}
+
 function mostrarSeccionConfigGeneral(clave) {
+  const info = SECCIONES_CONFIG_GENERAL[clave] || SECCIONES_CONFIG_GENERAL.jugadores;
   seccionConfigActiva = clave;
+  areaAdmin = info.grupo;
+  ultimaSeccionDeGrupo[info.grupo] = clave;
   enPantallaTorneoSelector = false;
-  // "Torneo en gestión" (el selector suelto) queda en su propia pantalla, separada
-  // de Configuración general -- ver mostrarSeccionTorneoSelector.
-  document.getElementById("admSelectorTorneoCard").style.display = "none";
-  // en mobile no hay sidebar (ver #admSidebar en style.css) ni ningún otro
-  // nav para volver a elegir sección -- ahí "Configuración general" sigue
-  // mostrando las 9 cards juntas, como siempre. Achicar a una sola solo
-  // tiene sentido en escritorio, donde la sidebar es la forma de cambiar.
-  const esDesktop = window.matchMedia("(min-width: 960px)").matches;
-  Object.entries(SECCIONES_CONFIG_GENERAL).forEach(([key, info]) => {
-    document.getElementById(info.id).style.display = (!esDesktop || key === clave) ? "block" : "none";
+  soltarTorneoGestion();
+  ocultarPantallasAdmin();
+  mostrarConfigGeneral(true);
+  // una sola card por vez, también en el celular (antes ahí se apilaban las 9)
+  Object.entries(SECCIONES_CONFIG_GENERAL).forEach(([key, s]) => {
+    document.getElementById(s.id).style.display = key === clave ? "block" : "none";
   });
   sincronizarAdmSidebar();
 }
 
-// "Torneo en gestión" sin elegir todavía: pantalla propia, separada de
-// Configuración general (antes el selector quedaba arriba de TODAS las
-// secciones de config general a la vez, lo cual confundía -- ver charla que
-// llevó a este cambio).
+// "Torneos": la lista (en curso/próximos y finalizados) + "Nuevo torneo"
 function mostrarSeccionTorneoSelector() {
+  areaAdmin = "torneos";
   enPantallaTorneoSelector = true;
-  mostrarConfigGeneral(false);
-  document.getElementById("admGestionTorneoWrap").style.display = "none";
-  document.getElementById("admSelectorTorneoCard").style.display = "block";
+  soltarTorneoGestion();
+  ocultarPantallasAdmin();
+  document.getElementById("admTorneosLista").style.display = "block";
+  renderAdminListaTorneos();
   sincronizarAdmSidebar();
+}
+
+function mostrarPanelAdmin() {
+  areaAdmin = "panel";
+  enPantallaTorneoSelector = false;
+  soltarTorneoGestion();
+  ocultarPantallasAdmin();
+  document.getElementById("admPanel").style.display = "block";
+  sincronizarAdmSidebar();
+  cargarPanelAdmin();
+}
+
+// Panel de Gestión: el torneo activo (el más próximo que no terminó) con su
+// etapa y próximo paso, y lo que está esperando que el admin lo resuelva.
+// Solo lee datos (las mismas RPC públicas que ya usa el resto del panel).
+async function cargarPanelAdmin() {
+  const contTorneo = document.getElementById("admPanelTorneo");
+  const contPend = document.getElementById("admPanelPendientes");
+  if (cacheTorneos.length === 0) await cargarTorneos();
+  if (cacheJugadoresAdmin.length === 0) await cargarJugadoresAdmin();
+  const t = cacheTorneos.filter((x) => x.estado !== "finalizado" && x.estado !== "cancelado")
+    .sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
+  const pendientes = [];
+
+  if (!t) {
+    contTorneo.innerHTML = `<div class="card panel-torneo"><h3>Torneo activo</h3>
+      <p class="match-meta">No hay ningún torneo en curso ni próximo.</p>
+      <button type="button" class="primary" data-panel-accion="nuevo">Crear un torneo</button></div>`;
+  } else {
+    const [{ data: cats }, { data: parejas }, { data: insc }] = await Promise.all([
+      sb.from("torneo_categorias").select("categoria, estado_fase").eq("torneo_id", t.id),
+      sb.rpc("parejas_publicas", { p_torneo_id: t.id }),
+      sb.rpc("inscriptos_publicos", { p_torneo_id: t.id })
+    ]);
+    if (areaAdmin !== "panel") return; // el admin ya se fue a otra pantalla mientras cargaba
+    const activas = (parejas || []).filter((p) => p.estado !== "rechazada");
+    const etapa = etapaTorneo(t, resumenCategoriasTorneo(cats || [], activas));
+    const barra = ETAPAS_TORNEO.map((_, i) => `<span class="${i < etapa.paso ? "on" : ""}"></span>`).join("");
+    contTorneo.innerHTML = `<div class="card panel-torneo">
+      <h3>Torneo activo</h3>
+      <div class="panel-torneo-top">
+        <div><strong>${escapeHtml(t.nombre)}</strong><small>${rangoFechasTorneo(t)}${t.complejos?.nombre ? " · " + escapeHtml(t.complejos.nombre) : ""}</small></div>
+        ${badgeEstadoTorneo(t)}
+      </div>
+      <div class="pasos-barra pasos-6" aria-hidden="true">${barra}</div>
+      <p class="match-meta">Etapa ${etapa.paso || "—"} de 6${etapa.paso ? " · " + ETAPAS_TORNEO[etapa.paso - 1][0] : ""} · ${activas.length} pareja${activas.length === 1 ? "" : "s"}</p>
+      <button type="button" class="primary cta-hero" data-panel-accion="torneo">${etapa.label ? "Próximo paso: " + etapa.label : "Ver el torneo"}</button>
+    </div>`;
+    contTorneo.dataset.torneo = t.id;
+
+    const sinPago = activas.filter((p) => !(p.jugador1_pago && p.jugador2_pago)).length;
+    const enPareja = new Set(activas.flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+    const sueltos = (insc || []).filter((i) => i.estado !== "cancelada" && i.estado !== "rechazada" && !enPareja.has(i.jugador_id)).length;
+    if (sinPago) pendientes.push([`${sinPago} pareja${sinPago === 1 ? "" : "s"} con pago pendiente`, `${t.nombre} · Inscripciones`, "inscripciones"]);
+    if (sueltos) pendientes.push([`${sueltos} jugador${sueltos === 1 ? "" : "es"} sin pareja`, `${t.nombre} · Inscripciones`, "inscripciones"]);
+  }
+  const solicitudes = cacheJugadoresAdmin.filter((j) => j.categoria_pendiente).length;
+  if (solicitudes) pendientes.push([`${solicitudes} solicitud${solicitudes === 1 ? "" : "es"} de categoría`, "Club · Solicitudes", "solicitudes"]);
+
+  contPend.innerHTML = pendientes.length
+    ? pendientes.map(([texto, sub, destino]) => `<button type="button" class="panel-pendiente" data-panel-accion="${destino}">
+        <span>${escapeHtml(texto)}<small>${escapeHtml(sub)}</small></span><span aria-hidden="true">›</span></button>`).join("")
+    : '<p class="match-meta chequeo-ok">Nada pendiente por ahora.</p>';
+}
+document.getElementById("admPanel").addEventListener("click", (e) => {
+  const accion = e.target.closest("[data-panel-accion]")?.dataset.panelAccion;
+  if (!accion) return;
+  const torneoId = document.getElementById("admPanelTorneo").dataset.torneo;
+  if (accion === "nuevo") { mostrarSeccionTorneoSelector(); document.getElementById("btnMostrarCrearTorneo").click(); return; }
+  if (accion === "solicitudes") { mostrarSeccionConfigGeneral("solicitudes"); return; }
+  if (!torneoId) return;
+  seccionGestionActiva = accion === "inscripciones" ? "inscripciones" : "resumen";
+  cargarGestionTorneo(torneoId);
+});
+
+function mostrarAreaAdmin(area) {
+  if (area === "panel") mostrarPanelAdmin();
+  else if (area === "torneos") mostrarSeccionTorneoSelector();
+  else mostrarSeccionConfigGeneral(ultimaSeccionDeGrupo[area]);
+}
+// pestañas de área (celular) y accesos del panel
+document.querySelectorAll("#view-admin [data-area]").forEach((btn) => {
+  btn.addEventListener("click", () => mostrarAreaAdmin(btn.dataset.area));
+});
+
+function renderAdminListaTorneos() {
+  const cont = document.getElementById("admListaTorneos");
+  if (!cont) return;
+  if (cacheTorneos.length === 0) {
+    cont.innerHTML = '<p class="empty">Todavía no hay torneos. Creá el primero con "Nuevo torneo".</p>';
+    return;
+  }
+  const terminado = (t) => t.estado === "finalizado" || t.estado === "cancelado";
+  const grupos = [
+    ["En curso y próximos", cacheTorneos.filter((t) => !terminado(t)).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))],
+    ["Finalizados", cacheTorneos.filter(terminado)]
+  ];
+  cont.innerHTML = grupos.filter(([, lista]) => lista.length).map(([titulo, lista]) => `
+    <h3>${titulo}</h3>
+    <div class="adm-torneos-grid">
+      ${lista.map((t) => `
+        <button type="button" class="adm-torneo-item" data-torneo="${t.id}">
+          <span><strong>${escapeHtml(t.nombre)}</strong><small>${rangoFechasTorneo(t)}${t.complejos?.nombre ? " · " + escapeHtml(t.complejos.nombre) : ""}</small></span>
+          ${badgeEstadoTorneo(t)}
+        </button>`).join("")}
+    </div>`).join("");
+  cont.querySelectorAll("[data-torneo]").forEach((btn) => btn.addEventListener("click", () => {
+    seccionGestionActiva = "resumen";
+    cargarGestionTorneo(btn.dataset.torneo);
+  }));
 }
 
 // ---------- Sidebar de Administración (#admSidebar, solo escritorio) ----------
@@ -3696,31 +3904,27 @@ function mostrarSeccionTorneoSelector() {
 // nuevo, solo lo muestra. En mobile #admSidebar ni se ve (ver style.css),
 // así que esto no cambia nada ahí.
 document.querySelectorAll("#admSidebar > .adm-side-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    if (btn.dataset.admNav === "config-general") {
-      document.getElementById("admBtnVolverConfigGeneral").click();
-    } else if (torneoGestionId) {
-      cargarGestionTorneo(torneoGestionId);
-    } else {
-      mostrarSeccionTorneoSelector();
-    }
-  });
+  btn.addEventListener("click", () => mostrarAreaAdmin(btn.dataset.admNav));
 });
 
 function sincronizarAdmSidebar() {
+  const enGestion = document.getElementById("admGestionTorneoWrap").style.display !== "none";
+  const esGrupo = areaAdmin === "club" || areaAdmin === "contenido";
+  // celular: pestañas de área + las secciones de Club/Contenido como chips
+  document.querySelectorAll("#admAreaNav .pill").forEach((b) => b.classList.toggle("active", b.dataset.area === areaAdmin));
+  const grupoNav = document.getElementById("admGrupoSubnav");
+  grupoNav.innerHTML = esGrupo ? Object.entries(seccionesDeGrupo(areaAdmin))
+    .map(([key, info]) => `<button type="button" class="pill ${key === seccionConfigActiva ? "active" : ""}" data-seccion-config="${key}">${info.label}</button>`).join("") : "";
+  grupoNav.querySelectorAll("[data-seccion-config]").forEach((b) => b.addEventListener("click", () => mostrarSeccionConfigGeneral(b.dataset.seccionConfig)));
+
   const sidebar = document.getElementById("admSidebar");
   if (!sidebar) return;
-  const enGestion = document.getElementById("admGestionTorneoWrap").style.display !== "none";
-  // "activo" en el ítem de menú "Torneo en gestión" tanto si ya hay un torneo cargado
-  // como si se está viendo el selector suelto (enPantallaTorneoSelector) -- las dos son
-  // parte de la misma sección, separada de Configuración general.
-  const enSeccionTorneo = enGestion || enPantallaTorneoSelector;
   sidebar.querySelectorAll(":scope > .adm-side-item").forEach((btn) => {
-    btn.classList.toggle("active", enSeccionTorneo ? btn.dataset.admNav === "torneo" : btn.dataset.admNav === "config-general");
+    btn.classList.toggle("active", btn.dataset.admNav === areaAdmin);
   });
-
   renderSubnavLateral("admSidebarSubnav", SECCIONES_GESTION, seccionGestionActiva, enGestion, mostrarSeccionGestion, "seccion-gestion", "seccionGestion");
-  renderSubnavLateral("admSidebarSubnavConfig", SECCIONES_CONFIG_GENERAL, seccionConfigActiva, !enSeccionTorneo, mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
+  renderSubnavLateral("admSidebarSubnavClub", seccionesDeGrupo("club"), seccionConfigActiva, areaAdmin === "club", mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
+  renderSubnavLateral("admSidebarSubnavContenido", seccionesDeGrupo("contenido"), seccionConfigActiva, areaAdmin === "contenido", mostrarSeccionConfigGeneral, "seccion-config", "seccionConfig");
 }
 
 // Pinta uno de los dos sub-menús de la sidebar (el de "Torneo en gestión" o
@@ -3762,12 +3966,18 @@ async function cargarGestionTorneo(id) {
   // este torneo" desde el propio torneo).
   adminFocoTorneoActivo = true;
   enPantallaTorneoSelector = false;
+  areaAdmin = "torneos";
   document.getElementById("admSelectorTorneoCard").style.display = "none";
+  document.getElementById("admPanel").style.display = "none";
+  document.getElementById("admTorneosLista").style.display = "none";
   mostrarConfigGeneral(false);
-  document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-block";
+  document.getElementById("admBtnVolverConfigGeneral").style.display = "inline-flex";
   document.getElementById("admGestionNombre").textContent = t.nombre;
   document.getElementById("admGestionEstado").innerHTML = badgeEstadoTorneo(t);
+  document.getElementById("admGestionMeta").textContent =
+    `${rangoFechasTorneo(t)} · ${t.complejos?.nombre || "sin sede"} · ${(t.torneo_categorias || []).length} categorías`;
   cargarPuntosTorneo(t);
+  await precargarAjustesTorneo(t);
   renderAdminGestionSubnav();
   sincronizarAdmSidebar();
 
@@ -3799,7 +4009,6 @@ async function cargarGestionTorneo(id) {
   if (!categoriasGestion.includes(partidosCategoriaFiltro)) partidosCategoriaFiltro = "";
   selCatPartidos.innerHTML = `<option value="">Todas</option>` +
     categoriasGestion.map((c) => `<option value="${c}" ${c === partidosCategoriaFiltro ? "selected" : ""}>${c}</option>`).join("");
-  renderEstadoCategorias(t.torneo_categorias || []);
 
   const { data: tc } = await sb.from("torneo_canchas").select("*, canchas(id, nombre, complejo_id)").eq("torneo_id", id);
   document.getElementById("admCanchas").innerHTML = (tc || []).map(canchaTorneoRowHtml).join("")
@@ -3863,19 +4072,115 @@ async function cargarGestionTorneo(id) {
     [(tc || []).length, "Canchas"],
     [`${pctCalendario}%`, "Calendario armado"]
   ]);
-  renderDiagnosticoTorneo(insc || [], parejas || [], partidos || []);
+  renderDiagnosticoTorneo(insc || [], parejas || [], partidos || [], (tc || []).length);
+  renderEtapasYCategorias(t, parejas || []);
 
   await cargarBloqueosCancha();
   await cargarFotosTorneoAdmin();
   renderPartidosAdmin(partidos || [], tc || [], parejas || []);
 }
 
+// ---------- Etapas del torneo (Resumen) ----------
+// Las 6 etapas por las que pasa un torneo, con UN próximo paso a la vista.
+// Se calcula con lo que ya existe (torneos.estado y torneo_categorias.estado_fase)
+// y el botón no hace nada nuevo: lleva al botón de siempre (o cierra la
+// inscripción, que se puede reabrir).
+const ETAPAS_TORNEO = [
+  ["Inscripción abierta", "Los jugadores se anotan y pagan"],
+  ["Inscripción cerrada", "Nadie más se puede anotar"],
+  ["Fixture", "Cruces por categoría, todavía sin horario"],
+  ["Calendario", "De prueba, revisar y publicar"],
+  ["En juego", "Resultados y siguiente fase"],
+  ["Finalizado", "Campeones y puntos al ranking"]
+];
+const ESTADO_FASE_CHIP = {
+  fixture_generado: ["Fixture armado", "badge vio"],
+  calendario_borrador: ["Calendario de prueba", "badge orange"],
+  calendario_confirmado: ["Publicado", "badge solid"],
+  finalizada: ["Finalizada", "badge"]
+};
+
+function resumenCategoriasTorneo(torneoCategorias, parejas) {
+  return torneoCategorias.map((c) => {
+    const delaCat = parejas.filter((p) => p.categoria === c.categoria && p.estado !== "rechazada");
+    const pagas = delaCat.filter((p) => p.jugador1_pago && p.jugador2_pago).length;
+    return { categoria: c.categoria, fase: c.estado_fase || "sin_fixture", total: delaCat.length, pagas };
+  });
+}
+
+function etapaTorneo(t, porCat) {
+  if (t.estado === "cancelado") return { paso: 0 };
+  if (t.estado === "finalizado") return { paso: 6 };
+  if (t.estado === "inscripcion") return { paso: 1, accion: "cerrar", label: "Cerrar inscripción" };
+  const listas = porCat.filter((c) => c.fase === "sin_fixture" && c.pagas >= 2).length;
+  if (listas) return { paso: 3, accion: "fixture", label: `Armar fixture · ${listas} categoría${listas === 1 ? "" : "s"}` };
+  if (porCat.some((c) => c.fase === "fixture_generado")) return { paso: 4, accion: "calendario", label: "Generar calendario de prueba" };
+  if (porCat.some((c) => c.fase === "calendario_borrador")) return { paso: 4, accion: "publicar", label: "Revisar y publicar calendario" };
+  if (porCat.some((c) => c.fase === "calendario_confirmado")) return { paso: 5, accion: "resultados", label: "Cargar resultados" };
+  return { paso: 3, accion: "inscripciones", label: "Revisar parejas y pagos" };
+}
+
+function chipCategoriaHtml(c) {
+  if (ESTADO_FASE_CHIP[c.fase]) { const [txt, cls] = ESTADO_FASE_CHIP[c.fase]; return `<span class="${cls}">${txt}</span>`; }
+  if (c.total < 2) return '<span class="badge">Pocas parejas</span>';
+  if (c.pagas < c.total) return '<span class="badge orange">Faltan pagos</span>';
+  return '<span class="badge solid">Lista para fixture</span>';
+}
+
+function renderEtapasYCategorias(t, parejas) {
+  const porCat = resumenCategoriasTorneo(t.torneo_categorias || [], parejas);
+  const etapa = etapaTorneo(t, porCat);
+  const activas = parejas.filter((p) => p.estado !== "rechazada");
+  const pagas = activas.filter((p) => p.jugador1_pago && p.jugador2_pago).length;
+  document.getElementById("admEtapas").innerHTML = etapa.paso === 0
+    ? '<li class="ahora"><span class="etapa-dot">!</span><span><b>Torneo cancelado</b></span></li>'
+    : ETAPAS_TORNEO.map(([titulo, detalle], i) => {
+      const n = i + 1;
+      const clase = n < etapa.paso || etapa.paso === 6 ? "ok" : n === etapa.paso ? "ahora" : "";
+      const texto = n === 1 ? `${activas.length} pareja${activas.length === 1 ? "" : "s"} · ${pagas} con el pago confirmado` : detalle;
+      return `<li class="${clase}"><span class="etapa-dot">${clase === "ok" ? "✓" : n}</span><span><b>${titulo}</b><small>${texto}</small></span></li>`;
+    }).join("");
+  document.getElementById("admProximoPaso").innerHTML = etapa.accion
+    ? `<button type="button" class="primary cta-hero" data-proximo-paso="${etapa.accion}">${etapa.label}</button>`
+    : `<p class="match-meta">${etapa.paso === 6 ? "El torneo terminó: campeones y puntos ya están cargados." : ""}</p>`;
+
+  const filasHtml = porCat.length ? porCat.map((c) => `
+    <div class="cat-estado-fila">
+      <span><strong>${escapeHtml(c.categoria)}</strong><small>${c.total} pareja${c.total === 1 ? "" : "s"}${c.total ? ` · pagos ${c.pagas}/${c.total}` : ""}</small></span>
+      ${chipCategoriaHtml(c)}
+    </div>`).join("") : '<p class="empty">Este torneo todavía no tiene categorías.</p>';
+  document.getElementById("admResumenCategorias").innerHTML = filasHtml;
+  document.getElementById("admEstadoCategorias").innerHTML = filasHtml;
+
+  // cada botón de Partidos dice sobre cuántas categorías va a actuar (ver CSS [data-cuenta])
+  const cuenta = (id, n, uno, varios) => {
+    const b = document.getElementById(id);
+    if (n) b.dataset.cuenta = `${n} ${n === 1 ? uno : varios}`; else delete b.dataset.cuenta;
+  };
+  cuenta("btnArmarPartidos", porCat.filter((c) => c.fase === "sin_fixture" && c.pagas >= 2).length, "categoría lista", "categorías listas");
+  cuenta("btnGenerarCalendario", porCat.filter((c) => c.fase === "fixture_generado").length, "categoría", "categorías");
+  cuenta("btnPublicarCalendario", porCat.filter((c) => c.fase === "calendario_borrador").length, "categoría", "categorías");
+}
+
+document.getElementById("admProximoPaso").addEventListener("click", (e) => {
+  const accion = e.target.closest("[data-proximo-paso]")?.dataset.proximoPaso;
+  if (!accion) return;
+  if (accion === "cerrar") { document.getElementById("btnToggleInscripcion").click(); return; }
+  mostrarSeccionGestion(accion === "inscripciones" ? "inscripciones" : "partidos");
+  const destino = { fixture: "btnArmarPartidos", calendario: "btnGenerarCalendario", publicar: "btnPublicarCalendario" }[accion];
+  const b = destino ? document.getElementById(destino) : null;
+  if (!b) return;
+  b.scrollIntoView({ behavior: "smooth", block: "center" });
+  b.classList.add("resaltado");
+  setTimeout(() => b.classList.remove("resaltado"), 2500);
+});
+
 // Chequeo rápido de salud del torneo, pedido por el club para poder confirmar
 // "¿quedó bien armado?" sin tener que revisar categoría por categoría a mano.
 // Cada fila es una situación real que puede pasar sin que rompa nada (una
 // pareja sin partido, alguien anotado sin pareja, un partido sin horario) pero
 // que el club quiere poder ver de un vistazo antes de avisarle a la gente.
-function renderDiagnosticoTorneo(insc, parejas, partidos) {
+function renderDiagnosticoTorneo(insc, parejas, partidos, cantidadCanchas) {
   const cont = document.getElementById("admDiagnostico");
   if (!cont) return;
   const parejasActivas = parejas.filter((p) => p.estado !== "rechazada");
@@ -3887,6 +4192,14 @@ function renderDiagnosticoTorneo(insc, parejas, partidos) {
   const partidosSinHorario = partidos.filter((p) => !p.horario && p.estado !== "jugado");
 
   const filas = [];
+  // lo básico primero: sin canchas o sin parejas no hay torneo que armar
+  // (antes, con 0 parejas y 0 canchas, esto decía "Todo en orden")
+  if (!cantidadCanchas) filas.push('Este torneo no tiene canchas asignadas — agregalas en "Canchas" antes de generar el calendario.');
+  if (parejasActivas.length === 0) filas.push("Todavía no hay parejas anotadas.");
+  const porCategoria = {};
+  parejasActivas.forEach((p) => { porCategoria[p.categoria] = (porCategoria[p.categoria] || 0) + 1; });
+  const conUnaSola = Object.entries(porCategoria).filter(([, n]) => n === 1).map(([c]) => c);
+  if (conUnaSola.length) filas.push(`Con una sola pareja (no se puede armar fixture todavía): ${conUnaSola.map(escapeHtml).join(", ")}.`);
   if (parejasSinPartido.length) filas.push(`${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
   if (inscSinPareja.length) filas.push(`${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
   if (parejasPendientes.length) filas.push(`${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`).join(", ")}.`);
@@ -3921,13 +4234,8 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
   }
 
   toast(`"${nombre}" borrado`);
-  adminFocoTorneoActivo = false;
-  torneoGestionId = null;
-  torneoGestionData = null;
-  document.getElementById("admSelectTorneoGestion").value = "";
-  document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-  mostrarSeccionTorneoSelector(); // vuelve al selector suelto, no a Configuración general -- venía de gestionar ESTE torneo
   await cargarTorneos();
+  mostrarSeccionTorneoSelector(); // vuelve a la lista de Torneos
   avisarActualizacionEnVivo();
   } finally {
     btn.disabled = false;
@@ -3935,9 +4243,7 @@ document.getElementById("btnBorrarTorneo").addEventListener("click", async () =>
 });
 
 // ---------- editar torneo (nombre, sede, categorías, fechas, costo, flyer) ----------
-document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", async () => {
-  if (!torneoGestionData) return;
-  const t = torneoGestionData;
+async function precargarAjustesTorneo(t) {
   if (cacheCategorias.length === 0) await cargarCategorias();
   document.getElementById("teNombre").value = t.nombre;
   document.getElementById("teComplejo").value = t.complejo_id || "";
@@ -3951,6 +4257,11 @@ document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", a
   document.getElementById("teHoraHasta").value = t.hora_hasta ? t.hora_hasta.slice(0, 5) : "";
   renderHorariosPorDiaForm("teHorariosPorDiaForm", "chkDiaTorneoEdit", t.horarios_por_dia || {});
   document.getElementById("teFaseGruposFormato").value = t.fase_grupos_formato || "grupos";
+  // formato del club fijo ("Zonas + repechaje", igual que al crear); el selector
+  // solo aparece en torneos viejos que usaron otro formato
+  const esZonas = (t.fase_grupos_formato || "grupos") === "cuadro_zonas";
+  document.getElementById("teFormatoFijo").style.display = esZonas ? "block" : "none";
+  document.getElementById("teFormatoViejoWrap").style.display = esZonas ? "none" : "block";
   document.getElementById("teTamanoGrupo").value = t.tamano_grupo || 3;
   document.getElementById("teAvanzanPorGrupo").value = t.avanzan_por_grupo || 2;
   toggleGrupoConfigRow("teFaseGruposFormato", "teGrupoConfigRow");
@@ -3968,13 +4279,30 @@ document.getElementById("admBtnMostrarEditarTorneo").addEventListener("click", a
     .forEach((id) => { document.getElementById(id).disabled = hayCalendarioArmado; });
   document.querySelectorAll(".chkDiaTorneoEdit, .chkTorneoCategoriaEdit").forEach((chk) => { chk.disabled = hayCalendarioArmado; });
   document.querySelectorAll("#teHorariosPorDiaForm input").forEach((inp) => { inp.disabled = hayCalendarioArmado; });
+  resumirAjustesTorneo(t);
+}
 
-  const card = document.getElementById("editarTorneoCard");
-  card.style.display = "block";
-  card.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-document.getElementById("btnCancelarEditarTorneo").addEventListener("click", () => {
-  document.getElementById("editarTorneoCard").style.display = "none";
+// La línea de resumen de cada bloque de Ajustes (lo que tiene guardado hoy)
+function resumirAjustesTorneo(t) {
+  const set = (id, txt) => { document.getElementById(id).textContent = txt; };
+  const nombresDias = { 0: "Dom", 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb" };
+  const orden = [4, 5, 6, 0, 1, 2, 3];
+  const dias = (t.dias_semana || []).slice().sort((a, b) => orden.indexOf(a) - orden.indexOf(b)).map((d) => nombresDias[d]);
+  const horas = t.hora_desde && t.hora_hasta ? ` · ${t.hora_desde.slice(0, 5)} a ${t.hora_hasta.slice(0, 5)}` : "";
+  const complejo = cacheComplejos.find((c) => c.id === t.complejo_id)?.nombre || t.complejos?.nombre || "sin sede";
+  const formato = { cuadro_zonas: "Zonas + repechaje", grupos: "Grupos", eliminacion: "Eliminación directa" }[t.fase_grupos_formato] || "Grupos";
+  const n = (t.torneo_categorias || []).length;
+  const pr = t.puntos_ronda || {};
+  set("ajResumenDatos", `${t.nombre} · ${complejo}`);
+  set("ajResumenFechas", `${rangoFechasTorneo(t)}${dias.length ? " · " + dias.join(", ") : ""}${horas}`);
+  set("ajResumenCategorias", `${n} categoría${n === 1 ? "" : "s"} · ${formato}`);
+  set("ajResumenCosto", `${{ inscripcion: "Inscripción abierta", inscripcion_cerrada: "Inscripción cerrada" }[t.estado] || "Inscripción terminada"} · ${t.costo ? "$" + Number(t.costo).toLocaleString("es-AR") : "sin costo"}`);
+  set("ajResumenFlyer", t.flyer_url ? "Flyer cargado" : "Sin flyer");
+  set("ajResumenPuntaje", t.es_puntuable === false ? "No suma puntos al ranking" : `Suma puntos · Campeón ${pr["Campeón"] ?? "—"} · Sub ${pr["Sub"] ?? "—"}`);
+}
+// cada bloque tiene su "Guardar cambios": todos guardan el torneo completo, igual que antes
+document.getElementById("admSeccionAjustes").addEventListener("click", (e) => {
+  if (e.target.closest(".ajuste-guardar")) document.getElementById("btnGuardarTorneo").click();
 });
 document.getElementById("btnGuardarTorneo").addEventListener("click", async () => {
   const btn = document.getElementById("btnGuardarTorneo");
@@ -4026,7 +4354,6 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
   await sb.from("torneo_categorias").insert(categoriasElegidas.map((categoria) => ({ torneo_id: torneoGestionId, categoria })));
 
   toast("Torneo actualizado");
-  document.getElementById("editarTorneoCard").style.display = "none";
   cargarTorneos();
   cargarInicio();
   refrescarTrasAccionGestion();
@@ -4269,26 +4596,6 @@ function armarGruposDeParejas(parejasCategoria, tamanoGrupo) {
   return gruposArr;
 }
 
-// Un badge por categoría con su fase actual, para que el admin sepa de un
-// vistazo qué falta: si el calendario ya está armado "de prueba" pero
-// todavía no se publicó, se lo remarca en naranja para que no se olvide de
-// apretar "Publicar calendario".
-const ETIQUETA_ESTADO_FASE = {
-  sin_fixture: "sin fixture",
-  fixture_generado: "fixture armado, falta calendario",
-  calendario_borrador: "calendario de prueba — sin publicar",
-  calendario_confirmado: "calendario publicado",
-  finalizada: "finalizada"
-};
-function renderEstadoCategorias(torneoCategorias) {
-  const cont = document.getElementById("admEstadoCategorias");
-  if (!cont) return;
-  cont.innerHTML = torneoCategorias.map((c) => {
-    const clase = c.estado_fase === "calendario_borrador" ? "badge orange" : "badge";
-    const etiqueta = ETIQUETA_ESTADO_FASE[c.estado_fase] || c.estado_fase;
-    return `<span class="${clase}" style="margin:0 6px 6px 0">${c.categoria}: ${etiqueta}</span>`;
-  }).join("");
-}
 
 // Arma (e inserta) el FIXTURE de UNA categoría: quién juega contra quién,
 // SIN asignarle todavía cancha ni horario — eso es un paso aparte
@@ -5437,15 +5744,7 @@ document.getElementById("btnAdministrarEsteTorneo").addEventListener("click", as
   await cargarGestionTorneo(torneoActualId); // ya deja la pantalla enfocada solo en este torneo (ver más arriba)
   document.getElementById("admGestionTorneoWrap").scrollIntoView({ behavior: "smooth", block: "start" });
 });
-document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", () => {
-  adminFocoTorneoActivo = false;
-  torneoGestionId = null;
-  torneoGestionData = null;
-  document.getElementById("admGestionTorneoWrap").style.display = "none";
-  document.getElementById("admSelectTorneoGestion").value = "";
-  document.getElementById("admBtnVolverConfigGeneral").style.display = "none";
-  mostrarSeccionConfigGeneral(seccionConfigActiva); // esconde admSelectorTorneoCard por su cuenta
-});
+document.getElementById("admBtnVolverConfigGeneral").addEventListener("click", mostrarSeccionTorneoSelector);
 
 // Atajo pedido por el club: desde "Administrar este torneo" poder cargar/ver
 // auspiciantes de ESE torneo sin tener que ir a la Configuración general

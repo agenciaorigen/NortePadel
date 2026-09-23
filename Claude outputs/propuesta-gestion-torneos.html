@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gestión de torneos · Propuesta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
+<style>
+  /* Misma paleta y letras que elnortepadel.com (rediseño "circuito") */
+  :root {
+    --bg: #07090B; --bg-elev: #0F1215; --card: #161A1E; --card-2: #1C2126;
+    --lima: #B9FF3D; --lima-ink: #0A0F02; --text: #F3F5F4; --muted: #8D969C;
+    --border: rgba(255,255,255,.09); --warn: #ffc24d; --danger: #ff5c6c; --violeta: #8A6FE0;
+    --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --body: "Manrope", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--body); font-size: 15.5px; line-height: 1.6; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1, h2, h3, h4 { font-family: var(--display); text-transform: uppercase; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(48px, 9vw, 92px); font-style: italic; font-weight: 800; line-height: .88; }
+  h1 span { color: var(--lima); }
+  h2 { font-size: clamp(32px, 5vw, 46px); font-style: italic; font-weight: 800; line-height: .95; margin-bottom: 14px; }
+  h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .eyebrow { font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: .18em; text-transform: uppercase; color: var(--lima); margin: 0 0 12px; }
+  .lead { font-size: 18px; color: #c9ced1; max-width: 62ch; margin-top: 20px; }
+  section { padding: 56px 0 8px; border-top: 1px solid var(--border); margin-top: 48px; }
+  .muted { color: var(--muted); }
+  strong { color: var(--text); }
+
+  /* tres ideas */
+  .ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 30px; }
+  .idea { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .idea .n { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 40px; color: var(--lima); line-height: 1; }
+  .idea h3 { margin-top: 10px; }
+  .idea p { font-size: 14.5px; color: #c9ced1; margin: 0; }
+
+  /* diagnóstico */
+  .diag { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 22px; }
+  .diag-item { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .diag-item h4 { font-size: 18px; margin-bottom: 6px; }
+  .diag-item p { font-size: 14px; color: #c9ced1; margin: 0; }
+  .sev { display: inline-block; font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+  .sev.alta { background: rgba(255,92,108,.14); color: var(--danger); }
+  .sev.media { background: rgba(255,194,77,.14); color: var(--warn); }
+  .sev.baja { background: rgba(255,255,255,.07); color: var(--muted); }
+
+  /* mapa de estructura */
+  .mapa { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 22px; }
+  .rama { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .rama h3 { color: var(--lima); font-style: italic; font-size: 26px; }
+  .rama .sub { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  .rama ul { list-style: none; padding: 0; margin: 0; }
+  .rama li { padding: 7px 0; border-top: 1px solid var(--border); font-size: 14.5px; }
+  .rama li b { font-family: var(--display); font-size: 16.5px; letter-spacing: .03em; text-transform: uppercase; font-weight: 700; }
+  .rama li span { display: block; color: var(--muted); font-size: 13px; }
+
+  /* maquetas de celular */
+  .maquetas { display: flex; flex-wrap: wrap; gap: 36px 28px; justify-content: center; margin-top: 30px; }
+  .maqueta { width: 340px; max-width: 100%; }
+  .maqueta-cap { margin-top: 14px; font-size: 14px; color: #c9ced1; }
+  .maqueta-cap b { display: block; font-family: var(--display); font-size: 19px; text-transform: uppercase; letter-spacing: .03em; color: var(--text); margin-bottom: 2px; }
+  .phone { background: var(--bg); border: 1px solid rgba(255,255,255,.14); border-radius: 30px; padding: 12px 12px 0; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7); overflow: hidden; min-height: 700px; position: relative; }
+  .ph-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 12px; border-bottom: 1px solid var(--border); }
+  .ph-marca { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 17px; }
+  .ph-marca span { color: var(--lima); }
+  .ph-chip { font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px; }
+  .ph-body { padding: 14px 4px 80px; font-size: 13px; }
+  .ph-tabbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; padding: 10px 6px 14px; background: var(--bg-elev); border-top: 1px solid var(--border); font-family: var(--display); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ph-tabbar .on { color: var(--lima); }
+  .ph-eyebrow { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--lima); margin: 0 0 4px; }
+  .ph-h { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 30px; line-height: .92; text-transform: uppercase; margin: 0 0 6px; }
+  .ph-meta { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .ph-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .ph-label { font-family: var(--display); font-weight: 700; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .badge.lima { color: var(--lima); border-color: rgba(185,255,61,.35); background: rgba(185,255,61,.1); }
+  .badge.warn { color: var(--warn); border-color: rgba(255,194,77,.35); background: rgba(255,194,77,.1); }
+  .badge.vio { color: #b7a6f5; border-color: rgba(138,111,224,.4); background: rgba(138,111,224,.12); }
+  .btn { display: block; width: 100%; text-align: center; font-family: var(--display); font-weight: 800; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); margin-top: 8px; }
+  .btn.lima { background: var(--lima); color: var(--lima-ink); border-color: var(--lima); }
+  .btn.inline { display: inline-block; width: auto; padding: 6px 10px; font-size: 12px; margin: 0; }
+  .fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+  .fila:first-of-type { border-top: 0; }
+  .fila small { color: var(--muted); display: block; font-size: 11px; }
+  .chev { color: var(--muted); font-size: 16px; }
+  .tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 12px; overflow: hidden; font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .tabs span { padding: 0 0 7px; }
+  .tabs .on { color: var(--text); border-bottom: 2px solid var(--lima); }
+
+  /* ciclo de vida */
+  .ciclo { list-style: none; margin: 0; padding: 0; }
+  .ciclo li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; position: relative; padding-bottom: 12px; }
+  .ciclo li::before { content: ""; position: absolute; left: 10px; top: 20px; bottom: 0; width: 2px; background: var(--border); }
+  .ciclo li:last-child::before { display: none; }
+  .ciclo .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 12px; font-weight: 800; color: var(--muted); background: var(--bg); position: relative; z-index: 1; }
+  .ciclo .ok .dot { background: var(--lima); border-color: var(--lima); color: var(--lima-ink); }
+  .ciclo .ahora .dot { border-color: var(--lima); color: var(--lima); box-shadow: 0 0 0 4px rgba(185,255,61,.15); }
+  .ciclo b { font-family: var(--display); font-size: 15px; letter-spacing: .03em; text-transform: uppercase; display: block; line-height: 1.2; }
+  .ciclo .ahora b { color: var(--lima); }
+  .ciclo small { color: var(--muted); font-size: 11.5px; }
+
+  /* barra de pagos */
+  .barra { height: 5px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; width: 70px; }
+  .barra i { display: block; height: 100%; background: var(--lima); }
+
+  /* bloques plegables de Ajustes */
+  .bloque { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--card); }
+  .bloque-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .bloque-top b { font-family: var(--display); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
+  .bloque-top small { display: block; color: var(--muted); font-size: 11.5px; font-family: var(--body); letter-spacing: 0; text-transform: none; font-weight: 500; }
+  .bloque.abierto { border-color: rgba(185,255,61,.4); }
+  .campo { margin-top: 9px; }
+  .campo span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .campo div { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 12.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chips em { font-style: normal; font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .chips em.on { background: var(--lima); color: var(--lima-ink); border-color: var(--lima); font-weight: 700; }
+  .candado { font-size: 11px; color: var(--warn); }
+  .peligro { border-color: rgba(255,92,108,.3); }
+  .peligro b { color: var(--danger); }
+
+  /* pasos del asistente */
+  .pasos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 4px 0 14px; }
+  .pasos span { height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); }
+  .pasos .on { background: var(--lima); }
+
+  /* tabla de equivalencias */
+  .tabla-wrap { overflow-x: auto; margin-top: 20px; border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--bg-elev); }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { color: #c9ced1; }
+  td .nuevo { color: var(--lima); font-weight: 700; }
+
+  /* etapas */
+  .etapas { display: grid; gap: 12px; margin-top: 22px; }
+  .etapa { display: grid; grid-template-columns: 70px 1fr; gap: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .etapa .num { font-family: var(--display); font-style: italic; font-weight: 800; font-size: 50px; line-height: .85; color: var(--lima); }
+  .etapa p { margin: 0; font-size: 14.5px; color: #c9ced1; }
+  .etapa h3 { margin-bottom: 4px; }
+
+  /* decisiones */
+  .decisiones { display: grid; gap: 12px; margin-top: 22px; }
+  .decision { background: var(--bg-elev); border: 1px solid rgba(185,255,61,.25); border-radius: 12px; padding: 16px 18px; }
+  .decision h4 { font-size: 18px; margin-bottom: 6px; }
+  .decision p { margin: 0; font-size: 14.5px; color: #c9ced1; }
+  .decision p b { color: var(--lima); }
+
+  footer { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  @media (max-width: 560px) {
+    .etapa { grid-template-columns: 1fr; gap: 6px; }
+    .wrap { padding-top: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Norte Padel · Panel de gestión</p>
+  <h1>Gestionar un torneo,<br /><span>paso a paso.</span></h1>
+  <p class="lead">Revisé cómo se crea, se configura y se opera hoy un torneo en el panel. La propuesta reordena todo alrededor de una idea simple: que el panel te diga en qué etapa está cada torneo y cuál es el próximo paso, y que todo lo que hoy se puede editar se siga pudiendo editar, más a mano.</p>
+
+  <div class="ideas">
+    <div class="idea">
+      <div class="n">1</div>
+      <h3>El torneo te guía</h3>
+      <p>Una línea de tiempo con las 6 etapas del torneo y un botón con el próximo paso. Se acaba el "¿qué me falta?".</p>
+    </div>
+    <div class="idea">
+      <div class="n">2</div>
+      <h3>Todo en su lugar</h3>
+      <p>El panel pasa a tener tres partes claras: Torneos, Club y Contenido. Dentro de cada torneo, lo que se usa cada semana va adelante y lo que se toca una vez va en Ajustes.</p>
+    </div>
+    <div class="idea">
+      <div class="n">3</div>
+      <h3>Crear en dos minutos</h3>
+      <p>Un asistente de 4 pasos que puede copiar la configuración de la fecha anterior: sede, horarios, canchas, categorías, costo y puntaje.</p>
+    </div>
+  </div>
+
+  <!-- ============ DIAGNÓSTICO ============ -->
+  <section>
+    <p class="eyebrow">Lo que encontré</p>
+    <h2>Diagnóstico</h2>
+    <p>Todo funciona, pero el camino para llegar a cada cosa es largo y algunas trampas no se ven hasta que pasan.</p>
+    <div class="diag">
+      <div class="diag-item">
+        <span class="sev alta">Riesgo real</span>
+        <h4>El puntaje nuevo no es el tuyo</h4>
+        <p>Cada torneo nuevo arranca con la tabla de puntos por defecto de la base (Campeón 1000, Sub 750, Semi 500…), no con la que usás vos en las Fechas Puntuables (Campeón 2000, Sub 1500, Semi 1000…). Si te olvidás de corregirla en "Puntaje", ese torneo reparte la mitad de puntos.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev alta">Riesgo real</span>
+        <h4>"Todo en orden" cuando no hay nada</h4>
+        <p>El diagnóstico del Resumen dice "Todo en orden" aunque el torneo tenga 0 parejas y 0 canchas, porque solo mira problemas de partidos ya armados. Te da una tranquilidad que no corresponde.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev media">Fricción</span>
+        <h4>Crear y gestionar están en lugares distintos</h4>
+        <p>Se crea desde la lista pública de Torneos ("+ Crear torneo"), se gestiona desde Config eligiendo el torneo en un desplegable y también se entra desde la llave inglesa de la portada del torneo. Son tres puertas al mismo lugar.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev media">Fricción</span>
+        <h4>No se ve en qué etapa está cada categoría</h4>
+        <p>El avance real (fixture, calendario de prueba, publicado, finalizada) vive en una lista de textos al pie de "Partidos". Los botones 1, 2 y 3 actúan sobre todas las categorías juntas y no dicen cuál está lista para cuál paso.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev media">Fricción</span>
+        <h4>La configuración está repartida</h4>
+        <p>Los datos del torneo están en "Editar torneo" (un formulario muy largo), las canchas en otra sección, el puntaje en otra, los auspiciantes en la configuración general y las fotos en otra más. Para revisar "¿quedó bien configurado?" hay que recorrer cinco lugares.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev media">Fricción</span>
+        <h4>En el celular, Configuración general es una sola página enorme</h4>
+        <p>En la computadora hay barra lateral, pero en el celular todas las tarjetas del club (WhatsApp, sedes, categorías, etiquetas, noticias, auspiciantes, jugadores…) quedan apiladas en una pantalla de casi 4 metros de scroll.</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev baja">Detalle</span>
+        <h4>El formato no coincide entre crear y editar</h4>
+        <p>Al crear, el formato queda fijo en "Zonas + repechaje". Al editar, en cambio, todavía se ofrecen los tres formatos viejos (grupos, eliminación directa, zonas).</p>
+      </div>
+      <div class="diag-item">
+        <span class="sev baja">Detalle</span>
+        <h4>"Borrar torneo" al lado de "Editar"</h4>
+        <p>La acción más destructiva del panel está en la misma fila y del mismo tamaño que "Editar torneo" y "Auspiciantes". Pide confirmación, pero está a un toque equivocado de distancia.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ESTRUCTURA ============ -->
+  <section>
+    <p class="eyebrow">Cómo quedaría ordenado</p>
+    <h2>La nueva estructura</h2>
+    <p>La pestaña Config pasa a llamarse <strong>Gestión</strong> y abre en un panel de inicio. Desde ahí, tres ramas:</p>
+    <div class="mapa">
+      <div class="rama">
+        <h3>Torneos</h3>
+        <p class="sub">Lo que cambia cada semana</p>
+        <ul>
+          <li><b>Lista de torneos</b><span>En curso, próximos y finalizados, cada uno con su etapa. Acá vive "Nuevo torneo".</span></li>
+          <li><b>Resumen</b><span>Etapas, próximo paso y avance por categoría.</span></li>
+          <li><b>Inscripciones</b><span>Parejas, pagos, sueltos, horarios que no pueden y alta manual.</span></li>
+          <li><b>Partidos</b><span>Fixture, calendario, resultados, siguiente fase y las vistas Lista / Planilla / Llave / Tabla.</span></li>
+          <li><b>Canchas</b><span>Canchas del torneo, días y horarios de cada una y bloqueos.</span></li>
+          <li><b>Fotos</b><span>Galería del torneo.</span></li>
+          <li><b>Ajustes</b><span>Datos, fechas y horarios, categorías y formato, inscripción y costo, puntaje, flyer y auspiciantes del torneo. Al final, borrar torneo.</span></li>
+        </ul>
+      </div>
+      <div class="rama">
+        <h3>Club</h3>
+        <p class="sub">La base que usan todos los torneos</p>
+        <ul>
+          <li><b>Jugadores</b><span>Buscar, corregir datos y puntos, ascender, blanquear clave, borrar perfiles repetidos.</span></li>
+          <li><b>Solicitudes de categoría</b><span>Con un número de pendientes visible desde el panel.</span></li>
+          <li><b>Sedes y canchas</b><span>Complejos y sus canchas.</span></li>
+          <li><b>Categorías</b><span>Damas y Caballeros.</span></li>
+          <li><b>Etiquetas</b><span>Uso interno del admin.</span></li>
+        </ul>
+      </div>
+      <div class="rama">
+        <h3>Contenido</h3>
+        <p class="sub">Lo que se ve en el sitio</p>
+        <ul>
+          <li><b>Noticias</b><span>Se publican en Inicio.</span></li>
+          <li><b>Auspiciantes</b><span>Generales y por torneo, con el filtro por torneo a la vista.</span></li>
+          <li><b>Jugador del mes</b></li>
+          <li><b>Contacto y redes</b><span>WhatsApp del club, WhatsApp de fotos, Instagram y el link de YouTube en vivo.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MAQUETAS ============ -->
+  <section>
+    <p class="eyebrow">Cómo se vería en el celular</p>
+    <h2>Pantallas clave</h2>
+    <p>Maquetas con los datos de la Fecha Puntuable 8. Los números son de ejemplo.</p>
+
+    <div class="maquetas">
+
+      <!-- 1. Panel de inicio -->
+      <div class="maqueta">
+        <div class="phone">
+          <div class="ph-top"><span class="ph-marca">NORTE <span>PADEL</span></span><span class="ph-chip">Admin</span></div>
+          <div class="ph-body">
+            <p class="ph-eyebrow">Panel del club</p>
+            <p class="ph-h">Gestión</p>
+            <div class="ph-card" style="border-color:rgba(185,255,61,.35)">
+              <p class="ph-label">Torneo activo</p>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div>
+                  <div style="font-family:var(--display);font-style:italic;font-weight:800;font-size:22px;line-height:1;text-transform:uppercase">Fecha Puntuable 8</div>
+                  <div class="ph-meta" style="margin:4px 0 0">Jue 8 al dom 11 oct · Flaco Padel</div>
+                </div>
+                <span class="badge lima">Inscripción</span>
+              </div>
+              <div class="pasos" style="grid-template-columns:repeat(6,1fr);margin:12px 0 4px"><span class="on"></span><span></span><span></span><span></span><span></span><span></span></div>
+              <div class="ph-meta" style="margin:0">Etapa 1 de 6 · 42 parejas anotadas</div>
+              <span class="btn lima">Próximo paso: cerrar inscripción</span>
+            </div>
+            <div class="ph-card">
+              <p class="ph-label">Para resolver</p>
+              <div class="fila"><div>6 parejas con pago pendiente<small>Fecha Puntuable 8 · Inscripciones</small></div><span class="chev">›</span></div>
+              <div class="fila"><div>2 solicitudes de categoría<small>Club · Solicitudes</small></div><span class="chev">›</span></div>
+              <div class="fila"><div>3 jugadores sin pareja<small>Fecha Puntuable 8 · Inscripciones</small></div><span class="chev">›</span></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div class="ph-card" style="text-align:center;margin:0"><div style="font-family:var(--display);font-weight:800;font-size:15px;text-transform:uppercase">Torneos</div><small class="muted" style="font-size:10.5px">8 en total</small></div>
+              <div class="ph-card" style="text-align:center;margin:0"><div style="font-family:var(--display);font-weight:800;font-size:15px;text-transform:uppercase">Club</div><small class="muted" style="font-size:10.5px">Jugadores, sedes</small></div>
+              <div class="ph-card" style="text-align:center;margin:0"><div style="font-family:var(--display);font-weight:800;font-size:15px;text-transform:uppercase">Contenido</div><small class="muted" style="font-size:10.5px">Noticias, sponsors</small></div>
+            </div>
+          </div>
+          <div class="ph-tabbar"><span>Inicio</span><span>Torneos</span><span>Ranking</span><span>En vivo</span><span class="on">Gestión</span></div>
+        </div>
+        <p class="maqueta-cap"><b>1 · Panel de inicio</b>Lo primero que ves al entrar: el torneo activo con su etapa y el próximo paso, y lo que está esperando que lo resuelvas. Cada renglón te lleva directo a la pantalla donde se resuelve.</p>
+      </div>
+
+      <!-- 2. Resumen del torneo -->
+      <div class="maqueta">
+        <div class="phone">
+          <div class="ph-top"><span class="ph-marca">NORTE <span>PADEL</span></span><span class="ph-chip">Admin</span></div>
+          <div class="ph-body">
+            <p class="ph-eyebrow">← Torneos</p>
+            <p class="ph-h">Fecha Puntuable 8</p>
+            <p class="ph-meta">Jue 8 al dom 11 oct · Flaco Padel · 11 categorías</p>
+            <div class="tabs"><span class="on">Resumen</span><span>Inscripciones</span><span>Partidos</span><span>Canchas</span><span>Fotos</span></div>
+            <div class="ph-card">
+              <p class="ph-label">Etapas del torneo</p>
+              <ol class="ciclo">
+                <li class="ahora"><span class="dot">1</span><div><b>Inscripción abierta</b><small>42 parejas · 36 con el pago confirmado</small></div></li>
+                <li><span class="dot">2</span><div><b>Cerrar inscripción</b><small>Nadie más se puede anotar</small></div></li>
+                <li><span class="dot">3</span><div><b>Armar fixture</b><small>Cruces por categoría, sin horario</small></div></li>
+                <li><span class="dot">4</span><div><b>Calendario</b><small>De prueba, revisar y publicar</small></div></li>
+                <li><span class="dot">5</span><div><b>En juego</b><small>Resultados y siguiente fase</small></div></li>
+                <li><span class="dot">6</span><div><b>Finalizado</b><small>Campeones y puntos al ranking</small></div></li>
+              </ol>
+              <span class="btn lima">Cerrar inscripción</span>
+            </div>
+            <div class="ph-card">
+              <p class="ph-label">Por categoría</p>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">3ra Caballeros</b><small>8 parejas · pagos 8/8</small></div><span class="badge lima">Lista</span></div>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">4ta Damas</b><small>6 parejas · pagos 4/6</small><div class="barra"><i style="width:66%"></i></div></div><span class="badge warn">Faltan pagos</span></div>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">6ta Caballeros</b><small>1 pareja</small></div><span class="badge">Pocas parejas</span></div>
+            </div>
+          </div>
+          <div class="ph-tabbar"><span>Inicio</span><span>Torneos</span><span>Ranking</span><span>En vivo</span><span class="on">Gestión</span></div>
+        </div>
+        <p class="maqueta-cap"><b>2 · Resumen del torneo</b>Las 6 etapas en una línea de tiempo, siempre con un único botón para la siguiente. Abajo, cada categoría con su propio estado. Así se ve cuál está lista para el fixture y cuál todavía no.</p>
+      </div>
+
+      <!-- 3. Partidos por categoría -->
+      <div class="maqueta">
+        <div class="phone">
+          <div class="ph-top"><span class="ph-marca">NORTE <span>PADEL</span></span><span class="ph-chip">Admin</span></div>
+          <div class="ph-body">
+            <p class="ph-eyebrow">← Torneos</p>
+            <p class="ph-h">Fecha Puntuable 8</p>
+            <div class="tabs"><span>Resumen</span><span>Inscripciones</span><span class="on">Partidos</span><span>Canchas</span><span>Fotos</span></div>
+            <div class="ph-card">
+              <p class="ph-label">Avance por categoría</p>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">3ra Caballeros</b><small>12 partidos · 12 con horario</small></div><span class="badge lima">Publicado</span></div>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">4ta Caballeros</b><small>10 partidos · sin publicar</small></div><span class="badge warn">De prueba</span></div>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">5ta Damas</b><small>8 partidos · sin horario</small></div><span class="badge vio">Fixture</span></div>
+              <div class="fila"><div><b style="font-family:var(--display);font-size:14px;text-transform:uppercase">6ta Damas</b><small>5 parejas listas</small></div><span class="badge">Sin fixture</span></div>
+            </div>
+            <div class="ph-card">
+              <p class="ph-label">Acciones</p>
+              <span class="btn">Armar fixture · 1 categoría lista</span>
+              <span class="btn">Calendario de prueba · 1 categoría</span>
+              <span class="btn lima">Publicar calendario · 4ta Caballeros</span>
+              <span class="btn">Siguiente fase</span>
+            </div>
+            <div class="tabs" style="border:0;margin-top:14px"><span class="on">Lista</span><span>Planilla</span><span>Llave</span><span>Tabla</span></div>
+          </div>
+          <div class="ph-tabbar"><span>Inicio</span><span>Torneos</span><span>Ranking</span><span>En vivo</span><span class="on">Gestión</span></div>
+        </div>
+        <p class="maqueta-cap"><b>3 · Partidos</b>Los mismos cuatro botones de hoy, pero cada uno te dice sobre cuántas categorías va a actuar antes de tocarlo. El avance de cada categoría queda arriba, con colores. Las vistas Lista, Planilla, Llave y Tabla no cambian.</p>
+      </div>
+
+      <!-- 4. Ajustes -->
+      <div class="maqueta">
+        <div class="phone">
+          <div class="ph-top"><span class="ph-marca">NORTE <span>PADEL</span></span><span class="ph-chip">Admin</span></div>
+          <div class="ph-body">
+            <p class="ph-eyebrow">← Torneos</p>
+            <p class="ph-h">Fecha Puntuable 8</p>
+            <div class="tabs"><span>Partidos</span><span>Canchas</span><span>Fotos</span><span class="on">Ajustes</span></div>
+            <div class="bloque"><div class="bloque-top"><div><b>Datos</b><small>Fecha Puntuable 8 · Flaco Padel</small></div><span class="btn inline">Editar</span></div></div>
+            <div class="bloque abierto">
+              <div class="bloque-top"><div><b>Fechas y horarios</b><small>Jue 8 al dom 11 oct</small></div><span class="btn inline">Cerrar</span></div>
+              <div class="campo"><span>Días que se juega</span><div class="chips" style="background:none;border:0;padding:0"><em class="on">Jue</em><em class="on">Vie</em><em class="on">Sáb</em><em class="on">Dom</em><em>Lun</em><em>Mar</em><em>Mié</em></div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="campo"><span>Desde</span><div>16:00</div></div><div class="campo"><span>Hasta</span><div>22:00</div></div></div>
+              <div class="campo"><span>Horario distinto por día (opcional)</span><div>Vie 18:00 a 23:00</div></div>
+              <span class="btn lima">Guardar</span>
+            </div>
+            <div class="bloque"><div class="bloque-top"><div><b>Categorías y formato</b><small>11 categorías · Zonas + repechaje</small></div><span class="btn inline">Editar</span></div></div>
+            <div class="bloque"><div class="bloque-top"><div><b>Inscripción y costo</b><small>Abierta · Costo $40.000</small></div><span class="btn inline">Editar</span></div></div>
+            <div class="bloque"><div class="bloque-top"><div><b>Puntaje</b><small>Puntuable · Campeón 2000 · Sub 1500…</small></div><span class="btn inline">Editar</span></div></div>
+            <div class="bloque"><div class="bloque-top"><div><b>Flyer y auspiciantes</b><small>Flyer cargado · 3 auspiciantes</small></div><span class="btn inline">Editar</span></div></div>
+            <div class="bloque peligro"><div class="bloque-top"><div><b>Borrar torneo</b><small>Se borran inscripciones, parejas y partidos</small></div><span class="chev">›</span></div></div>
+          </div>
+          <div class="ph-tabbar"><span>Inicio</span><span>Torneos</span><span>Ranking</span><span>En vivo</span><span class="on">Gestión</span></div>
+        </div>
+        <p class="maqueta-cap"><b>4 · Ajustes</b>El formulario largo de "Editar torneo" se parte en bloques. Cada bloque cerrado muestra un resumen de lo que tiene cargado, así se revisa todo de un vistazo, y se edita de a un bloque. Cuando ya hay calendario, los bloques que hoy se bloquean muestran un candado y el motivo.</p>
+      </div>
+
+      <!-- 5. Nuevo torneo -->
+      <div class="maqueta">
+        <div class="phone">
+          <div class="ph-top"><span class="ph-marca">NORTE <span>PADEL</span></span><span class="ph-chip">Admin</span></div>
+          <div class="ph-body">
+            <p class="ph-eyebrow">Torneos</p>
+            <p class="ph-h">Nuevo torneo</p>
+            <div class="pasos"><span class="on"></span><span></span><span></span><span></span></div>
+            <p class="ph-meta">Paso 1 de 4 · Datos</p>
+            <div class="ph-card" style="border-color:rgba(185,255,61,.35)">
+              <p class="ph-label">Partir de un torneo anterior</p>
+              <div class="campo" style="margin-top:0"><div>Fecha Puntuable 7 ▾</div></div>
+              <p class="ph-meta" style="margin:8px 0 0">Copia sede, días y horarios, canchas, categorías, costo y puntaje. No copia inscripciones ni partidos.</p>
+            </div>
+            <div class="campo"><span>Nombre</span><div>Fecha Puntuable 8</div></div>
+            <div class="campo"><span>Sede</span><div>Flaco Padel</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="campo"><span>Inicio</span><div>08/10/2026</div></div><div class="campo"><span>Fin</span><div>11/10/2026</div></div></div>
+            <div class="campo"><span>Flyer (opcional)</span><div>Elegir imagen…</div></div>
+            <p class="ph-meta" style="margin-top:14px">Siguientes pasos: <b style="color:var(--text)">2</b> Días y horarios · <b style="color:var(--text)">3</b> Canchas · <b style="color:var(--text)">4</b> Categorías, costo y puntaje</p>
+            <span class="btn lima">Siguiente</span>
+          </div>
+          <div class="ph-tabbar"><span>Inicio</span><span>Torneos</span><span>Ranking</span><span>En vivo</span><span class="on">Gestión</span></div>
+        </div>
+        <p class="maqueta-cap"><b>5 · Nuevo torneo</b>El formulario de hoy, partido en 4 pasos cortos. Lo más útil es "Partir de un torneo anterior": las Fechas Puntuables se parecen mucho entre sí, así que la mayoría de las veces solo hay que cambiar el nombre y las fechas.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ NADA SE PIERDE ============ -->
+  <section>
+    <p class="eyebrow">Todo se sigue pudiendo editar</p>
+    <h2>Dónde queda cada cosa</h2>
+    <p>Ninguna función se elimina. Esta tabla muestra adónde se mueve cada una. Lo marcado en lima es nuevo.</p>
+    <div class="tabla-wrap">
+      <table>
+        <thead><tr><th>Hoy</th><th>En la propuesta</th></tr></thead>
+        <tbody>
+          <tr><td>"+ Crear torneo" en la lista pública de Torneos</td><td>Gestión › Torneos › Nuevo torneo (asistente) · <span class="nuevo">copiar de un torneo anterior</span></td></tr>
+          <tr><td>Desplegable "Torneo en gestión"</td><td>Gestión › Torneos: lista con la etapa de cada torneo</td></tr>
+          <tr><td>Llave inglesa en la portada del torneo</td><td>Se mantiene, lleva al Resumen de ese torneo</td></tr>
+          <tr><td>Resumen: dashboard y diagnóstico</td><td>Resumen: <span class="nuevo">etapas del torneo, próximo paso y estado por categoría</span> · diagnóstico que también avisa si faltan canchas o parejas</td></tr>
+          <tr><td>Cerrar / reabrir inscripción</td><td>Botón de la etapa 1 del Resumen, y también en Ajustes › Inscripción y costo</td></tr>
+          <tr><td>Editar torneo (formulario único)</td><td>Ajustes: Datos · Fechas y horarios · Categorías y formato · Inscripción y costo · Flyer. Mismos campos, mismo bloqueo cuando ya hay calendario</td></tr>
+          <tr><td>Inscripciones y pagos</td><td>Inscripciones (sin cambios de funcionamiento)</td></tr>
+          <tr><td>Canchas del torneo + Bloqueos de cancha</td><td>Canchas: las dos juntas, porque las dos deciden dónde y cuándo se puede jugar</td></tr>
+          <tr><td>Puntaje para el ranking</td><td>Ajustes › Puntaje · <span class="nuevo">al crear, arranca con el puntaje del torneo anterior</span></td></tr>
+          <tr><td>Fotos</td><td>Fotos (sin cambios)</td></tr>
+          <tr><td>Partidos: botones 1, 2, 3 y siguiente fase</td><td>Partidos: los mismos botones, <span class="nuevo">cada uno dice sobre cuántas categorías va a actuar</span> · avance por categoría con colores</td></tr>
+          <tr><td>Auspiciantes (en la configuración general, con acceso desde el torneo)</td><td>Contenido › Auspiciantes, y desde Ajustes › Flyer y auspiciantes, ya filtrado por ese torneo</td></tr>
+          <tr><td>Borrar torneo (al lado de "Editar")</td><td>Al final de Ajustes, separado del resto</td></tr>
+          <tr><td>WhatsApp, WhatsApp de fotos, Instagram, YouTube en vivo</td><td>Contenido › Contacto y redes</td></tr>
+          <tr><td>Complejos, categorías, etiquetas, solicitudes, jugadores</td><td>Club (en el celular, una sección por pantalla en lugar de todo apilado)</td></tr>
+          <tr><td>Noticias, jugador del mes</td><td>Contenido</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ ETAPAS ============ -->
+  <section>
+    <p class="eyebrow">De a uno, como venimos</p>
+    <h2>Plan por etapas</h2>
+    <p>Cada etapa se puede subir y usar sola. Ninguna necesita cambios en la base de datos, así que no hay SQL que correr.</p>
+    <div class="etapas">
+      <div class="etapa"><div class="num">1</div><div><h3>Resumen que guía</h3><p>Las etapas del torneo con el botón de próximo paso, el estado por categoría y un diagnóstico que no dice "todo en orden" cuando falta lo básico. Es lo que más ayuda en el día a día, y no mueve nada de lugar.</p></div></div>
+      <div class="etapa"><div class="num">2</div><div><h3>Ajustes en bloques</h3><p>Partir "Editar torneo" en bloques con resumen, juntar Canchas con Bloqueos y llevar "Borrar torneo" al final. También unificar el formato ("Zonas + repechaje", igual que al crear).</p></div></div>
+      <div class="etapa"><div class="num">3</div><div><h3>Nuevo torneo con asistente</h3><p>Los 4 pasos, con "Partir de un torneo anterior" que copia también el puntaje. Con eso desaparece el riesgo de que una fecha reparta la mitad de puntos.</p></div></div>
+      <div class="etapa"><div class="num">4</div><div><h3>Panel de gestión</h3><p>La pestaña Gestión con su panel de inicio (torneo activo y "Para resolver") y las ramas Club y Contenido, cada una en su propia pantalla también en el celular.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ============ DECISIONES ============ -->
+  <section>
+    <p class="eyebrow">Antes de arrancar</p>
+    <h2>Tres cosas para que decidas</h2>
+    <div class="decisiones">
+      <div class="decision"><h4>¿Sacamos "+ Crear torneo" de la lista pública?</h4><p>Mi recomendación: <b>sí</b>. Lo ve solo el admin, pero mezcla la vista del público con la gestión. Crear quedaría únicamente en Gestión › Torneos.</p></div>
+      <div class="decision"><h4>¿El formato queda fijo en "Zonas + repechaje"?</h4><p>Mi recomendación: <b>sí</b>, también al editar. Los torneos viejos que usaron otro formato se siguen viendo y operando igual; solo deja de ofrecerse para cambiarlo.</p></div>
+      <div class="decision"><h4>¿Por qué etapa empezamos?</h4><p>Mi recomendación: <b>la 1</b>, el Resumen que guía. Es la que más tiempo te ahorra en cada fecha y no cambia nada de lugar, así que no hay que acostumbrarse a nada nuevo.</p></div>
+    </div>
+  </section>
+
+  <footer>Propuesta preparada a partir del código actual del panel (index.html y app.js) y de capturas del panel en celular y computadora.</footer>
+</div>
+</body>
+</html>

@@ -142,7 +142,7 @@ main { padding: 16px; max-width: 720px; margin: 0 auto; }
 /* separador de "capítulo" para pantallas con muchas cards seguidas
    (Administración): reusa el verde de marca como ritmo visual, sin
    agregar ningún elemento nuevo. */
-.card.card-accent { border-left: 3px solid var(--accent); padding-left: 22px; }
+.card.card-accent { } /* antes: filo lima a la izquierda; con el lima nuevo quedaba demasiado fuerte */
 /* halo verde sutil para las pocas cards que son el "momento importante"
    de una pantalla vacía (login, anotarme, confirmar inscripción). */
 .card.card-glow { background: linear-gradient(160deg, rgba(var(--accent-rgb),.07), transparent 55%), var(--card); }
@@ -1703,77 +1703,171 @@ body.is-admin #btnAdminPanel { display: flex; }
 }
 
 /* ============================================================
-   PANEL DE ADMINISTRACIÓN: sidebar oscura (solo escritorio)
-   Identidad propia del panel (Bodoni Moda + Work Sans, verde lícida),
-   separada a propósito de Barlow Condensed/Manrope del resto del sitio -- ver
-   #admShell en index.html y sincronizarAdmSidebar() en app.js. En mobile
-   este bloque entero no aplica: #admSidebar queda oculta (regla base,
-   FUERA del media query) y admContenido se ve exactamente como antes,
-   en una sola columna.
+   GESTIÓN (panel de administración). Misma identidad que el sitio
+   (Barlow Condensed + Manrope, lima). En escritorio: barra lateral con
+   Inicio / Torneos / Club / Contenido; en celular esas mismas áreas son
+   pestañas arriba (#admAreaNav) -- ver sincronizarAdmSidebar() en app.js.
    ============================================================ */
 #admSidebar { display: none; }
+#admAreaNav { margin-bottom: 14px; }
+#admGrupoSubnav:empty { display: none; }
+.adm-head-accion { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.adm-head-accion .primary { width: auto; margin: 0; }
+
+/* Panel */
+.panel-torneo { border-color: rgba(var(--accent-rgb),.35); }
+.panel-torneo-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.panel-torneo-top strong { display: block; font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 28px; line-height: .95; text-transform: uppercase; }
+.panel-torneo-top small { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+.panel-pendiente {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%;
+  background: none; border: none; border-top: 1px solid var(--border); color: var(--text);
+  padding: 12px 0; text-align: left; cursor: pointer; font-family: var(--font-body); font-size: 14.5px;
+}
+.panel-pendiente:first-child { border-top: none; padding-top: 2px; }
+.panel-pendiente small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.panel-pendiente > span:last-child { color: var(--muted); font-size: 20px; }
+.adm-panel-accesos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.adm-acceso {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text);
+  padding: 14px 10px; text-align: center; cursor: pointer;
+}
+.adm-acceso:hover { border-color: rgba(var(--accent-rgb),.45); }
+.adm-acceso strong { display: block; font-size: 17px; text-transform: uppercase; letter-spacing: .04em; }
+.adm-acceso span { display: block; color: var(--muted); font-family: var(--font-body); font-size: 11.5px; margin-top: 4px; line-height: 1.3; }
+
+/* barra de pasos (asistente "Nuevo torneo" y panel) */
+.pasos-barra { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 14px 0 8px; }
+.pasos-barra.pasos-6 { grid-template-columns: repeat(6, 1fr); }
+.pasos-barra span { height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); }
+.pasos-barra span.on { background: var(--accent); }
+
+/* lista de torneos de Gestión */
+.adm-torneos-grid { display: grid; gap: 8px; margin-bottom: 20px; }
+.adm-torneo-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text);
+  padding: 14px 16px; text-align: left; cursor: pointer; font-family: var(--font-body);
+}
+.adm-torneo-item:hover { border-color: rgba(var(--accent-rgb),.45); }
+.adm-torneo-item strong { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 700; text-transform: uppercase; line-height: 1.05; }
+.adm-torneo-item small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.adm-torneo-item .badge { flex-shrink: 0; }
+
+/* asistente "Nuevo torneo" */
+.crear-copiar { background: var(--bg-elev); border: 1px solid rgba(var(--accent-rgb),.3); border-radius: var(--radius-sm); padding: 4px 14px 12px; margin-bottom: 6px; }
+.crear-copiar .match-meta { margin-top: 8px; }
+.crear-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.crear-nav button { width: auto; margin: 0; }
+.chips-canchas { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* encabezado del torneo en gestión */
+.adm-torneo-head { margin: 4px 0 14px; }
+.adm-torneo-head h2 { margin: 6px 0 4px; font-size: 40px; font-style: italic; line-height: .92; }
+.adm-torneo-head .match-meta { margin: 0 0 10px; font-size: 13px; }
+.adm-torneo-head-estado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.link-volver {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 0; cursor: pointer;
+  color: var(--muted); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+}
+.link-volver:hover { color: var(--text); }
+#admGestionSubnav { margin-bottom: 14px; }
+
+/* etapas del torneo (Resumen) */
+.etapas-torneo { list-style: none; margin: 4px 0 6px; padding: 0; }
+.etapas-torneo li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; position: relative; padding-bottom: 14px; }
+.etapas-torneo li::before { content: ""; position: absolute; left: 12px; top: 26px; bottom: 0; width: 2px; background: var(--border); }
+.etapas-torneo li:last-child::before { display: none; }
+.etapa-dot {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); background: var(--card);
+  display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;
+  font-family: var(--font-display); font-weight: 800; font-size: 13px; color: var(--muted);
+}
+.etapas-torneo li.ok .etapa-dot { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.etapas-torneo li.ahora .etapa-dot { border-color: var(--accent); color: var(--accent-bright); box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.15); }
+.etapas-torneo b { display: block; font-family: var(--font-display); font-size: 17px; letter-spacing: .03em; text-transform: uppercase; line-height: 1.25; }
+.etapas-torneo li.ahora b { color: var(--accent-bright); }
+.etapas-torneo li:not(.ok):not(.ahora) b { color: var(--muted); }
+.etapas-torneo small { color: var(--muted); font-size: 12.5px; }
+#admProximoPaso .primary { margin-top: 4px; }
+
+/* estado por categoría (Resumen y Partidos) */
+.cat-estado-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+.cat-estado-fila:first-child { border-top: none; padding-top: 0; }
+.cat-estado-fila strong { display: block; font-family: var(--font-display); font-size: 16px; text-transform: uppercase; letter-spacing: .03em; }
+.cat-estado-fila small { display: block; color: var(--muted); font-size: 12px; }
+.cat-estado-fila .badge { flex-shrink: 0; }
+.badge.vio { color: #b7a6f5; border-color: rgba(138,111,224,.45); background: rgba(138,111,224,.12); }
+/* "Armar fixture · 2 categorías listas": el conteo lo pone app.js en data-cuenta */
+button[data-cuenta]::after { content: " · " attr(data-cuenta); color: var(--accent-bright); }
+button.primary[data-cuenta]::after { color: inherit; opacity: .75; }
+.resaltado { animation: resaltar 1.2s ease-in-out 2; }
+@keyframes resaltar { 50% { box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.55); } }
+@media (prefers-reduced-motion: reduce) { .resaltado { animation: none; outline: 3px solid var(--accent); } }
+
+/* Ajustes: bloques plegables con resumen (details/summary nativo) */
+.ajuste-bloque { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 16px; margin-bottom: 10px; }
+.ajuste-bloque[open] { border-color: rgba(var(--accent-rgb),.4); padding-bottom: 16px; }
+.ajuste-bloque summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0; cursor: pointer; list-style: none; }
+.ajuste-bloque summary::-webkit-details-marker { display: none; }
+.ajuste-bloque summary::after { content: "Editar"; flex-shrink: 0; font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; }
+.ajuste-bloque[open] summary::after { content: "Cerrar"; }
+.ajuste-bloque summary b { display: block; font-family: var(--font-display); font-size: 18px; letter-spacing: .03em; text-transform: uppercase; }
+.ajuste-bloque summary small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ajuste-bloque summary:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 2px; }
+.ajuste-peligro summary b { color: var(--danger); }
+.ajuste-peligro summary::after { content: "Ver"; }
+.aviso-bloqueo { color: var(--state-warn); margin-bottom: 12px; }
 
 @media (min-width: 960px) {
   /* el panel admin necesita más aire que el resto del sitio (sidebar +
      contenido con formularios largos) -- se ensancha SOLO cuando view-admin
      es la vista activa, sin tocar el ancho de ninguna otra pantalla. */
   .app-body:has(#view-admin.active) { max-width: 1600px; }
-  /* OJO: acá hubo un .app-body:has(#view-torneo-resultados.active){max-width:none}
-     que ensanchaba TODA la vista de un torneo (héroe, banners, etc.), no solo el
-     cuadro -- en pantallas grandes se veía "muy ancho" incluso antes de que hubiera
-     cuadro armado. Se sacó porque .llave-scroll ya tiene su propio scroll lateral
-     (ver más abajo) y no necesita que el contenedor de toda la página se agrande. */
 
   #view-admin.view.active { display: block; }
   #admShell { display: flex; align-items: flex-start; gap: 0; }
 
   #admSidebar {
     width: 232px; flex: none;
-    background: #0a1410; color: #f3f6f2;
-    display: flex; flex-direction: column; padding: 24px 0;
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text);
+    display: flex; flex-direction: column; padding: 22px 0;
     position: sticky; top: calc(var(--topbar-h) + var(--navbar-h) + 20px);
     max-height: calc(100vh - var(--topbar-h) - var(--navbar-h) - 40px);
     overflow-y: auto;
-    font-family: "Work Sans", system-ui, -apple-system, sans-serif;
     border-radius: var(--radius-lg);
   }
   #admSidebar .adm-side-brand {
     display: flex; align-items: center; gap: 10px;
-    padding: 0 24px 22px; border-bottom: 1px solid rgba(243,246,242,.1); margin-bottom: 10px;
+    padding: 0 22px 20px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
   }
   #admSidebar .adm-side-brand .mark {
-    width: 34px; height: 34px; background: #B9FF3D; color: #05100b;
+    width: 34px; height: 34px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-ink);
     display: flex; align-items: center; justify-content: center; flex: none;
-    font-family: "Bodoni Moda", Georgia, serif; font-weight: 900; font-size: 16px;
+    font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 20px;
   }
-  #admSidebar .adm-side-brand .name { display: block; font-size: 14px; font-weight: 700; font-family: "Bodoni Moda", Georgia, serif; }
-  #admSidebar .adm-side-brand .sub { display: block; font-size: 10.5px; color: #6e8177; }
+  #admSidebar .adm-side-brand .name { display: block; font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 18px; text-transform: uppercase; line-height: 1; }
+  #admSidebar .adm-side-brand .sub { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; margin-top: 3px; }
 
   .adm-side-item {
     display: flex; align-items: center; gap: 12px; width: 100%;
-    padding: 11px 24px; font-size: 13.5px; font-family: inherit;
-    color: #9db3a6; background: none; border: none; border-left: 3px solid transparent;
+    padding: 11px 22px; font-size: 16px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--muted); background: none; border: none; border-left: 3px solid transparent;
     text-align: left; cursor: pointer;
   }
   .adm-side-item svg { flex: none; }
-  .adm-side-item:hover { color: #f3f6f2; }
-  .adm-side-item.active { color: #f3f6f2; background: rgba(185,255,61,.08); border-left-color: #B9FF3D; font-weight: 600; }
+  .adm-side-item:hover { color: var(--text); }
+  .adm-side-item.active { color: var(--text); background: rgba(var(--accent-rgb),.08); border-left-color: var(--accent); }
 
-  /* sub-secciones de "Torneo en gestión" (Resumen/Inscripciones/Canchas/
-     Bloqueos/Puntaje/Partidos, ver SECCIONES_GESTION en app.js) y de
-     "Configuración general" (ver SECCIONES_CONFIG_GENERAL) -- anidadas
-     visualmente debajo de su ítem padre, una sola visible por vez
-     (sincronizarAdmSidebar decide cuál de las dos listas mostrar). */
-  #admSidebarSubnav .adm-side-item, #admSidebarSubnavConfig .adm-side-item { padding-left: 48px; font-size: 12.5px; }
+  /* secciones de cada área, debajo de su ítem (una sola lista visible por vez) */
+  #admSidebarSubnav .adm-side-item, #admSidebarSubnavClub .adm-side-item, #admSidebarSubnavContenido .adm-side-item {
+    padding: 8px 22px 8px 51px; font-family: var(--font-body); font-size: 13.5px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  }
 
   #admContenido { flex: 1; min-width: 0; padding: 0 0 0 36px; }
-  #admContenido h1, #admContenido h2, #admContenido h3 { font-family: "Bodoni Moda", Georgia, serif; }
-  #admContenido h2 { text-transform: none; font-style: normal; letter-spacing: -.01em; }
 
-  /* el pill-row de "Torneo en gestión" (admGestionSubnav) navega entre las
-     mismas secciones que ya están en la sidebar (#admSidebarSubnav) -- en
-     escritorio queda redundante, así que se oculta ahí; en mobile (donde no
-     hay sidebar) sigue siendo la única forma de cambiar de sección, así que
-     no se toca fuera de este media query. */
-  #admGestionSubnav { display: none; }
+  /* en escritorio la barra lateral ya hace de navegación: las pestañas de
+     área y de sección (pensadas para el celular) se ocultan */
+  #admAreaNav, #admGrupoSubnav, #admGestionSubnav { display: none; }
+  .adm-torneo-head h2 { font-size: 60px; }
 }
