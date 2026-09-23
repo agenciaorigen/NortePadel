@@ -1689,16 +1689,19 @@ function etiquetaDotHtml(jugadorId) {
 // es el único interruptor entre ambas — nunca se muestran acciones de
 // gestión en la pantalla pública.
 // ============================================================
-// Muestra en texto plano (nada de tooltip: en el celular no hay hover) los
-// horarios en que ESE jugador avisó que no puede jugar en este torneo —
-// junta lo general de su perfil con lo puntual de este torneo, mismo cálculo
-// que ya usa el armado automático (ver jugadoresDisponibilidad). Vacío si
-// tiene disponibilidad completa, que es el caso más común.
-function dispBadgeHtml(jugadorId, dispPorJugador) {
-  const filas = dispPorJugador?.[jugadorId];
+// Renglón propio (no un badge/pill apretado — con día completo y "de X a Y"
+// en vez de un guión) con los horarios en que ESE jugador avisó que no puede
+// jugar en este torneo. Junta lo general de su perfil con lo puntual de este
+// torneo, mismo cálculo que ya usa el armado automático (ver
+// jugadoresDisponibilidad). Vacío si tiene disponibilidad completa, que es
+// el caso más común. Se probó primero como badge en una sola línea y quedaba
+// ilegible apenas había más de un horario cargado.
+function dispResumenHtml(nombreCompleto, filas) {
   if (!filas || !filas.length) return "";
-  const detalle = filas.map((d) => `${DIAS_CORTO[d.dia_semana]} ${String(d.hora_desde).slice(0, 5)}-${String(d.hora_hasta).slice(0, 5)}`).join(", ");
-  return ` <span class="badge orange" style="white-space:normal">🕒 No puede: ${escapeHtml(detalle)}</span>`;
+  const detalle = filas
+    .map((d) => `${DIAS[d.dia_semana]} de ${String(d.hora_desde).slice(0, 5)} a ${String(d.hora_hasta).slice(0, 5)}`)
+    .join("<br>");
+  return `<p class="match-meta disp-resumen">🕒 <strong>${escapeHtml((nombreCompleto || "").split(" ")[0])} no puede jugar:</strong><br>${detalle}</p>`;
 }
 
 // Carga el picker de horarios bloqueados de UN jugador puntual para ESTE
@@ -1742,7 +1745,8 @@ function parejaRowHtml(p, editable, dispPorJugador) {
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
   const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
   const nombrePareja = `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`;
-  const badgesDisp = editable ? dispBadgeHtml(p.jugador1_id, dispPorJugador) + dispBadgeHtml(p.jugador2_id, dispPorJugador) : "";
+  const dispResumenJ1 = editable ? dispResumenHtml(p.jugador1_nombre, dispPorJugador?.[p.jugador1_id]) : "";
+  const dispResumenJ2 = editable ? dispResumenHtml(p.jugador2_nombre, dispPorJugador?.[p.jugador2_id]) : "";
   // Pago (ver inscripciones.pago): independiente de "estado", que solo habla
   // de la categoría/confirmación. Un admin puede tocar cada 💰 para marcar/
   // desmarcar el pago de ESE jugador, o el atajo de "los 2" cuando falta alguno.
@@ -1759,7 +1763,7 @@ function parejaRowHtml(p, editable, dispPorJugador) {
     : "";
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
-      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}${badgesDisp}</span>
+      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
@@ -1769,6 +1773,8 @@ function parejaRowHtml(p, editable, dispPorJugador) {
       </span>
     </div>
     ${editable ? pagoHtml : ""}
+    ${editable ? dispResumenJ1 : ""}
+    ${editable ? dispResumenJ2 : ""}
     ${editable ? `
     <div class="match-admin-panel" data-disp-pareja="${p.id}" style="display:none">
       <p class="match-meta" style="margin-bottom:6px">Horarios en que NO pueden jugar este torneo — cargalo vos si el jugador todavía no lo hizo.</p>
@@ -1802,7 +1808,7 @@ function sinParejaChipHtml(i, editable, dispPorJugador) {
   const pagoHtml = editable
     ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${i.pago ? "✅" : "⬜"}</button>`
     : "";
-  const badgeDisp = editable ? dispBadgeHtml(i.jugador_id, dispPorJugador) : "";
+  const dispResumen = editable ? dispResumenHtml(i.nombre, dispPorJugador?.[i.jugador_id]) : "";
   const idFormSuelto = `admDispForm-suelto-${i.jugador_id}`;
   const botonDisp = editable ? `<button type="button" class="secondary small btnToggleDispSuelto" data-jugador="${i.jugador_id}" title="Cargar horarios en que no puede jugar" aria-label="Cargar horarios en que no puede jugar ${nombreCompleto}">🕒</button>` : "";
   const panelDisp = editable ? `
@@ -1810,7 +1816,7 @@ function sinParejaChipHtml(i, editable, dispPorJugador) {
       <div id="${idFormSuelto}"></div>
       <button type="button" class="secondary small btnGuardarDispAdmin" data-jugador="${i.jugador_id}" data-cont="${idFormSuelto}" style="margin-top:6px">Guardar</button>
     </div>` : "";
-  return `<span class="pill removable" style="display:inline-flex;flex-wrap:wrap;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${badgeDisp}${botonDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}${panelDisp}</span>`;
+  return `<span class="pill removable" style="display:inline-flex;flex-wrap:wrap;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${botonDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}${panelDisp}</span>${dispResumen}`;
 }
 // Cablea los toggles de pago (💰 por jugador + "marcar pago de los 2") de un
 // contenedor -- se usa igual en la lista de parejas y en la de "sin pareja",

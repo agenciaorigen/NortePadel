@@ -1049,6 +1049,12 @@ nav.tabbar .icon { position: relative; }
 .match-teams { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .match-meta { color: var(--muted); font-size: 12px; margin-top: 5px; }
 .match-meta.meta-caption { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
+/* Horarios en que un jugador avisó que no puede jugar (ver dispResumenHtml)
+   -- antes se probó como badge/pill de una línea y quedaba ilegible apenas
+   había más de un horario cargado; esto es texto normal, con line-height
+   cómodo para varias líneas. */
+.match-meta.disp-resumen { color: var(--state-warn); line-height: 1.6; margin-top: 6px; }
+.match-meta.disp-resumen strong { color: inherit; }
 /* ícono de trazo (cancha/horario/fecha/ganador) en vez de emoji, mismo estilo que la tabbar */
 .meta-ico { vertical-align: -3px; margin-right: 1px; flex-shrink: 0; }
 /* partido con resultado cargado (o notificación sin leer): se distingue con un filo
