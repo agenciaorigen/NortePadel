@@ -300,11 +300,21 @@ function llenarSelect(select, items, labelFn, valueFn) {
 // ============================================================
 function traducirErrorAuth(error) {
   const msg = error?.message || "";
-  if (msg.includes("Invalid login credentials")) return "Email o contraseña incorrectos.";
+  if (msg.includes("Invalid login credentials")) return "Usuario o contraseña incorrectos. Si nunca entraste o no te funciona la clave, pedile una nueva al club con el botón de abajo.";
   if (msg.includes("User already registered")) return "Ya existe una cuenta con ese email. Probá iniciar sesión.";
-  if (msg.includes("Password should be")) return "La contraseña es muy corta (mínimo 6 caracteres).";
+  if (msg.includes("Password should be")) return "La contraseña es muy corta (mínimo 8 caracteres).";
   return msg || "Ocurrió un error.";
 }
+
+// Las cuentas del circuito que nunca se activaron no tienen clave conocida:
+// el jugador le pide una al club (Gestión › Club › Jugadores › Blanquear clave).
+document.getElementById("btnPedirClave").addEventListener("click", () => {
+  const numero = String(configApp.whatsapp_numero || "").replace(/\D/g, "");
+  if (!numero) { toast("El club todavía no cargó su WhatsApp: pedí la clave en persona."); return; }
+  const usuario = document.getElementById("authEmail").value.trim();
+  const mensaje = `Hola! Necesito una clave nueva para entrar a la app de Norte Padel.${usuario ? ` Mi usuario es: ${usuario}` : " Mi nombre es: "}`;
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
+});
 
 document.getElementById("btnLogin").addEventListener("click", async () => {
   const email = document.getElementById("authEmail").value.trim();
@@ -336,6 +346,7 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
 });
 
 document.getElementById("btnMiPerfilRanking").addEventListener("click", () => cambiarVista("ranking"));
+document.getElementById("btnFotosIngresar").addEventListener("click", () => cambiarVista("perfil"));
 // Derecho a pedir la supresión de los datos (Ley 25.326): abre WhatsApp con
 // el pedido ya escrito; el club da de baja la cuenta desde Gestión.
 document.getElementById("btnPedirBaja").addEventListener("click", () => {
@@ -6584,13 +6595,35 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 // la versión liviana; quien quiera la foto de calidad completa la pide por
 // WhatsApp (mismo patrón que ya se usa para coordinar el pago de la
 // inscripción) y el club se la manda/vende por fuera del sitio.
+// Las fotos del torneo son solo para quien inició sesión: el bucket
+// "fotos-torneos" es privado y cada foto se muestra con un link firmado que
+// vence en una hora. torneo_fotos.url guarda la dirección de siempre; de ahí
+// sale la ruta del archivo dentro del bucket.
+function rutaFotoTorneo(url) {
+  const marca = "/fotos-torneos/";
+  const i = String(url || "").indexOf(marca);
+  return i === -1 ? "" : decodeURIComponent(String(url).slice(i + marca.length).split("?")[0]);
+}
+async function firmarFotosTorneo(fotos) {
+  const rutas = fotos.map((f) => rutaFotoTorneo(f.url));
+  const validas = rutas.filter(Boolean);
+  const { data } = validas.length
+    ? await sb.storage.from("fotos-torneos").createSignedUrls(validas, 3600)
+    : { data: [] };
+  const firmada = Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
+  return fotos.map((f, i) => ({ ...f, urlVista: firmada[rutas[i]] || "", archivo: rutas[i].split("/").pop() }));
+}
+
 function fotoTorneoItemHtml(foto, admin) {
+  const url = urlSegura(foto.urlVista);
+  if (!url) return "";
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  // se pide por nombre de archivo (el mismo que tiene el original en la cámara), no por link
   const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
-    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${urlSegura(foto.url)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
+    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${escapeHtml(foto.archivo)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
     : "";
   return `<div class="foto-item">
-    <img src="${urlSegura(foto.url)}" alt="Foto del torneo" loading="lazy" data-foto-grande="${urlSegura(foto.url)}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+    <img src="${url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
     ${borrar}
     ${pedirOriginal}
   </div>`;
@@ -6600,8 +6633,16 @@ async function cargarFotosTorneo() {
   const cont = document.getElementById("dtFotosGaleria");
   const vacio = document.getElementById("dtFotosVacio");
   if (!cont || !torneoActualId) return;
+  const avisoLogin = document.getElementById("dtFotosLogin");
+  if (!currentUser) {
+    cont.innerHTML = "";
+    if (vacio) vacio.style.display = "none";
+    avisoLogin.style.display = "block";
+    return;
+  }
+  avisoLogin.style.display = "none";
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
-  const fotos = data || [];
+  const fotos = await firmarFotosTorneo(data || []);
   cont.innerHTML = fotos.map((f) => fotoTorneoItemHtml(f, false)).join("");
   if (vacio) vacio.style.display = fotos.length ? "none" : "block";
 }
@@ -6610,7 +6651,7 @@ async function cargarFotosTorneoAdmin() {
   const cont = document.getElementById("admFotosLista");
   if (!cont || !torneoGestionId) return;
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
-  const fotos = data || [];
+  const fotos = await firmarFotosTorneo(data || []);
   cont.innerHTML = fotos.length
     ? fotos.map((f) => fotoTorneoItemHtml(f, true)).join("")
     : '<p class="empty">Todavía no subiste ninguna foto de este torneo.</p>';
@@ -6901,7 +6942,7 @@ document.addEventListener("click", (e) => {
   const numero = configApp.whatsapp_fotos || configApp.whatsapp_numero;
   if (!el || !numero) return;
   const t = cacheTorneos.find((x) => x.id === torneoActualId);
-  const mensaje = `Hola! Quiero pedir esta foto de "${t?.nombre || "el torneo"}" en calidad original: ${el.dataset.pedirFoto}`;
+  const mensaje = `Hola! Quiero pedir en calidad original la foto "${el.dataset.pedirFoto}" de "${t?.nombre || "el torneo"}".`;
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
 });
 document.addEventListener("keydown", (e) => {

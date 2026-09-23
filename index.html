@@ -326,6 +326,10 @@
     <div class="card">
       <h3>Fotos del torneo</h3>
       <div id="dtFotosGaleria" class="fotos-galeria"></div>
+      <div class="fotos-login" id="dtFotosLogin" style="display:none">
+        <p class="match-meta">Las fotos del torneo son para los jugadores del circuito. Iniciá sesión para verlas y descargarlas.</p>
+        <button type="button" class="primary cta-hero" id="btnFotosIngresar">Iniciar sesión</button>
+      </div>
       <p class="empty" id="dtFotosVacio" style="display:none">Todavía no hay fotos subidas de este torneo.</p>
       <p class="match-meta fotos-aviso">¿Aparecés en una foto y preferís que no esté publicada? Escribinos por WhatsApp y la sacamos. Más info en <a href="privacidad.html#imagenes" target="_blank" rel="noopener">Privacidad</a>.</p>
     </div>
@@ -510,6 +514,7 @@
       </label>
       <button class="secondary" id="btnSignup" style="margin-top:10px;width:100%">Crear cuenta nueva</button>
       <p class="match-meta" id="authError"></p>
+      <button type="button" class="link-btn auth-ayuda" id="btnPedirClave">¿No podés entrar o es tu primera vez? Pedile una clave nueva al club</button>
     </div>
 
     <div class="card" id="completarPerfilCard" style="display:none">
