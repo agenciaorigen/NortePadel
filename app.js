@@ -1689,7 +1689,19 @@ function etiquetaDotHtml(jugadorId) {
 // es el único interruptor entre ambas — nunca se muestran acciones de
 // gestión en la pantalla pública.
 // ============================================================
-function parejaRowHtml(p, editable) {
+// Muestra en texto plano (nada de tooltip: en el celular no hay hover) los
+// horarios en que ESE jugador avisó que no puede jugar en este torneo —
+// junta lo general de su perfil con lo puntual de este torneo, mismo cálculo
+// que ya usa el armado automático (ver jugadoresDisponibilidad). Vacío si
+// tiene disponibilidad completa, que es el caso más común.
+function dispBadgeHtml(jugadorId, dispPorJugador) {
+  const filas = dispPorJugador?.[jugadorId];
+  if (!filas || !filas.length) return "";
+  const detalle = filas.map((d) => `${DIAS_CORTO[d.dia_semana]} ${String(d.hora_desde).slice(0, 5)}-${String(d.hora_hasta).slice(0, 5)}`).join(", ");
+  return ` <span class="badge orange" style="white-space:normal">🕒 No puede: ${escapeHtml(detalle)}</span>`;
+}
+
+function parejaRowHtml(p, editable, dispPorJugador) {
   const catBadge = p.categoria ? `<span class="badge">${p.categoria}</span>` : "";
   const estadoBadge = p.estado === "confirmada" ? `<span class="badge solid">Confirmada</span>`
     : p.estado === "rechazada" ? `<span class="badge danger" title="${escapeHtml(p.motivo_rechazo || "")}">Rechazada</span>`
@@ -1697,6 +1709,7 @@ function parejaRowHtml(p, editable) {
   const etiquetas = editable ? etiquetaDotHtml(p.jugador1_id) + etiquetaDotHtml(p.jugador2_id) : "";
   const pendiente = editable && p.estado !== "confirmada" && p.estado !== "rechazada";
   const nombrePareja = `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`;
+  const badgesDisp = editable ? dispBadgeHtml(p.jugador1_id, dispPorJugador) + dispBadgeHtml(p.jugador2_id, dispPorJugador) : "";
   // Pago (ver inscripciones.pago): independiente de "estado", que solo habla
   // de la categoría/confirmación. Un admin puede tocar cada 💰 para marcar/
   // desmarcar el pago de ESE jugador, o el atajo de "los 2" cuando falta alguno.
@@ -1713,7 +1726,7 @@ function parejaRowHtml(p, editable) {
     : "";
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
-      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}</span>
+      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}${badgesDisp}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
@@ -1738,14 +1751,15 @@ function parejaRowHtml(p, editable) {
     </div>` : ""}
   </div>`;
 }
-function sinParejaChipHtml(i, editable) {
+function sinParejaChipHtml(i, editable, dispPorJugador) {
   const sufijoEstado = i.estado && i.estado !== "confirmada" ? ` · ${i.estado === "pendiente" ? "pendiente" : i.estado}` : "";
   const nombreCompleto = `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`;
   // Igual que en parejaRowHtml: el pago es información solo para el admin.
   const pagoHtml = editable
     ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${i.pago ? "✅" : "⬜"}</button>`
     : "";
-  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
+  const badgeDisp = editable ? dispBadgeHtml(i.jugador_id, dispPorJugador) : "";
+  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${badgeDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
 }
 // Cablea los toggles de pago (💰 por jugador + "marcar pago de los 2") de un
 // contenedor -- se usa igual en la lista de parejas y en la de "sin pareja",
@@ -1780,7 +1794,7 @@ function wireTogglesPago(cont) {
     });
   });
 }
-function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable) {
+function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable, dispPorJugador = {}) {
   // al público no se le muestran parejas rechazadas ni inscripciones
   // canceladas/rechazadas — son historial para el admin, no algo vigente
   const inscBase = editable ? (insc || []) : (insc || []).filter((i) => i.estado !== "cancelada" && i.estado !== "rechazada");
@@ -1802,7 +1816,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   const resumenPagoHtml = editable && parejasBase.length
     ? `<p class="match-meta" style="margin-bottom:8px">💳 ${pagas} de ${parejasBase.length} parejas con el pago confirmado${pagas < parejasBase.length ? " — las que faltan no entran al fixture hasta confirmarlas" : ""}.</p>`
     : "";
-  contParejas.innerHTML = resumenPagoHtml + (parejasOrdenadas.map((p) => parejaRowHtml(p, editable)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
+  contParejas.innerHTML = resumenPagoHtml + (parejasOrdenadas.map((p) => parejaRowHtml(p, editable, dispPorJugador)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
   if (editable) {
     contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -1889,7 +1903,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   const contSinPareja = document.getElementById(contSinParejaId);
   contSinPareja.innerHTML = sinPareja.length === 0 ? "" : `
     <p class="match-meta" style="margin:12px 0 6px">Todavía sin pareja:</p>
-    ${sinPareja.map((i) => sinParejaChipHtml(i, editable)).join("")}`;
+    ${sinPareja.map((i) => sinParejaChipHtml(i, editable, dispPorJugador)).join("")}`;
   if (editable) {
     contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -2788,6 +2802,7 @@ async function prepararFormularioInscripcion() {
   }
 
   document.getElementById("confirmarInscripcionWrap").style.display = "none";
+  document.getElementById("inscDispWrap").style.display = "none";
   document.getElementById("buscarParejaWrap").style.display = "block";
   parejaSeleccionada = null;
   document.getElementById("buscarPareja").value = "";
@@ -2795,7 +2810,7 @@ async function prepararFormularioInscripcion() {
   document.getElementById("anotarmeCategoria").value = "";
   const btn = document.getElementById("btnInscribirme");
   btn.style.display = "block";
-  btn.onclick = () => mostrarConfirmarInscripcion();
+  btn.onclick = () => mostrarPasoDisponibilidad();
   actualizarBotonInscribirme();
 }
 
@@ -2887,6 +2902,39 @@ document.getElementById("btnGuardarDispTorneo").addEventListener("click", async 
   const disponibilidades = leerRestriccionesDeForm("torneoDispBloqueadaForm").map((r) => ({ jugador_id: miJugador.id, torneo_id: torneoActualId, ...r }));
   if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
   toast("¡Guardado! 🎾");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Paso intermedio (antes de confirmar) para que cargar los horarios en que
+// NO se puede jugar quede DENTRO del camino obligatorio de inscripción, no
+// como algo opcional que solo se ve después en "Mi inscripción" — pedido del
+// club porque sin este dato es mucho más difícil armar bien el fixture.
+// Reusa el mismo componente y la misma tabla que "Mi disponibilidad"
+// (torneo_id + jugador_id), así que si ya lo había cargado antes lo ve
+// precargado acá.
+async function mostrarPasoDisponibilidad() {
+  if (!miJugador) return;
+  document.getElementById("buscarParejaWrap").style.display = "none";
+  document.getElementById("btnInscribirme").style.display = "none";
+  document.getElementById("inscDispWrap").style.display = "block";
+  renderDisponibilidadForm("inscDispForm");
+  const { data: disp } = await sb.from("disponibilidad").select("*")
+    .eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
+  precargarRestriccionesEnForm("inscDispForm", disp);
+}
+
+document.getElementById("btnContinuarDesdeDisp").addEventListener("click", async () => {
+  const btn = document.getElementById("btnContinuarDesdeDisp");
+  if (btn.disabled || !miJugador) return;
+  btn.disabled = true;
+  try {
+    await sb.from("disponibilidad").delete().eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
+    const disponibilidades = leerRestriccionesDeForm("inscDispForm").map((r) => ({ jugador_id: miJugador.id, torneo_id: torneoActualId, ...r }));
+    if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
+    document.getElementById("inscDispWrap").style.display = "none";
+    mostrarConfirmarInscripcion();
   } finally {
     btn.disabled = false;
   }
@@ -3648,7 +3696,10 @@ async function cargarGestionTorneo(id) {
     sb.rpc("parejas_publicas", { p_torneo_id: id }),
     sb.rpc("partidos_publicos", { p_torneo_id: id })
   ]);
-  renderParejasEn("admParejas", "admSinPareja", insc || [], parejas || [], true);
+  // así el admin ve de un vistazo, junto a cada jugador, si avisó horarios en
+  // los que no puede jugar — mismo cálculo que usa el armado automático.
+  const dispPorJugador = await jugadoresDisponibilidad((insc || []).map((i) => i.jugador_id), id);
+  renderParejasEn("admParejas", "admSinPareja", insc || [], parejas || [], true, dispPorJugador);
 
   const conHorario = (partidos || []).filter((p) => p.horario).length;
   const pctCalendario = (partidos || []).length ? Math.round((conHorario / partidos.length) * 100) : 0;
@@ -4038,6 +4089,7 @@ function ventanaDeCancha(tc, torneo) {
 // cargado para ESTE torneo puntualmente — combinados, ya que ambos restan
 // disponibilidad por igual a la hora de buscar un horario común.
 async function jugadoresDisponibilidad(jugadorIds, torneoId) {
+  if (!jugadorIds || jugadorIds.length === 0) return {};
   const { data: dispRows } = await sb
     .from("disponibilidad")
     .select("*")
