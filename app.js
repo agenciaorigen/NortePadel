@@ -5932,7 +5932,7 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
 // liso) — a esos no les agregamos la caja blanca de contraste, porque quedaría
 // una caja adentro de otra. PNG (y el resto) sí suelen ser logos con fondo
 // transparente y necesitan la caja blanca para leerse sobre el fondo oscuro.
-function renderSponsorItem(s, caption) {
+function renderSponsorItem(s, caption, admin) {
   const esJpg = /\.jpe?g(\?|#|$)/i.test(s.logo_url || "");
   // El nombre viaja dos veces adentro de este mismo atributo: primero como
   // literal de un string JS (adentro de comillas simples, dentro del
@@ -5945,9 +5945,13 @@ function renderSponsorItem(s, caption) {
   const contenido = `<img src="${s.logo_url}" alt="${escapeHtml(s.nombre)}" loading="lazy" onerror="${onerror}" />` +
     (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
   const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "");
-  return s.link_url
+  const item = s.link_url
     ? `<a href="${s.link_url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
     : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
+  // En admin el logo va aparte del botón de borrar (nunca adentro del <a>,
+  // que ya es clickeable y abre el link del auspiciante).
+  if (!admin) return item;
+  return `<div class="sponsor-admin-item">${item}<button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">✕ Borrar</button></div>`;
 }
 
 async function cargarSponsors() {
@@ -5960,8 +5964,23 @@ async function cargarSponsors() {
 
   if (admin) {
     admin.innerHTML = (data && data.length > 0)
-      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General")).join("")
+      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General", true)).join("")
       : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
+    admin.querySelectorAll(".btnQuitarSponsor").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        if (!confirm("¿Borrar este auspiciante? Deja de verse en todos lados.")) return;
+        btn.disabled = true;
+        try {
+          const { error } = await sb.from("sponsors").delete().eq("id", btn.dataset.id);
+          if (error) { toast("Error: " + error.message); return; }
+          toast("Auspiciante borrado");
+          cargarSponsors();
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   const generales = (data || []).filter((s) => !s.torneo_id);
