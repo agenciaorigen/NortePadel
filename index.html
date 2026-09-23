@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Norte Padel</title>
-<meta name="theme-color" content="#05080A" />
+<meta name="theme-color" content="#07090B" />
 <!-- iOS no lee manifest.json para "Agregar a inicio" — sin estas etiquetas
      abre como acceso directo al navegador, no como app a pantalla completa -->
 <meta name="mobile-web-app-capable" content="yes" />
@@ -16,8 +16,11 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;800&family=Bodoni+Moda:opsz,wght@6..96,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<!-- Bodoni Moda / Work Sans: identidad propia del panel de administración
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,700;1,800&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;800&family=Bodoni+Moda:opsz,wght@6..96,400..900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<!-- Barlow Condensed: voz "deportiva" de la marca (titulares, números,
+     botones) -- rediseño "circuito profesional". Playfair queda cargada solo
+     porque la usan las imágenes exportables (Top 20 / Campeón, ver app.js).
+     Bodoni Moda / Work Sans: identidad propia del panel de administración
      (rediseño pedido aparte, ver #admSidebar en style.css) -- distinta a
      Playfair/Manrope, que siguen siendo la identidad del resto del sitio. -->
 <link rel="stylesheet" href="style.css" />
@@ -49,8 +52,8 @@
 
 <div id="fotoGrandeOverlay" class="overlay-bloqueante overlay-foto" style="display:none">
   <div class="fotogrande-acciones">
-    <a href="" download id="fotoGrandeDescargar" class="secondary small">⬇ Descargar</a>
-    <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">✕ Cerrar</button>
+    <a href="" download id="fotoGrandeDescargar" class="secondary small">Descargar</a>
+    <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">Cerrar</button>
   </div>
   <img id="fotoGrandeImg" src="" alt="Foto ampliada" />
 </div>
@@ -86,13 +89,14 @@
 <main>
 
   <!-- INICIO -->
+  <!-- Orden pedido por el club (rediseño "circuito profesional"): Hero ->
+       Próximo torneo -> Ranking -> Resultados -> Próximos partidos ->
+       Noticias -> Partners -> Footer. Son los MISMOS bloques de siempre (mismos
+       ids, mismo JS), solo reordenados y agrupados bajo un título de sección.
+       "Tus partidos" (solo con sesión iniciada) queda arriba, pero es lo único
+       personal de esta pantalla: un visitante ve exactamente el orden de arriba. -->
   <section id="view-inicio" class="view active">
 
-    <!-- Carrusel del hero: en mobile es una sola slide "real" (el hero de siempre);
-         en escritorio se suman 2 slides fijas más (Torneos, Ranking), ocultas/mostradas
-         por moverFlyerDestacadoSegunAncho() (app.js) según el ancho — mismo mecanismo
-         que ya usa moverBannerEnergiaSegunAncho() con #energiaBanda. El afiche del
-         torneo destacado sigue viéndose, como siempre, más abajo en "Próximos torneos". -->
     <div class="hero-carousel" id="heroCarousel">
       <div class="hero-carousel-track" id="heroCarouselTrack">
         <div class="hero-carousel-slide">
@@ -102,8 +106,9 @@
               <strong id="heroPosicionValor">—</strong>
               <span class="hero-club-widget-sub" id="heroPosicionSub"></span>
             </div>
+            <p class="hero-kicker">Norte Padel · Circuito de pádel</p>
             <h2 class="hero-club-titulo">Movimiento.<br /><span>Disciplina.</span><br />Resultado.</h2>
-            <p class="hero-club-sub">El circuito de pádel de Norte Padel: ranking en vivo, torneos todo el año.</p>
+            <p class="hero-club-sub">Torneos todo el año, ranking en vivo y los mejores jugadores del norte.</p>
             <button class="hero-club-cta" id="btnHeroTorneos" type="button">Ver torneos <span aria-hidden="true">→</span></button>
           </div>
         </div>
@@ -125,21 +130,13 @@
       <div class="hero-carousel-dots" id="heroCarouselDots"></div>
     </div>
 
-    <!-- "Próximo partido destacado": UN solo banner (en todos los anchos, no solo
-         escritorio) que rota solo entre los próximos partidos del torneo destacado
-         (ver renderProximosCarrusel en app.js) -- antes había un banner fijo con el
-         primero + una lista aparte con el resto, que además se duplicaban; ahora es
-         un único carrusel con fotos grandes en duotono. -->
-    <div class="seccion" id="inicioProximoDestacadoWrap" style="display:none">
-      <h3>Próximo partido destacado</h3>
-      <div class="hero-carousel" id="destacadoCarousel">
-        <div class="hero-carousel-track" id="destacadoCarouselTrack"></div>
-        <div class="hero-carousel-dots visible" id="destacadoCarouselDots"></div>
+    <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
+      <div class="marquee-track" aria-hidden="true">
+        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
+        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
       </div>
-    </div>
+    </button>
 
-    <!-- Solo si hay sesión iniciada (ver cargarMiProximoPartido/cargarMisUltimosPartidos
-         en app.js) -- reutiliza la misma tarjeta de partido que "Últimos resultados"/Llave. -->
     <div class="seccion" id="inicioMisPartidosWrap" style="display:none">
       <div id="inicioMiProximoWrap" style="display:none">
         <h3>Tu próximo partido</h3>
@@ -149,79 +146,96 @@
       <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
     </div>
 
-    <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
-      <div class="marquee-track" aria-hidden="true">
-        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
-        <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
+    <section class="seccion seccion-torneo" aria-labelledby="tituloProximoTorneo">
+      <div class="seccion-head">
+        <h2 id="tituloProximoTorneo">Próximo torneo</h2>
+        <button type="button" class="link-mas" id="btnInicioVerTorneos">Todos los torneos <span aria-hidden="true">→</span></button>
       </div>
-    </button>
+      <div id="flyerDestacado"></div>
+      <div class="flyer-grid" id="flyerMini"></div>
+      <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
+    </section>
 
-    <!-- Últimos resultados del torneo destacado: tarjetas quietas (misma tarjeta
-         que ya usa Resultados/Llave, ver llavePartidoCardHtml en app.js). Los
-         próximos partidos ya se ven arriba, en el carrusel de "Próximo partido
-         destacado" -- no se repiten acá abajo. -->
-    <div class="seccion" id="inicioResultadosWrap" style="display:none">
-      <h3>Últimos resultados</h3>
-      <div class="inicio-partidos-grid" id="inicioResultadosGrid"></div>
-    </div>
-
-    <!-- En mobile los auspiciantes pasan a una barra que se desliza sola
-         (mismo mecanismo que la banda de arriba, "marquee-scroll"), bien
-         grande, en vez del renglón chico de logos que quedaba más abajo del
-         todo. En desktop esta barra no se ve: ahí los auspiciantes van en la
-         fila "Presentan" del contenido principal (#sponsorsInlineCard). -->
-    <div class="sponsor-marquee" id="sponsorMarqueeMobile" style="display:none">
-      <p class="sponsor-label">Auspician</p>
-      <div class="sponsor-marquee-track" id="sponsorMarqueeTrack"></div>
-    </div>
-
+    <section class="bloque-inicio" aria-labelledby="tituloRanking">
+      <div class="seccion-head">
+        <h2 id="tituloRanking">Ranking</h2>
+        <button type="button" class="link-mas" id="btnInicioVerRanking">Ranking completo <span aria-hidden="true">→</span></button>
+      </div>
     <div class="destacados-band" id="mejoresCategoriaCard" style="display:none">
-      <div class="destacados-overline"><span>🏆 Mejores de cada categoría</span></div>
+      <div class="destacados-overline"><span>Líderes por categoría</span></div>
       <div class="destacados-track" id="mejoresCategoriaTrack"></div>
       <div class="hero-carousel-dots visible" id="mejoresCategoriaDots"></div>
     </div>
 
     <div class="seccion" id="ascendidosCard" style="display:none">
-      <h3>📈 Ascendieron este mes</h3>
+      <h3>Ascendieron este mes</h3>
       <div class="ascendidos-wrap">
         <div class="ascendidos-track" id="ascendidosContenido"></div>
       </div>
     </div>
+    </section>
+
+    <section class="bloque-inicio" aria-labelledby="tituloResultados">
+      <div class="seccion-head">
+        <h2 id="tituloResultados">Resultados</h2>
+      </div>
+    <div class="seccion" id="inicioResultadosWrap" style="display:none">
+      <h3>Últimos resultados</h3>
+      <div class="inicio-partidos-grid" id="inicioResultadosGrid"></div>
+    </div>
 
     <div class="seccion" id="campeonesCard" style="display:none">
-      <h3>🏆 Campeones</h3>
+      <h3>Campeones</h3>
       <div class="campeones-strip" id="campeonesContenido"></div>
       <div class="hero-carousel-dots visible" id="campeonesDots"></div>
     </div>
+    </section>
 
-    <div class="seccion">
-      <h2>Próximos torneos</h2>
-      <div id="flyerDestacado"></div>
-      <div class="flyer-grid" id="flyerMini"></div>
-      <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
+    <div class="seccion" id="inicioProximoDestacadoWrap" style="display:none">
+      <div class="seccion-head">
+        <h2>Próximos partidos</h2>
+      </div>
+      <div class="hero-carousel" id="destacadoCarousel">
+        <div class="hero-carousel-track" id="destacadoCarouselTrack"></div>
+        <div class="hero-carousel-dots visible" id="destacadoCarouselDots"></div>
+      </div>
     </div>
 
-    <!-- Vive siempre acá, arriba de Noticias, en mobile y en desktop (ya no
-         hay columna lateral aparte donde reubicarla). -->
+    <section class="bloque-inicio" aria-labelledby="tituloNoticias">
+      <div class="seccion-head">
+        <h2 id="tituloNoticias">Noticias</h2>
+      </div>
+    <div class="seccion" id="noticiasCard" style="display:none">
+      <div class="torneo-card-header">
+        <div id="noticiasInstagram"></div>
+      </div>
+      <div id="noticiasContenido"></div>
+    </div>
+
     <div class="energia-banda" id="energiaBanda">
       <div class="energia-texto">
         <h3>En noviembre vamos a Brasil</h3>
         <p>Padel Tour 2026</p>
       </div>
     </div>
+    </section>
 
-    <div class="seccion" id="noticiasCard" style="display:none">
-      <div class="torneo-card-header">
-        <h3>📰 Noticias</h3>
-        <div id="noticiasInstagram"></div>
-      </div>
-      <div id="noticiasContenido"></div>
+    <div class="bloque-partners">
+    <div class="sponsor-marquee" id="sponsorMarqueeMobile" style="display:none">
+      <p class="sponsor-label">Partners del circuito</p>
+      <div class="sponsor-marquee-track" id="sponsorMarqueeTrack"></div>
     </div>
-
     <div class="seccion" id="sponsorsInlineCard" style="display:none">
-      <p class="sponsor-label">Presentan</p>
+      <p class="sponsor-label">Partners del circuito</p>
       <div class="sponsor-strip" id="sponsorsInline"></div>
     </div>
+    </div>
+
+    <footer class="inicio-footer">
+      <p class="inicio-footer-marca">NORTE <span>PADEL</span></p>
+      <p>Movimiento. Disciplina. Resultado.</p>
+      <p class="inicio-footer-legal">© Norte Padel · Circuito de pádel</p>
+    </footer>
   </section>
 
   <!-- TORNEOS -->
@@ -347,7 +361,7 @@
        mostraban casi lo mismo — ver renderResultadosPublico en app.js. -->
   <section id="view-torneo-resultados" class="view">
     <div class="torneo-hero">
-      <button type="button" class="hero-icon-btn admin-only" id="btnAdministrarEsteTorneo" title="Administrar este torneo" aria-label="Administrar este torneo">🔧</button>
+      <button type="button" class="hero-icon-btn admin-only" id="btnAdministrarEsteTorneo" title="Administrar este torneo" aria-label="Administrar este torneo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.6 2.6l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.1-.5-.5-2.1 2.7-2.3Z"/></svg></button>
       <div class="torneo-hero-overlay">
         <p id="dtEstadoHero"></p>
         <h2 id="dtNombreHero"></h2>
@@ -440,8 +454,8 @@
       <p class="match-meta" id="miInscResumen"></p>
     </div>
     <div class="card">
-      <button type="button" class="secondary" id="miInscBtnDisponibilidad" style="width:100%">🕒 Modificar mi disponibilidad</button>
-      <button type="button" class="secondary" id="miInscBtnMisPartidos" style="width:100%;margin-top:8px">📅 Ver mis partidos</button>
+      <button type="button" class="secondary" id="miInscBtnDisponibilidad" style="width:100%">Modificar mi disponibilidad</button>
+      <button type="button" class="secondary" id="miInscBtnMisPartidos" style="width:100%;margin-top:8px">Ver mis partidos</button>
       <button type="button" class="danger" id="miInscBtnCancelar" style="width:100%;margin-top:8px">Cancelar inscripción</button>
     </div>
   </section>
@@ -464,8 +478,8 @@
       <div class="pill-row" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
       <div class="pill-row admin-only" style="margin-bottom:10px">
-        <button type="button" class="secondary small" id="btnExportarTop20">📤 Exportar Top 20 (imagen)</button>
-        <button type="button" class="secondary small" id="btnExportarCampeon">📤 Exportar Campeón (imagen)</button>
+        <button type="button" class="secondary small" id="btnExportarTop20">Exportar Top 20 (imagen)</button>
+        <button type="button" class="secondary small" id="btnExportarCampeon">Exportar Campeón (imagen)</button>
       </div>
       <table id="tablaRanking">
         <thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>PJ</th><th>PG</th></tr></thead>
@@ -487,7 +501,7 @@
     </div>
     <div class="seccion" id="enVivoPartidosWrap" style="display:none">
       <div id="enVivoJugandoWrap" style="display:none">
-        <h3>🔴 Jugándose ahora</h3>
+        <h3><span class="live-dot"></span>Jugándose ahora</h3>
         <div class="inicio-partidos-grid" id="enVivoJugandoGrid"></div>
       </div>
       <div id="enVivoProximosWrap" style="display:none">
@@ -517,7 +531,7 @@
       </div>
     </div>
     <div class="card">
-      <h3>📈 Rendimiento</h3>
+      <h3>Rendimiento</h3>
       <div class="pj-stats">
         <div><strong id="pjFinales"></strong><span>Finales jugadas</span></div>
         <div><strong id="pjTotalTorneos"></strong><span>Torneos jugados</span></div>
@@ -526,11 +540,11 @@
       <p class="match-meta" id="pjPrimerUltimoTorneo" style="margin-top:10px"></p>
     </div>
     <div class="card">
-      <h3>🏆 Torneos ganados</h3>
+      <h3>Torneos ganados</h3>
       <div id="pjTorneosGanados"></div>
     </div>
     <div class="card" id="pjSubcampeonatosCard" style="display:none">
-      <h3>🥈 Subcampeonatos</h3>
+      <h3>Subcampeonatos</h3>
       <div id="pjSubcampeonatos"></div>
     </div>
   </section>
@@ -552,7 +566,7 @@
       <h2>Completá tu perfil de jugador</h2>
       <div style="text-align:center;margin-bottom:14px">
         <img id="fotoPreview" alt="Tu foto de perfil" class="avatar avatar-grande" style="display:none;margin:0 auto" onerror="mostrarFotoPreview(null)" />
-        <div id="fotoPlaceholder" class="avatar avatar-grande avatar-placeholder" style="margin:0 auto">🎾</div>
+        <div id="fotoPlaceholder" class="avatar avatar-grande avatar-placeholder" style="margin:0 auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="45%" height="45%" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg></div>
         <label for="jFoto">Foto de perfil</label>
         <input id="jFoto" type="file" accept="image/*" />
       </div>
@@ -589,7 +603,7 @@
     <div class="card" id="miPerfilCard" style="display:none">
       <h2>Mi perfil</h2>
       <p class="match-meta" id="miPerfilResumen"></p>
-      <button class="secondary" id="btnVerMiPerfilPublico" style="width:100%;margin-top:12px">📊 Ver mis estadísticas</button>
+      <button class="secondary" id="btnVerMiPerfilPublico" style="width:100%;margin-top:12px">Ver mis estadísticas</button>
       <button class="secondary small" id="btnEditarPerfil" style="margin-top:10px">Editar mis datos y horarios</button>
       <button class="secondary small danger" id="btnLogout" style="margin-top:10px">Cerrar sesión</button>
     </div>
@@ -637,9 +651,9 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <h2 id="admGestionNombre" style="margin:0"></h2>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">✏️ Editar torneo</button>
-            <button type="button" class="secondary small" id="btnAuspiciantesTorneo">📢 Auspiciantes</button>
-            <button type="button" class="secondary small danger" id="btnBorrarTorneo">🗑️ Borrar torneo</button>
+            <button type="button" class="secondary small" id="admBtnMostrarEditarTorneo">Editar torneo</button>
+            <button type="button" class="secondary small" id="btnAuspiciantesTorneo">Auspiciantes</button>
+            <button type="button" class="secondary small danger" id="btnBorrarTorneo">Borrar torneo</button>
           </div>
         </div>
         <button type="button" class="link-btn" id="admBtnVolverConfigGeneral" style="display:none;margin-top:4px">← Volver a Administración general</button>
@@ -657,7 +671,7 @@
 
       <div class="card card-accent" id="editarTorneoCard" style="display:none">
         <h2>Editar torneo</h2>
-        <p class="match-meta" id="teAvisoBloqueo" style="display:none">🔒 Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
+        <p class="match-meta" id="teAvisoBloqueo" style="display:none">Este torneo ya tiene calendario armado — fechas, horarios, formato y categorías quedan bloqueados para no romperlo. Nombre, sede y costo se pueden seguir editando.</p>
         <label for="teNombre">Nombre</label>
         <input id="teNombre" placeholder="Ej: Apertura Norte 2026" />
         <label for="teComplejo">Complejo sede</label>

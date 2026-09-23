@@ -177,6 +177,8 @@ document.getElementById("btnPerfil").addEventListener("click", () => cambiarVist
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
 document.getElementById("btnHeroTorneos2").addEventListener("click", () => cambiarVista("torneos"));
 document.getElementById("btnHeroRanking").addEventListener("click", () => cambiarVista("ranking"));
+document.getElementById("btnInicioVerTorneos").addEventListener("click", () => cambiarVista("torneos"));
+document.getElementById("btnInicioVerRanking").addEventListener("click", () => cambiarVista("ranking"));
 document.getElementById("marqueeBanda").addEventListener("click", () => {
   if (torneoDestacadoId) abrirTorneo(torneoDestacadoId);
   else cambiarVista("torneos");
@@ -276,7 +278,7 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
   if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
-  toast("¡Bienvenido de nuevo! 🎾");
+  toast("¡Bienvenido de nuevo!");
 });
 
 document.getElementById("btnSignup").addEventListener("click", async () => {
@@ -285,7 +287,7 @@ document.getElementById("btnSignup").addEventListener("click", async () => {
   if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
   const { error } = await sb.auth.signUp({ email, password });
   if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
-  toast("Cuenta creada. Ahora completá tu perfil de jugador 🎾");
+  toast("Cuenta creada. Ahora completá tu perfil de jugador");
 });
 
 document.getElementById("btnLogout").addEventListener("click", async () => {
@@ -314,8 +316,8 @@ function renderDisponibilidadForm(contenedorId = "disponibilidadForm") {
   cont._restricciones = [];
   cont.innerHTML = `
     <div class="pill-row disp-toggle">
-      <button type="button" class="pill active" data-disp="completa">🟢 Tengo disponibilidad completa</button>
-      <button type="button" class="pill" data-disp="restringida">🔴 Tengo horarios en los que no puedo jugar</button>
+      <button type="button" class="pill active" data-disp="completa">Tengo disponibilidad completa</button>
+      <button type="button" class="pill" data-disp="restringida">Tengo horarios en los que no puedo jugar</button>
     </div>
     <div class="disp-restricciones-wrap" style="display:none">
       <div class="disp-lista-restricciones"></div>
@@ -525,7 +527,7 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   miJugador = perfil;
   editandoPerfil = false;
   document.getElementById("jFoto").value = "";
-  toast(datos.categoria_pendiente ? "¡Perfil guardado! Tu categoría queda pendiente de aprobación 🎾" : "¡Perfil guardado! 🎾");
+  toast(datos.categoria_pendiente ? "¡Perfil guardado! Tu categoría queda pendiente de aprobación" : "¡Perfil guardado!");
   pedirPermisoNotificaciones();
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
@@ -558,7 +560,7 @@ document.getElementById("btnGuardarClaveNueva").addEventListener("click", async 
   document.getElementById("nuevaClave1").value = "";
   document.getElementById("nuevaClave2").value = "";
   document.getElementById("cambiarClaveOverlay").style.display = "none";
-  toast("¡Contraseña actualizada! 🔒");
+  toast("¡Contraseña actualizada!");
   } finally {
     btn.disabled = false;
   }
@@ -970,8 +972,8 @@ async function abrirPerfilJugador(jugadorId) {
   if (cantOro > 0 || cantPlata > 0) {
     trofeos.style.display = "flex";
     trofeos.innerHTML = [
-      cantOro > 0 ? `<span class="pj-medalla pj-medalla-oro">🥇 ${cantOro > 1 ? `${cantOro} veces campeón` : "Campeón"}</span>` : "",
-      cantPlata > 0 ? `<span class="pj-medalla pj-medalla-plata">🥈 ${cantPlata > 1 ? `${cantPlata} veces subcampeón` : "Subcampeón"}</span>` : ""
+      cantOro > 0 ? `<span class="pj-medalla pj-medalla-oro">${iconoTrofeo()} ${cantOro > 1 ? `${cantOro} veces campeón` : "Campeón"}</span>` : "",
+      cantPlata > 0 ? `<span class="pj-medalla pj-medalla-plata">${iconoTrofeo()} ${cantPlata > 1 ? `${cantPlata} veces subcampeón` : "Subcampeón"}</span>` : ""
     ].join("");
   } else {
     trofeos.style.display = "none";
@@ -983,7 +985,7 @@ async function abrirPerfilJugador(jugadorId) {
   cardSub.style.display = cantPlata > 0 ? "block" : "none";
   contSub.innerHTML = (finalesPerdidas || []).map((t) => `
     <div class="pj-torneo-item">
-      <div><strong>🥈 ${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
+      <div><strong>${t.torneo_nombre}</strong><div class="match-meta">con ${escapeHtml(t.companero_nombre)} ${escapeHtml(t.companero_apellido)}${t.categoria ? " · " + t.categoria : ""}</div></div>
       <span class="match-meta">${t.fecha || ""}</span>
     </div>`).join("");
 }
@@ -1000,7 +1002,7 @@ document.getElementById("btnVerMiPerfilPublico").addEventListener("click", () =>
 // ============================================================
 async function cargarInicio() {
   const hoy = new Date().toISOString().slice(0, 10);
-  const { data } = await sb.from("torneos").select("*").not("flyer_url", "is", null).order("fecha_inicio", { ascending: true });
+  const { data } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria)").not("flyer_url", "is", null).order("fecha_inicio", { ascending: true });
   const proximos = (data || []).filter((t) => !t.fecha_fin || t.fecha_fin >= hoy);
 
   const destacado = document.getElementById("flyerDestacado");
@@ -1018,14 +1020,36 @@ async function cargarInicio() {
 
   // el primero, más grande y destacado; el resto, en la grilla chica de siempre
   const [primero, ...resto] = proximos;
+  // presentación tipo "evento deportivo": afiche + fecha, sede, categorías y
+  // estado. Toda la tarjeta sigue abriendo el torneo, igual que antes (desde
+  // ahí se ve la inscripción si está abierta) -- el botón es solo la señal
+  // visible de esa misma acción, no un camino nuevo.
+  const fechaEvento = (f) => f ? new Date(f + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") : "";
+  const fechasTxt = primero.fecha_fin && primero.fecha_fin !== primero.fecha_inicio
+    ? `${fechaEvento(primero.fecha_inicio)} al ${fechaEvento(primero.fecha_fin)}`
+    : fechaEvento(primero.fecha_inicio);
+  const fechas = fechasTxt.charAt(0).toUpperCase() + fechasTxt.slice(1);
+  const categoriasEvento = (primero.torneo_categorias || []).map((c) => c.categoria)
+    .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   destacado.innerHTML = `
-    <div class="flyer-destacado" style="background-image:url('${primero.flyer_url}')">
-      <div class="flyer-destacado-info">
-        <strong>${primero.nombre}</strong>
-        <span>${iconoCalendarioChico()} ${primero.fecha_inicio}</span>
+    <article class="evento-torneo" tabindex="0" role="button" aria-label="Ver ${escapeHtml(primero.nombre)}">
+      <div class="evento-flyer" style="background-image:url('${primero.flyer_url}')"></div>
+      <div class="evento-info">
+        <div class="evento-estado">${badgeEstadoTorneo(primero)}</div>
+        <h3 class="evento-nombre">${escapeHtml(primero.nombre)}</h3>
+        <dl class="evento-datos">
+          <div><dt>Fecha</dt><dd>${fechas}</dd></div>
+          ${primero.complejos?.nombre ? `<div><dt>Sede</dt><dd>${escapeHtml(primero.complejos.nombre)}</dd></div>` : ""}
+          ${categoriasEvento.length ? `<div><dt>Categorías</dt><dd class="evento-cats">${categoriasEvento.map((c) => `<span>${escapeHtml(c)}</span>`).join("")}</dd></div>` : ""}
+        </dl>
+        <span class="evento-cta">${primero.estado === "inscripcion" ? "Inscribirme" : "Ver torneo"} <span aria-hidden="true">→</span></span>
       </div>
-    </div>`;
-  destacado.querySelector(".flyer-destacado").addEventListener("click", () => abrirTorneo(primero.id));
+    </article>`;
+  const tarjetaEvento = destacado.querySelector(".evento-torneo");
+  tarjetaEvento.addEventListener("click", () => abrirTorneo(primero.id));
+  tarjetaEvento.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirTorneo(primero.id); }
+  });
 
   resto.forEach((t) => {
     const div = document.createElement("div");
@@ -1041,6 +1065,8 @@ async function cargarInicio() {
 // suma una lupa chica superpuesta (pointer-events:none, no interfiere con el click
 // ni con el foco por teclado, que siguen siendo los de la imagen) para que la acción
 // de ampliar sea visible de un vistazo y no dependa solo del cursor al pasar el mouse.
+// silueta de trazo para jugadores sin foto (antes era el emoji 🎾)
+const ICONO_JUGADOR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="50%" height="50%" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>';
 function avatarHtml(fotoUrl, size, extraClass, ampliable) {
   const s = size || 44;
   const clickable = ampliable && fotoUrl;
@@ -1048,7 +1074,7 @@ function avatarHtml(fotoUrl, size, extraClass, ampliable) {
   const dataAttr = clickable ? ` data-foto-grande="${fotoUrl}" tabindex="0" role="button" aria-label="Ver foto en grande"` : "";
   const img = fotoUrl
     ? `<img class="avatar${cls}" src="${fotoUrl}" alt="" loading="lazy" style="width:${s}px;height:${s}px" onerror="this.style.display='none'"${dataAttr} />`
-    : `<div class="avatar avatar-placeholder${cls}" style="width:${s}px;height:${s}px">🎾</div>`;
+    : `<div class="avatar avatar-placeholder${cls}" style="width:${s}px;height:${s}px">${ICONO_JUGADOR_SVG}</div>`;
   if (!clickable) return img;
   const iconoLupa = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="10" cy="10" r="6.5"/><path d="M10 7.2v5.6M7.2 10h5.6"/><path d="M15 15l5.5 5.5"/></svg>`;
   return `<span class="avatar-wrap" style="width:${s}px;height:${s}px">${img}<span class="avatar-zoom-icon" aria-hidden="true">${iconoLupa}</span></span>`;
@@ -1105,7 +1131,7 @@ function renderMejoresPorCategoria() {
     const fondo = j.foto_url ? `style="background-image:url('${j.foto_url}')"` : "";
     return `
       <div class="destacado-card" data-jugador-id="${j.id}" ${fondo}>
-        <div class="destacado-tag">🏆 ${escapeHtml(j.categoria)}</div>
+        <div class="destacado-tag">${escapeHtml(j.categoria)}</div>
         <div class="destacado-stat">
           <strong>${j.puntos_ranking}</strong>
           <span>puntos</span>
@@ -1701,7 +1727,7 @@ function dispResumenHtml(nombreCompleto, filas) {
   const detalle = filas
     .map((d) => `${DIAS[d.dia_semana]} de ${String(d.hora_desde).slice(0, 5)} a ${String(d.hora_hasta).slice(0, 5)}`)
     .join("<br>");
-  return `<p class="match-meta disp-resumen">🕒 <strong>${escapeHtml((nombreCompleto || "").split(" ")[0])} no puede jugar:</strong><br>${detalle}</p>`;
+  return `<p class="match-meta disp-resumen">${iconoReloj()} <strong>${escapeHtml((nombreCompleto || "").split(" ")[0])} no puede jugar:</strong><br>${detalle}</p>`;
 }
 
 // Carga el picker de horarios bloqueados de UN jugador puntual para ESTE
@@ -1763,7 +1789,7 @@ function parejaRowHtml(p, editable, dispPorJugador) {
     : "";
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
-      <span>${etiquetas}🎾 ${nombrePareja} ${catBadge} ${estadoBadge}</span>
+      <span>${etiquetas}${nombrePareja} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
@@ -2846,17 +2872,17 @@ async function actualizarAccesoInscripcion() {
   const inscActiva = data && data.estado !== "cancelada" && data.estado !== "rechazada";
   yaInscriptoEnTorneoActual = !!inscActiva;
   if (inscActiva) {
-    estado.textContent = "✅ Ya estás inscripto en este torneo.";
+    estado.textContent = "Ya estás inscripto en este torneo.";
     btn.textContent = "Ver mi inscripción";
     btn.style.display = "block";
     btn.onclick = () => mostrarPantallaTorneo("mi-inscripcion");
   } else if (data && data.estado === "rechazada") {
-    estado.textContent = `❌ Tu inscripción fue rechazada${data.motivo_rechazo ? ": " + data.motivo_rechazo : ""}. Podés volver a anotarte.`;
+    estado.textContent = `Tu inscripción fue rechazada${data.motivo_rechazo ? ": " + data.motivo_rechazo : ""}. Podés volver a anotarte.`;
     btn.textContent = "Anotarme de nuevo";
     btn.style.display = "block";
     btn.onclick = () => mostrarPantallaTorneo("inscripcion");
   } else if (torneoActualData && torneoActualData.estado !== "inscripcion") {
-    estado.textContent = "🔒 La inscripción para este torneo está cerrada.";
+    estado.textContent = "La inscripción para este torneo está cerrada.";
     btn.style.display = "none";
   } else {
     estado.textContent = "";
@@ -2923,7 +2949,7 @@ async function cargarMiInscripcion() {
     return;
   }
   contEstado.innerHTML = insc.estado === "confirmada"
-    ? '<span class="badge solid">🟢 Confirmada</span>'
+    ? '<span class="badge solid">Confirmada</span>'
     : '<span class="badge orange">Pendiente de confirmar</span>';
   // un jugador puede tener más de una pareja en este torneo si juega más de
   // una categoría (cada pareja guarda su propia categoría) -- se muestran
@@ -2992,7 +3018,7 @@ document.getElementById("btnGuardarDispTorneo").addEventListener("click", async 
   await sb.from("disponibilidad").delete().eq("jugador_id", miJugador.id).eq("torneo_id", torneoActualId);
   const disponibilidades = leerRestriccionesDeForm("torneoDispBloqueadaForm").map((r) => ({ jugador_id: miJugador.id, torneo_id: torneoActualId, ...r }));
   if (disponibilidades.length > 0) await sb.from("disponibilidad").insert(disponibilidades);
-  toast("¡Guardado! 🎾");
+  toast("¡Guardado!");
   } finally {
     btn.disabled = false;
   }
@@ -3071,7 +3097,7 @@ document.getElementById("btnConfirmarInscripcion").addEventListener("click", asy
   });
   boton.disabled = false;
   if (error) { toast("Error: " + error.message); return; }
-  toast("¡Listo, se anotaron los dos! Falta que el admin confirme la inscripción 🎾");
+  toast("¡Listo, se anotaron los dos! Falta que el admin confirme la inscripción");
   parejaSeleccionada = null;
   document.getElementById("buscarPareja").value = "";
   document.getElementById("parejaSeleccionadaTxt").textContent = "";
@@ -3158,7 +3184,7 @@ document.getElementById("btnPedirReserva").addEventListener("click", async () =>
   });
   boton.disabled = false;
   if (error) { toast("Error: " + error.message); return; }
-  toast("¡Listo! Falta que el club confirme tu reserva 🎾");
+  toast("¡Listo! Falta que el club confirme tu reserva");
   document.getElementById("reservaHorario").value = "";
   invitadosSeleccionados = [];
   renderInvitadosSeleccionados();
@@ -3328,7 +3354,7 @@ async function refrescarDetalleTorneo() {
   const contCosto = document.getElementById("dtCosto");
   if (t.costo && Number(t.costo) > 0 && !inscripcionYaCerrada) {
     contCosto.style.display = "block";
-    contCosto.innerHTML = `<span class="badge solid">💰 Costo: $${t.costo}</span>` +
+    contCosto.innerHTML = `<span class="badge solid">Costo: $${t.costo}</span>` +
       (configApp.whatsapp_numero ? botonWhatsappPagoHtml("btnPagarWhatsapp", "margin-left:8px") : "");
     wirearBotonWhatsappPago("btnPagarWhatsapp", t);
   } else {
@@ -6175,7 +6201,7 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 function fotoTorneoItemHtml(foto, admin) {
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
   const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
-    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${foto.url}" aria-label="Pedir esta foto en calidad original">📩 Original</button>`
+    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${foto.url}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
     : "";
   return `<div class="foto-item">
     <img src="${foto.url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${foto.url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
@@ -6296,7 +6322,7 @@ async function cargarNoticias() {
   const card = document.getElementById("noticiasCard");
   const ig = document.getElementById("noticiasInstagram");
   if (configApp.instagram_url) {
-    ig.innerHTML = `<a href="${configApp.instagram_url}" target="_blank" rel="noopener noreferrer" class="secondary small">📸 Seguinos en Instagram</a>`;
+    ig.innerHTML = `<a href="${configApp.instagram_url}" target="_blank" rel="noopener noreferrer" class="secondary small">Seguinos en Instagram</a>`;
   } else {
     ig.innerHTML = "";
   }
@@ -6376,7 +6402,7 @@ async function pedirPermisoNotificaciones() {
 }
 
 function mostrarNotificacionLocal(mensaje) {
-  toast("🔔 " + mensaje);
+  toast(mensaje);
   if ("Notification" in window && Notification.permission === "granted") {
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then((reg) => reg.showNotification("Norte Padel", { body: mensaje, icon: "icon-192.png" }));
