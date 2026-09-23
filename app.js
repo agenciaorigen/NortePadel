@@ -6143,12 +6143,21 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 // FOTOS DEL TORNEO (galería pública, solo el admin sube/borra)
 // ============================================================
 // admin=true agrega el botón de borrar; reutiliza el mismo overlay/lightbox
-// que ya usan las fotos de jugador (ver abrirFotoGrande más abajo).
+// que ya usan las fotos de jugador (ver abrirFotoGrande más abajo). En
+// público (admin=false) suma "Pedir original" -- la que se sube ya se achica
+// y comprime sola (ver comprimirFoto), así que lo que se ve/descarga acá es
+// la versión liviana; quien quiera la foto de calidad completa la pide por
+// WhatsApp (mismo patrón que ya se usa para coordinar el pago de la
+// inscripción) y el club se la manda/vende por fuera del sitio.
 function fotoTorneoItemHtml(foto, admin) {
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  const pedirOriginal = (!admin && configApp.whatsapp_numero)
+    ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${foto.url}" aria-label="Pedir esta foto en calidad original">📩 Original</button>`
+    : "";
   return `<div class="foto-item">
     <img src="${foto.url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${foto.url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
     ${borrar}
+    ${pedirOriginal}
   </div>`;
 }
 
@@ -6448,6 +6457,16 @@ document.getElementById("fotoGrandeDescargar").addEventListener("click", async (
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-foto-grande]");
   if (el) abrirFotoGrande(el.dataset.fotoGrande);
+});
+// "Pedir original" de una foto del torneo: abre WhatsApp con un mensaje que
+// ya incluye el link de ESA foto puntual (la versión liviana que se ve en el
+// sitio), así el club sabe cuál es sin que la persona tenga que describirla.
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-pedir-foto]");
+  if (!el || !configApp.whatsapp_numero) return;
+  const t = cacheTorneos.find((x) => x.id === torneoActualId);
+  const mensaje = `Hola! Quiero pedir esta foto de "${t?.nombre || "el torneo"}" en calidad original: ${el.dataset.pedirFoto}`;
+  window.open(`https://wa.me/${configApp.whatsapp_numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
 });
 document.addEventListener("keydown", (e) => {
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-foto-grande]")) {
