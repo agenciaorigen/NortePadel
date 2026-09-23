@@ -1136,6 +1136,13 @@ nav.tabbar .icon { position: relative; }
 .match-meta.disp-resumen strong { color: inherit; }
 /* ícono de trazo (cancha/horario/fecha/ganador) en vez de emoji, mismo estilo que la tabbar */
 .meta-ico { vertical-align: -3px; margin-right: 1px; flex-shrink: 0; }
+.meta-ico.casilla-ok { color: var(--accent-bright); }
+/* bloqueo de cancha vigente (rojo) o ya pasado (gris) -- antes 🔴 / ⚪ */
+.estado-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--muted); opacity: .6; }
+.estado-dot.activo { background: var(--danger); opacity: 1; }
+/* chequeo previo del torneo (Administración): avisos en ámbar, "todo en orden" en lima */
+.match-meta.chequeo-aviso { color: var(--state-warn); }
+.match-meta.chequeo-ok { color: var(--state-ok); }
 /* partido con resultado cargado (o notificación sin leer): se distingue con un filo
    de color, no solo texto — mismo verde de "estado" que ya usan los badges, en vez
    del lima decorativo */
@@ -1698,7 +1705,7 @@ body.is-admin #btnAdminPanel { display: flex; }
 /* ============================================================
    PANEL DE ADMINISTRACIÓN: sidebar oscura (solo escritorio)
    Identidad propia del panel (Bodoni Moda + Work Sans, verde lícida),
-   separada a propósito de Playfair/Manrope del resto del sitio -- ver
+   separada a propósito de Barlow Condensed/Manrope del resto del sitio -- ver
    #admShell en index.html y sincronizarAdmSidebar() en app.js. En mobile
    este bloque entero no aplica: #admSidebar queda oculta (regla base,
    FUERA del media query) y admContenido se ve exactamente como antes,

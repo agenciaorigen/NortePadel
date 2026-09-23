@@ -763,34 +763,45 @@ function fondoImagenExport(ctx, w, h, fotoFondo) {
     ctx.fillRect(0, 0, w, h);
   } else {
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "#132a20");
-    grad.addColorStop(1, "#05080A");
+    grad.addColorStop(0, "#161A1E");
+    grad.addColorStop(1, "#07090B");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
   }
   const brillo = ctx.createRadialGradient(w / 2, 0, 0, w / 2, 0, w);
-  brillo.addColorStop(0, "rgba(111,224,138,.22)");
-  brillo.addColorStop(1, "rgba(111,224,138,0)");
+  brillo.addColorStop(0, "rgba(185,255,61,.14)");
+  brillo.addColorStop(1, "rgba(185,255,61,0)");
   ctx.fillStyle = brillo;
   ctx.fillRect(0, 0, w, h);
 }
 
+// el canvas no dispara la descarga de una fuente: si nadie usó todavía esa
+// variante en la página (ej. el admin entra directo a Ranking), sin esto la
+// imagen saldría con la letra de reserva en vez de Barlow Condensed
+async function cargarFuentesExport() {
+  try {
+    await Promise.all(["italic 800 40px 'Barlow Condensed'", "800 40px 'Barlow Condensed'", "700 32px 'Barlow Condensed'", "700 34px Manrope"]
+      .map((f) => document.fonts.load(f)));
+  } catch (e) { /* si falla, se dibuja igual con la fuente de reserva */ }
+  await document.fonts.ready;
+}
+
 function encabezadoImagenExport(ctx, w, categoria, etiqueta) {
   ctx.textAlign = "center";
-  ctx.fillStyle = "#6FE08A";
-  ctx.font = "700 30px Manrope";
+  ctx.fillStyle = "#B9FF3D";
+  ctx.font = "700 32px 'Barlow Condensed'";
   ctx.fillText(etiqueta, w / 2, 130);
-  ctx.fillStyle = "#EAF1EE";
-  ctx.font = "900 76px 'Playfair Display'";
-  ctx.fillText("NORTE PADEL", w / 2, 220);
-  ctx.fillStyle = "#9BB0A7";
+  ctx.fillStyle = "#F3F5F4";
+  ctx.font = "italic 800 104px 'Barlow Condensed'";
+  ctx.fillText("NORTE PADEL", w / 2, 225);
+  ctx.fillStyle = "#8D969C";
   ctx.font = "600 34px Manrope";
   ctx.fillText(categoria, w / 2, 280);
 }
 
 function piePaginaImagenExport(ctx, w, h) {
   ctx.textAlign = "center";
-  ctx.fillStyle = "#9BB0A7";
+  ctx.fillStyle = "#8D969C";
   ctx.font = "600 22px Manrope";
   const fecha = new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
   ctx.fillText(`Ranking al ${fecha}`, w / 2, h - 50);
@@ -812,7 +823,7 @@ function cargarImagenParaCanvas(url) {
 
 async function exportarRankingTop20() {
   if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para exportar"); return; }
-  await document.fonts.ready;
+  await cargarFuentesExport();
   const { categoria, lista } = ultimoRankingExport;
   const top = lista.slice(0, 20);
   const W = 1080, H = 1920;
@@ -821,11 +832,11 @@ async function exportarRankingTop20() {
   const ctx = canvas.getContext("2d");
   const fondo = await cargarImagenParaCanvas("ranking-bg-top20.jpg");
   fondoImagenExport(ctx, W, H, fondo);
-  encabezadoImagenExport(ctx, W, categoria, "🏆 TOP 20 · RANKING");
+  encabezadoImagenExport(ctx, W, categoria, "TOP 20 · RANKING");
 
   const inicioLista = 360;
   const altoFila = (H - inicioLista - 120) / 20;
-  const colorPosicion = (pos) => pos === 1 ? "#ffd700" : pos === 2 ? "#c9d3e0" : pos === 3 ? "#ff9d5c" : "#EAF1EE";
+  const colorPosicion = (pos) => pos === 1 ? "#ffd700" : pos === 2 ? "#c9d3e0" : pos === 3 ? "#ff9d5c" : "#F3F5F4";
   top.forEach((j, idx) => {
     const y = inicioLista + idx * altoFila;
     const posicion = idx + 1;
@@ -835,14 +846,14 @@ async function exportarRankingTop20() {
     }
     ctx.textAlign = "left";
     ctx.fillStyle = colorPosicion(posicion);
-    ctx.font = "800 34px Manrope";
+    ctx.font = "italic 800 40px 'Barlow Condensed'";
     ctx.fillText(String(posicion).padStart(2, "0"), 90, y + altoFila / 2 + 12);
-    ctx.fillStyle = "#EAF1EE";
+    ctx.fillStyle = "#F3F5F4";
     ctx.font = "700 34px Manrope";
     ctx.fillText(`${j.nombre} ${j.apellido}`, 175, y + altoFila / 2 + 12);
     ctx.textAlign = "right";
-    ctx.fillStyle = "#6FE08A";
-    ctx.font = "800 34px Manrope";
+    ctx.fillStyle = "#B9FF3D";
+    ctx.font = "800 40px 'Barlow Condensed'";
     ctx.fillText(String(j.puntos_ranking), W - 90, y + altoFila / 2 + 12);
   });
 
@@ -853,7 +864,7 @@ async function exportarRankingTop20() {
 function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) {
   ctx.clearRect(0, 0, W, H);
   fondoImagenExport(ctx, W, H, fotoFondo);
-  encabezadoImagenExport(ctx, W, categoria, "🏆 CAMPEÓN DE LA CATEGORÍA");
+  encabezadoImagenExport(ctx, W, categoria, "CAMPEÓN DE LA CATEGORÍA");
 
   const cx = W / 2, cy = 640, radio = 260;
   ctx.save();
@@ -866,29 +877,29 @@ function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) 
     const sx = (foto.width - lado) / 2, sy = (foto.height - lado) / 2;
     ctx.drawImage(foto, sx, sy, lado, lado, cx - radio, cy - radio, radio * 2, radio * 2);
   } else {
-    ctx.fillStyle = "#0F7A46";
+    ctx.fillStyle = "#161A1E";
     ctx.fillRect(cx - radio, cy - radio, radio * 2, radio * 2);
-    ctx.fillStyle = "#EAF1EE";
+    ctx.fillStyle = "#B9FF3D";
     ctx.textAlign = "center";
-    ctx.font = "900 160px Manrope";
+    ctx.font = "italic 800 180px 'Barlow Condensed'";
     ctx.fillText(`${campeon.nombre[0] || ""}${campeon.apellido[0] || ""}`, cx, cy + 55);
   }
   ctx.restore();
   ctx.lineWidth = 8;
-  ctx.strokeStyle = "#6FE08A";
+  ctx.strokeStyle = "#B9FF3D";
   ctx.beginPath();
   ctx.arc(cx, cy, radio, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.textAlign = "center";
-  ctx.fillStyle = "#EAF1EE";
-  ctx.font = "900 68px 'Playfair Display'";
-  ctx.fillText(`${campeon.nombre} ${campeon.apellido}`, cx, cy + radio + 130);
-  ctx.fillStyle = "#6FE08A";
-  ctx.font = "800 92px Manrope";
-  ctx.fillText(String(campeon.puntos_ranking), cx, cy + radio + 250);
-  ctx.fillStyle = "#9BB0A7";
-  ctx.font = "700 30px Manrope";
+  ctx.fillStyle = "#F3F5F4";
+  ctx.font = "italic 800 88px 'Barlow Condensed'";
+  ctx.fillText(`${campeon.nombre} ${campeon.apellido}`.toUpperCase(), cx, cy + radio + 130);
+  ctx.fillStyle = "#B9FF3D";
+  ctx.font = "italic 800 120px 'Barlow Condensed'";
+  ctx.fillText(String(campeon.puntos_ranking), cx, cy + radio + 260);
+  ctx.fillStyle = "#8D969C";
+  ctx.font = "700 32px 'Barlow Condensed'";
   ctx.fillText("PUNTOS", cx, cy + radio + 290);
 
   piePaginaImagenExport(ctx, W, H);
@@ -896,7 +907,7 @@ function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) 
 
 async function exportarRankingCampeon() {
   if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para exportar"); return; }
-  await document.fonts.ready;
+  await cargarFuentesExport();
   const { categoria, lista } = ultimoRankingExport;
   const campeon = lista[0];
   const W = 1080, H = 1920;
@@ -1089,6 +1100,13 @@ function avatarHtml(fotoUrl, size, extraClass, ampliable) {
 function iconoPin() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 21s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>'; }
 function iconoReloj() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>'; }
 function iconoTrofeo() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M8 4h8v4a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5a3 3 0 0 0 3 4"/><path d="M16 5h3a3 3 0 0 1-3 4"/><path d="M12 13v3"/><path d="M9 20h6"/><path d="M10 16h4l.5 4h-5l.5-4Z"/></svg>'; }
+function iconoLapiz() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4Z"/><path d="M13.5 6.5l4 4"/></svg>'; }
+// casilla de pago: tildada (lima) o vacía -- reemplaza a ✅ / ⬜
+function iconoCasilla(tildada) {
+  return tildada
+    ? '<svg class="meta-ico casilla-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.5l2.8 2.8L16.5 9"/></svg>'
+    : '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/></svg>';
+}
 function iconoCalendarioChico() { return '<svg class="meta-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg>'; }
 
 // "Mejores de cada categoría": reemplaza al viejo "Jugador/Jugadora del mes"
@@ -1578,7 +1596,7 @@ async function cargarCategorias() {
         <h4>${g}</h4>
         ${grupos[g].map((c) =>
           `<span class="pill removable">${c.nombre}
-            <button type="button" class="btnEditarCategoria" data-id="${c.id}" data-nombre="${c.nombre}" aria-label="Editar ${c.nombre}">✏️</button>
+            <button type="button" class="btnEditarCategoria" data-id="${c.id}" data-nombre="${c.nombre}" aria-label="Editar ${c.nombre}">${iconoLapiz()}</button>
             <button type="button" class="btnBorrarCategoria" data-id="${c.id}" aria-label="Borrar ${c.nombre}">×</button>
           </span>`
         ).join("")}
@@ -1788,9 +1806,9 @@ function parejaRowHtml(p, editable, dispPorJugador) {
   const pagoHtml = editable
     ? `<div class="pareja-pago-row">
         <span class="match-meta meta-caption">Pago:</span>
-        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador1_id}" data-pago="${p.jugador1_pago ? "1" : "0"}">${p.jugador1_pago ? "✅" : "⬜"} ${escapeHtml((p.jugador1_nombre || "").split(" ")[0])}</button>
-        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador2_id}" data-pago="${p.jugador2_pago ? "1" : "0"}">${p.jugador2_pago ? "✅" : "⬜"} ${escapeHtml((p.jugador2_nombre || "").split(" ")[0])}</button>
-        ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">✅ Marcar pago de los 2</button>` : ""}
+        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador1_id}" data-pago="${p.jugador1_pago ? "1" : "0"}">${iconoCasilla(p.jugador1_pago)} ${escapeHtml((p.jugador1_nombre || "").split(" ")[0])}</button>
+        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador2_id}" data-pago="${p.jugador2_pago ? "1" : "0"}">${iconoCasilla(p.jugador2_pago)} ${escapeHtml((p.jugador2_nombre || "").split(" ")[0])}</button>
+        ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Marcar pago de los 2</button>` : ""}
       </div>`
     : "";
   return `<div class="pareja-row-wrap">
@@ -1799,8 +1817,8 @@ function parejaRowHtml(p, editable, dispPorJugador) {
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
-        ${editable ? `<button type="button" class="secondary small btnToggleDispPareja" data-p="${p.id}" title="Cargar horarios en que no pueden jugar" aria-label="Cargar horarios en que no pueden jugar">🕒</button>` : ""}
-        ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">✏️</button>` : ""}
+        ${editable ? `<button type="button" class="secondary small btnToggleDispPareja" data-p="${p.id}" title="Cargar horarios en que no pueden jugar" aria-label="Cargar horarios en que no pueden jugar">${iconoReloj()}</button>` : ""}
+        ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">${iconoLapiz()}</button>` : ""}
         ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${escapeHtml(nombrePareja)}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${nombrePareja}">×</button>` : ""}
       </span>
     </div>
@@ -1838,11 +1856,11 @@ function sinParejaChipHtml(i, editable, dispPorJugador) {
   const nombreCompleto = `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`;
   // Igual que en parejaRowHtml: el pago es información solo para el admin.
   const pagoHtml = editable
-    ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${i.pago ? "✅" : "⬜"}</button>`
+    ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${iconoCasilla(i.pago)}</button>`
     : "";
   const dispResumen = editable ? dispResumenHtml(i.nombre, dispPorJugador?.[i.jugador_id]) : "";
   const idFormSuelto = `admDispForm-suelto-${i.jugador_id}`;
-  const botonDisp = editable ? `<button type="button" class="secondary small btnToggleDispSuelto" data-jugador="${i.jugador_id}" title="Cargar horarios en que no puede jugar" aria-label="Cargar horarios en que no puede jugar ${nombreCompleto}">🕒</button>` : "";
+  const botonDisp = editable ? `<button type="button" class="secondary small btnToggleDispSuelto" data-jugador="${i.jugador_id}" title="Cargar horarios en que no puede jugar" aria-label="Cargar horarios en que no puede jugar ${nombreCompleto}">${iconoReloj()}</button>` : "";
   const panelDisp = editable ? `
     <div class="match-admin-panel" data-disp-suelto="${i.jugador_id}" style="display:none;flex-basis:100%">
       <div id="${idFormSuelto}"></div>
@@ -1903,7 +1921,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
     : parejasBase;
   const pagas = editable ? parejasBase.filter((p) => p.jugador1_pago && p.jugador2_pago).length : 0;
   const resumenPagoHtml = editable && parejasBase.length
-    ? `<p class="match-meta" style="margin-bottom:8px">💳 ${pagas} de ${parejasBase.length} parejas con el pago confirmado${pagas < parejasBase.length ? " — las que faltan no entran al fixture hasta confirmarlas" : ""}.</p>`
+    ? `<p class="match-meta" style="margin-bottom:8px">${pagas} de ${parejasBase.length} parejas con el pago confirmado${pagas < parejasBase.length ? " — las que faltan no entran al fixture hasta confirmarlas" : ""}.</p>`
     : "";
   contParejas.innerHTML = resumenPagoHtml + (parejasOrdenadas.map((p) => parejaRowHtml(p, editable, dispPorJugador)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
   if (editable) {
@@ -2292,8 +2310,8 @@ function renderListaJugadoresAdmin() {
     div.insertAdjacentHTML("beforeend", `
       <div class="row" style="margin-top:8px;gap:8px">
         <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
-        <button type="button" class="secondary small btnAscenderJugador">⬆ Ascender</button>
-        <button type="button" class="secondary small btnBlanquearClave">🔑 Blanquear clave</button>
+        <button type="button" class="secondary small btnAscenderJugador">Ascender</button>
+        <button type="button" class="secondary small btnBlanquearClave">Blanquear clave</button>
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
     `);
@@ -2389,7 +2407,7 @@ function renderListaJugadoresAdmin() {
         partidosAfectados = count || 0;
       }
       if (partidosAfectados > 0) {
-        toast(`${j.nombre} ${j.apellido} tiene ${partidosAfectados} partido(s) armado(s) en el cuadro (jugados o no) — borrarlo se los lleva puestos. Si es un placeholder que hay que reemplazar por el jugador real, usá el ✏️ en "Inscripciones y parejas" en vez de borrar.`);
+        toast(`${j.nombre} ${j.apellido} tiene ${partidosAfectados} partido(s) armado(s) en el cuadro (jugados o no) — borrarlo se los lleva puestos. Si es un placeholder que hay que reemplazar por el jugador real, usá el lápiz (editar) en "Inscripciones y parejas" en vez de borrar.`);
         return;
       }
       const tieneHistorial = j.partidos_jugados > 0;
@@ -2638,7 +2656,7 @@ function canchaTorneoRowHtml(c) {
   const tieneHorarioPropio = c.horarios_por_dia && Object.keys(c.horarios_por_dia).length;
   return `<div class="cancha-torneo-fila">
     <span class="badge orange">${nombreCompleto} (${resumenDias}${tieneHorarioPropio ? " · horario propio" : ""})
-      <a href="#" class="btnEditarCanchaTorneo" data-tc="${c.id}" title="Editar días y horario">✏️</a>
+      <a href="#" class="btnEditarCanchaTorneo" data-tc="${c.id}" title="Editar días y horario" aria-label="Editar días y horario">${iconoLapiz()}</a>
       <a href="#" class="btnQuitarCanchaTorneo" data-tc="${c.id}" title="Quitar">✕</a>
     </span>
     <div class="cancha-torneo-editor" id="cteEditor-${c.id}" style="display:none">
@@ -3507,7 +3525,7 @@ function renderBloqueosAdmin() {
       const desde = new Date(b.desde).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       const hasta = new Date(b.hasta).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       return `<div class="pareja-row">
-        <span>${vigente ? "🔴" : "⚪"} ${b.canchas?.nombre || "?"} — ${desde} a ${hasta}${b.motivo ? ` (${escapeHtml(b.motivo)})` : ""}</span>
+        <span><span class="estado-dot${vigente ? " activo" : ""}" title="${vigente ? "Vigente" : "Ya pasó"}"></span>${b.canchas?.nombre || "?"} — ${desde} a ${hasta}${b.motivo ? ` (${escapeHtml(b.motivo)})` : ""}</span>
         <button class="secondary small btnQuitarBloqueo" data-id="${b.id}">Quitar</button>
       </div>`;
     }).join("");
@@ -3554,7 +3572,7 @@ document.getElementById("admBtnBloquearCancha").addEventListener("click", async 
     motivo
   });
   if (error) { toast("Error: " + error.message); return; }
-  toast("Cancha bloqueada ✅");
+  toast("Cancha bloqueada");
   document.getElementById("admBloqueoDesde").value = "";
   document.getElementById("admBloqueoHasta").value = "";
   document.getElementById("admBloqueoMotivo").value = "";
@@ -3756,7 +3774,7 @@ async function cargarGestionTorneo(id) {
   const btnToggleInsc = document.getElementById("btnToggleInscripcion");
   if (t.estado === "inscripcion" || t.estado === "inscripcion_cerrada") {
     btnToggleInsc.style.display = "inline-block";
-    btnToggleInsc.textContent = t.estado === "inscripcion" ? "🔒 Cerrar inscripción" : "🔓 Reabrir inscripción";
+    btnToggleInsc.textContent = t.estado === "inscripcion" ? "Cerrar inscripción" : "Reabrir inscripción";
     btnToggleInsc.onclick = async () => {
       if (btnToggleInsc.disabled) return;
       btnToggleInsc.disabled = true;
@@ -3869,14 +3887,14 @@ function renderDiagnosticoTorneo(insc, parejas, partidos) {
   const partidosSinHorario = partidos.filter((p) => !p.horario && p.estado !== "jugado");
 
   const filas = [];
-  if (parejasSinPartido.length) filas.push(`⚠️ ${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
-  if (inscSinPareja.length) filas.push(`⚠️ ${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
-  if (parejasPendientes.length) filas.push(`⚠️ ${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`).join(", ")}.`);
-  if (partidosSinHorario.length) filas.push(`⚠️ ${partidosSinHorario.length} partido${partidosSinHorario.length === 1 ? "" : "s"} todavía sin cancha/horario — usá "Generar calendario" o asignalo a mano.`);
+  if (parejasSinPartido.length) filas.push(`${parejasSinPartido.length} pareja${parejasSinPartido.length === 1 ? "" : "s"} sin ningún partido asignado: ${parejasSinPartido.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)} (${p.categoria || "sin categoría"})`).join(", ")} — generá el fixture de esa categoría.`);
+  if (inscSinPareja.length) filas.push(`${inscSinPareja.length} anotado${inscSinPareja.length === 1 ? "" : "s"} sin pareja todavía: ${inscSinPareja.map((i) => `${escapeHtml(i.nombre)} ${escapeHtml(i.apellido)}`).join(", ")} — no puede jugar hasta que tenga con quién.`);
+  if (parejasPendientes.length) filas.push(`${parejasPendientes.length} pareja${parejasPendientes.length === 1 ? "" : "s"} pendiente${parejasPendientes.length === 1 ? "" : "s"} de confirmar (todavía no revisaste el pago): ${parejasPendientes.map((p) => `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`).join(", ")}.`);
+  if (partidosSinHorario.length) filas.push(`${partidosSinHorario.length} partido${partidosSinHorario.length === 1 ? "" : "s"} todavía sin cancha/horario — usá "Generar calendario" o asignalo a mano.`);
 
   cont.innerHTML = filas.length === 0
-    ? '<p class="match-meta">✅ Todo en orden: todas las parejas tienen partido, nadie quedó sin pareja y no hay partidos sueltos sin horario.</p>'
-    : filas.map((f) => `<p class="match-meta" style="margin-bottom:6px">${f}</p>`).join("");
+    ? '<p class="match-meta chequeo-ok">Todo en orden: todas las parejas tienen partido, nadie quedó sin pareja y no hay partidos sueltos sin horario.</p>'
+    : filas.map((f) => `<p class="match-meta chequeo-aviso" style="margin-bottom:6px">${f}</p>`).join("");
 }
 
 // Borra un torneo completo (inscripciones, parejas, partidos, canchas
@@ -4259,8 +4277,8 @@ const ETIQUETA_ESTADO_FASE = {
   sin_fixture: "sin fixture",
   fixture_generado: "fixture armado, falta calendario",
   calendario_borrador: "calendario de prueba — sin publicar",
-  calendario_confirmado: "calendario publicado ✅",
-  finalizada: "finalizada 🏆"
+  calendario_confirmado: "calendario publicado",
+  finalizada: "finalizada"
 };
 function renderEstadoCategorias(torneoCategorias) {
   const cont = document.getElementById("admEstadoCategorias");
@@ -4639,7 +4657,7 @@ document.getElementById("btnPublicarCalendario").addEventListener("click", async
   if (error) { toast("Error: " + error.message); return; }
 
   await actualizarEstadoTorneoPorFases(torneoGestionId);
-  toast(`Calendario publicado ✅ (${enBorrador.map((c) => c.categoria).join(", ")}) — ya lo pueden ver los jugadores`);
+  toast(`Calendario publicado (${enBorrador.map((c) => c.categoria).join(", ")}) — ya lo pueden ver los jugadores`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
   } finally {
@@ -4905,9 +4923,9 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     </div>`;
   };
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
-  const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">🚫 Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
+  const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
-  const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">🔒 Cerrada</div>`;
+  const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">Cerrada</div>`;
 
   let html = "";
   if (editable && sinHorario.length > 0) {
@@ -5036,7 +5054,7 @@ function wirePlanillaDragAndDrop(containerId) {
         await sb.from("torneo_categorias").update({ estado_fase: yaPublicada ? "calendario_confirmado" : "calendario_borrador" }).eq("torneo_id", torneoGestionId).eq("categoria", partido.categoria);
         if (yaPublicada) await actualizarEstadoTorneoPorFases(torneoGestionId);
       }
-      toast(nuevoHorario ? "Partido reubicado ✅" : "Partido movido a \"sin horario\"");
+      toast(nuevoHorario ? "Partido reubicado" : "Partido movido a \"sin horario\"");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
       } finally {
@@ -5142,7 +5160,7 @@ function wireCargaResultado(cont) {
         sets, estado: "jugado", ganador_pareja_id: ganadorParejaId
       }).eq("id", partidoId).select("categoria, torneo_id, slot_cuadro").single();
       if (error) { toast("Error: " + error.message); return; }
-      toast("Resultado cargado, ranking actualizado ✅");
+      toast("Resultado cargado, ranking actualizado");
       if (partidoActualizado?.slot_cuadro) {
         // si esto alimenta una fase ya armada del cuadro de zonas, que el
         // rival de esa fase se actualice solo en vez de quedar trabado con
@@ -5216,7 +5234,7 @@ function llavePartidoCardHtml(p) {
         <span>${enVivoAhora ? '<span class="badge live"><span class="live-dot"></span>EN VIVO</span> ' : ""}${iconoReloj()} ${horario}</span>
         <span style="display:flex;align-items:center;gap:6px">
           ${p.slot_cuadro ? `<span>${p.slot_cuadro}</span>` : ""}
-          ${puedeCargarResultado ? `<button type="button" class="btnTogglePartidoAdmin" data-p="${p.id}" title="Cargar resultado" aria-label="Cargar resultado">✏️</button>` : ""}
+          ${puedeCargarResultado ? `<button type="button" class="btnTogglePartidoAdmin" data-p="${p.id}" title="Cargar resultado" aria-label="Cargar resultado">${iconoLapiz()}</button>` : ""}
         </span>
       </div>
       <div class="llave-fila ${ganador === 1 ? "ganador" : ""}">
@@ -5625,7 +5643,7 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
       ${editable && p.estado === "jugado" && !esByeSinJugar ? `
       <div class="match-actions">
-        <button type="button" class="secondary small btnTogglePartidoAdmin" data-p="${p.id}">✏️ Corregir resultado</button>
+        <button type="button" class="secondary small btnTogglePartidoAdmin" data-p="${p.id}">Corregir resultado</button>
       </div>
       ${cargaResultadoPanelHtml(p, true)}` : ""}
       ${editable && (p.estado !== "jugado" || esByeSinJugar) ? `
@@ -5871,7 +5889,7 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
         <td>${escapeHtml(resultado)}</td>
         <td class="tabla-cuadro-ganadora">${nombreGanadora ? escapeHtml(nombreGanadora) : "—"}</td>
         <td class="tabla-cuadro-meta">${escapeHtml(local)} · ${escapeHtml(horario)}</td>
-        <td><button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${p.id}" title="Editar" aria-label="Editar ${escapeHtml(slot)}">✏️</button></td>
+        <td><button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${p.id}" title="Editar" aria-label="Editar ${escapeHtml(slot)}">${iconoLapiz()}</button></td>
       </tr>
       <tr class="tabla-cuadro-editrow" data-fila-edicion="${p.id}" style="display:none">
         <td colspan="8">
@@ -5929,7 +5947,7 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
       <td>—</td>
       <td>—</td>
       <td class="tabla-cuadro-meta">a definir</td>
-      <td>${parejasCategoriaTabla.length ? `<button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${f.slot}" title="Armar a mano" aria-label="Armar ${escapeHtml(f.slot)} a mano">✏️</button>` : ""}</td>
+      <td>${parejasCategoriaTabla.length ? `<button type="button" class="tabla-cuadro-editbtn" data-toggle-fila="${f.slot}" title="Armar a mano" aria-label="Armar ${escapeHtml(f.slot)} a mano">${iconoLapiz()}</button>` : ""}</td>
     </tr>
     ${parejasCategoriaTabla.length ? `
     <tr class="tabla-cuadro-editrow" data-fila-edicion="${f.slot}" style="display:none">
@@ -5995,7 +6013,7 @@ function renderSponsorItem(s, caption, admin) {
   // En admin el logo va aparte del botón de borrar (nunca adentro del <a>,
   // que ya es clickeable y abre el link del auspiciante).
   if (!admin) return item;
-  return `<div class="sponsor-admin-item">${item}<button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">✕ Borrar</button></div>`;
+  return `<div class="sponsor-admin-item">${item}<button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">Borrar</button></div>`;
 }
 
 async function cargarSponsors() {
