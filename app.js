@@ -1701,6 +1701,39 @@ function dispBadgeHtml(jugadorId, dispPorJugador) {
   return ` <span class="badge orange" style="white-space:normal">🕒 No puede: ${escapeHtml(detalle)}</span>`;
 }
 
+// Carga el picker de horarios bloqueados de UN jugador puntual para ESTE
+// torneo, dentro del panel que abre el botón 🕒 de su fila — así el admin
+// puede cargarlo por él si todavía no lo hizo (pedido del club: no depender
+// de que cada jugador se acuerde de entrar a "Mi disponibilidad").
+async function cargarDispAdminForm(contId, jugadorId) {
+  if (!document.getElementById(contId)) return;
+  renderDisponibilidadForm(contId);
+  const { data } = await sb.from("disponibilidad").select("*").eq("jugador_id", jugadorId).eq("torneo_id", torneoGestionId);
+  precargarRestriccionesEnForm(contId, data);
+}
+// Guarda lo que se cargó en cualquiera de esos paneles (mismo patrón
+// delete+insert que btnGuardarDispTorneo) — un solo listener delegado sirve
+// tanto para los paneles de parejas como para los de "sin pareja".
+function wireGuardarDispAdmin(cont) {
+  cont.querySelectorAll(".btnGuardarDispAdmin").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        const jugadorId = btn.dataset.jugador;
+        const contId = btn.dataset.cont;
+        await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId).eq("torneo_id", torneoGestionId);
+        const filas = leerRestriccionesDeForm(contId).map((r) => ({ jugador_id: jugadorId, torneo_id: torneoGestionId, ...r }));
+        if (filas.length > 0) await sb.from("disponibilidad").insert(filas);
+        toast("Horarios guardados");
+        refrescarTrasAccionGestion();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 function parejaRowHtml(p, editable, dispPorJugador) {
   const catBadge = p.categoria ? `<span class="badge">${p.categoria}</span>` : "";
   const estadoBadge = p.estado === "confirmada" ? `<span class="badge solid">Confirmada</span>`
@@ -1730,11 +1763,22 @@ function parejaRowHtml(p, editable, dispPorJugador) {
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
         ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
         ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
+        ${editable ? `<button type="button" class="secondary small btnToggleDispPareja" data-p="${p.id}" title="Cargar horarios en que no pueden jugar" aria-label="Cargar horarios en que no pueden jugar">🕒</button>` : ""}
         ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">✏️</button>` : ""}
         ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${escapeHtml(nombrePareja)}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${nombrePareja}">×</button>` : ""}
       </span>
     </div>
     ${editable ? pagoHtml : ""}
+    ${editable ? `
+    <div class="match-admin-panel" data-disp-pareja="${p.id}" style="display:none">
+      <p class="match-meta" style="margin-bottom:6px">Horarios en que NO pueden jugar este torneo — cargalo vos si el jugador todavía no lo hizo.</p>
+      <p class="match-meta meta-caption" style="margin-bottom:4px">${escapeHtml(p.jugador1_nombre)}</p>
+      <div id="admDispForm-${p.id}-${p.jugador1_id}"></div>
+      <button type="button" class="secondary small btnGuardarDispAdmin" data-jugador="${p.jugador1_id}" data-cont="admDispForm-${p.id}-${p.jugador1_id}" style="margin-top:6px;margin-bottom:14px">Guardar</button>
+      <p class="match-meta meta-caption" style="margin-bottom:4px">${escapeHtml(p.jugador2_nombre)}</p>
+      <div id="admDispForm-${p.id}-${p.jugador2_id}"></div>
+      <button type="button" class="secondary small btnGuardarDispAdmin" data-jugador="${p.jugador2_id}" data-cont="admDispForm-${p.id}-${p.jugador2_id}" style="margin-top:6px">Guardar</button>
+    </div>` : ""}
     ${editable ? `
     <div class="match-admin-panel" data-editar-pareja="${p.id}" style="display:none">
       <p class="match-meta" style="margin-bottom:6px">Reemplazá al jugador que anotaste sin saber quién iba a jugar de verdad — se corrige en esta pareja y en TODOS los partidos que ya jugó o le falten (zona, octavos, cuartos...), no hace falta tocar cada partido. Si ya hay resultados cargados con el jugador viejo, los puntos de ranking que ya sumó quedan a su nombre hasta que se migren con un script aparte.</p>
@@ -1759,7 +1803,14 @@ function sinParejaChipHtml(i, editable, dispPorJugador) {
     ? `<button type="button" class="btnTogglePago" data-jugador="${i.jugador_id}" data-pago="${i.pago ? "1" : "0"}" style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px 0 0" title="${i.pago ? "Pagó" : "No pagó"} — tocar para cambiar" aria-label="${nombreCompleto}: ${i.pago ? "pagó" : "no pagó"}, tocar para cambiar">${i.pago ? "✅" : "⬜"}</button>`
     : "";
   const badgeDisp = editable ? dispBadgeHtml(i.jugador_id, dispPorJugador) : "";
-  return `<span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${badgeDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}</span>`;
+  const idFormSuelto = `admDispForm-suelto-${i.jugador_id}`;
+  const botonDisp = editable ? `<button type="button" class="secondary small btnToggleDispSuelto" data-jugador="${i.jugador_id}" title="Cargar horarios en que no puede jugar" aria-label="Cargar horarios en que no puede jugar ${nombreCompleto}">🕒</button>` : "";
+  const panelDisp = editable ? `
+    <div class="match-admin-panel" data-disp-suelto="${i.jugador_id}" style="display:none;flex-basis:100%">
+      <div id="${idFormSuelto}"></div>
+      <button type="button" class="secondary small btnGuardarDispAdmin" data-jugador="${i.jugador_id}" data-cont="${idFormSuelto}" style="margin-top:6px">Guardar</button>
+    </div>` : "";
+  return `<span class="pill removable" style="display:inline-flex;flex-wrap:wrap;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${badgeDisp}${botonDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}${panelDisp}</span>`;
 }
 // Cablea los toggles de pago (💰 por jugador + "marcar pago de los 2") de un
 // contenedor -- se usa igual en la lista de parejas y en la de "sin pareja",
@@ -1865,6 +1916,23 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
       });
     });
+    contParejas.querySelectorAll(".btnToggleDispPareja").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = contParejas.querySelector(`[data-disp-pareja="${btn.dataset.p}"]`);
+        if (!panel) return;
+        const abrir = panel.style.display === "none";
+        panel.style.display = abrir ? "block" : "none";
+        if (abrir && !panel.dataset.cargado) {
+          panel.dataset.cargado = "1";
+          const pareja = parejasBase.find((x) => x.id === btn.dataset.p);
+          if (pareja) {
+            cargarDispAdminForm(`admDispForm-${pareja.id}-${pareja.jugador1_id}`, pareja.jugador1_id);
+            cargarDispAdminForm(`admDispForm-${pareja.id}-${pareja.jugador2_id}`, pareja.jugador2_id);
+          }
+        }
+      });
+    });
+    wireGuardarDispAdmin(contParejas);
     contParejas.querySelectorAll(".btnCambiarJugadorPareja").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (btn.disabled) return;
@@ -1916,6 +1984,19 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         }
       });
     });
+    contSinPareja.querySelectorAll(".btnToggleDispSuelto").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = contSinPareja.querySelector(`[data-disp-suelto="${btn.dataset.jugador}"]`);
+        if (!panel) return;
+        const abrir = panel.style.display === "none";
+        panel.style.display = abrir ? "block" : "none";
+        if (abrir && !panel.dataset.cargado) {
+          panel.dataset.cargado = "1";
+          cargarDispAdminForm(`admDispForm-suelto-${btn.dataset.jugador}`, btn.dataset.jugador);
+        }
+      });
+    });
+    wireGuardarDispAdmin(contSinPareja);
     wireTogglesPago(contSinPareja);
   }
 }
