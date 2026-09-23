@@ -362,19 +362,25 @@ tr:first-child td { font-weight: 700; }
   position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  min-height: 190px;
+  min-height: 300px;
   margin-bottom: 16px;
   background:
     linear-gradient(200deg, rgba(var(--accent-rgb),.07), transparent 45%),
     linear-gradient(0deg, rgba(var(--bg-rgb),.96), rgba(var(--bg-rgb),.3) 70%),
-    url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
+    url('foto-cancha.jpg') center 15%/cover no-repeat, var(--bg);
   box-shadow: var(--shadow);
   display: flex; align-items: flex-end;
   padding: 22px;
 }
 .torneo-hero-overlay { position: relative; z-index: 1; }
 .torneo-hero-overlay .badge { margin-bottom: 10px; }
-.torneo-hero-overlay h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+.torneo-hero-overlay h2 { margin: 0; font-size: 44px; line-height: .9; font-style: italic; }
+.torneo-hero-meta {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0;
+  font-size: 13.5px; font-weight: 600; color: #d5dade;
+}
+.torneo-hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.torneo-hero-meta .meta-ico { color: var(--accent-bright); }
 /* ícono chico para "Administrar este torneo" (solo admin) — reemplaza el
    botón grande de antes para no ocupar lugar en la pantalla que ahora ve
    todo el mundo apenas entra al torneo. */
@@ -387,14 +393,24 @@ tr:first-child td { font-weight: 700; }
 }
 body.is-admin .hero-icon-btn.admin-only { display: flex; }
 @media (min-width: 960px) {
-  .torneo-hero { min-height: 260px; padding: 38px; }
-  .torneo-hero-overlay h2 { font-size: 34px; }
+  /* versión apaisada de la misma foto (foto-cancha-ancha.jpg: la jugadora a
+     la derecha, fundida a negro a la izquierda) -- con la foto vertical en una
+     franja tan ancha, el título caía justo encima de la cara */
+  .torneo-hero {
+    min-height: 380px; padding: 44px;
+    background:
+      linear-gradient(0deg, rgba(var(--bg-rgb),.8), transparent 40%),
+      url('foto-cancha-ancha.jpg') right center/cover no-repeat, var(--bg);
+  }
+  .torneo-hero-overlay h2 { font-size: 72px; }
+  .torneo-hero-meta { font-size: 15px; }
 }
 
 /* ---------- Hero Inicio ---------- */
-/* Hero = portada del circuito: la foto de juego más potente (jugador en
-   acción, hero-torneos.jpg), alto casi de pantalla en celular y el texto
-   apoyado abajo, como la tapa de una transmisión deportiva. */
+/* Hero = portada del circuito: foto real de un torneo propio (jugador en
+   acción, foto-portada-movil.jpg; en escritorio foto-portada.jpg, apaisada),
+   alto casi de pantalla en celular y el texto apoyado abajo, como la tapa
+   de una transmisión deportiva. */
 .hero-club {
   position: relative;
   overflow: hidden;
@@ -405,7 +421,7 @@ body.is-admin .hero-icon-btn.admin-only { display: flex; }
   display: flex; flex-direction: column; justify-content: flex-end;
   background:
     linear-gradient(0deg, rgba(var(--bg-rgb),.97) 8%, rgba(var(--bg-rgb),.55) 55%, rgba(var(--bg-rgb),.15)),
-    url('hero-torneos.jpg') 35% 30%/cover no-repeat,
+    url('foto-portada-movil.jpg') center 22%/cover no-repeat,
     var(--bg);
   box-shadow: var(--shadow);
 }
@@ -952,8 +968,31 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
    Calendario, Resultados, Inscripción, Mi inscripción, Mi disponibilidad) ---------- */
 #torneoContextBar { margin-bottom: 16px; }
 .torneo-context-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.torneo-context-top h2 { margin: 0; flex: 1; min-width: 140px; }
-#torneoSubnav.pill-row { margin-top: 10px; }
+.torneo-context-top h2 { margin: 0; flex: 1; min-width: 140px; font-style: italic; }
+/* "← Torneos": acción de navegación, no un botón más -- va como texto */
+#btnVolverTorneos {
+  background: none; border: none; padding: 6px 0; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
+}
+#btnVolverTorneos:hover { color: var(--text); }
+/* en la pantalla principal del torneo el nombre y el estado ya están en la
+   portada grande de abajo -- no se repiten en la barra */
+body:has(#view-torneo-resultados.active) .torneo-context-top h2,
+body:has(#view-torneo-resultados.active) #dtEstado { display: none; }
+#dtEstado { margin: 0; }
+/* Torneo / Fotos / Info: pestañas de transmisión (subrayado lima), no chips */
+#torneoSubnav.pill-row {
+  margin-top: 8px; gap: 22px; padding-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+#torneoSubnav .pill {
+  background: none; border: none; border-radius: 0;
+  padding: 10px 0 9px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted);
+}
+#torneoSubnav .pill:hover { color: var(--text); }
+#torneoSubnav .pill.active { background: none; color: var(--text); border-bottom-color: var(--accent); }
 
 /* ---------- Buscador de pareja ---------- */
 .suggest-list { position: relative; }
@@ -1183,7 +1222,7 @@ nav.tabbar .icon { position: relative; }
   background:
     linear-gradient(200deg, rgba(var(--accent-rgb),.07), transparent 45%),
     linear-gradient(180deg, rgba(var(--bg-rgb),.88), rgba(var(--bg-rgb),.96) 45%),
-    url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
+    url('foto-cancha.jpg') center/cover no-repeat, var(--bg);
 }
 
 .torneo-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -1502,7 +1541,7 @@ body.is-admin #btnAdminPanel { display: flex; }
     backdrop-filter: blur(16px) saturate(1.1);
     -webkit-backdrop-filter: blur(16px) saturate(1.1);
   }
-  header.topbar { padding: 16px 32px; border-bottom: none; }
+  header.topbar { position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h); padding: 0 32px; border-bottom: none; }
   header.topbar h1 { font-size: 23px; }
 
   /* de sidebar izquierdo a franja horizontal fija, apilada debajo de header.topbar
@@ -1533,7 +1572,13 @@ body.is-admin #btnAdminPanel { display: flex; }
   }
   main { padding: 0; max-width: none; margin: 0; }
 
-  .hero-club { padding: 56px 56px 52px; min-height: 480px; background-position: center, 50% 35%, center; }
+  .hero-club {
+    padding: 56px 56px 52px; min-height: 480px;
+    background:
+      linear-gradient(0deg, rgba(var(--bg-rgb),.85) 4%, transparent 45%),
+      linear-gradient(90deg, var(--bg) 30%, rgba(var(--bg-rgb),0) 62%),
+      url('foto-portada.jpg') right 18%/auto 140% no-repeat, var(--bg);
+  }
   .hero-club-titulo { font-size: clamp(72px, 7vw, 108px); max-width: 70%; }
   .hero-club-sub { font-size: 16px; max-width: 42ch; }
 
@@ -1544,12 +1589,12 @@ body.is-admin #btnAdminPanel { display: flex; }
   .hero-club-torneo {
     background:
       linear-gradient(0deg, rgba(var(--bg-rgb),.97) 8%, rgba(var(--bg-rgb),.5) 60%, rgba(var(--bg-rgb),.2)),
-      url('hero-cancha.jpg') center/cover no-repeat, var(--bg);
+      url('foto-torneos.jpg') center 30%/cover no-repeat, var(--bg);
   }
   .hero-club-ranking {
     background:
       linear-gradient(0deg, rgba(var(--bg-rgb),.97) 8%, rgba(var(--bg-rgb),.5) 60%, rgba(var(--bg-rgb),.2)),
-      url('hero-ranking.jpg') center/cover no-repeat, var(--bg);
+      url('foto-ranking.jpg') center 45%/cover no-repeat, var(--bg);
   }
 
   /* "Próximo partido destacado" en escritorio: mismo carrusel de siempre

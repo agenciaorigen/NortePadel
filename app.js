@@ -1024,11 +1024,7 @@ async function cargarInicio() {
   // estado. Toda la tarjeta sigue abriendo el torneo, igual que antes (desde
   // ahí se ve la inscripción si está abierta) -- el botón es solo la señal
   // visible de esa misma acción, no un camino nuevo.
-  const fechaEvento = (f) => f ? new Date(f + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") : "";
-  const fechasTxt = primero.fecha_fin && primero.fecha_fin !== primero.fecha_inicio
-    ? `${fechaEvento(primero.fecha_inicio)} al ${fechaEvento(primero.fecha_fin)}`
-    : fechaEvento(primero.fecha_inicio);
-  const fechas = fechasTxt.charAt(0).toUpperCase() + fechasTxt.slice(1);
+  const fechas = rangoFechasTorneo(primero);
   const categoriasEvento = (primero.torneo_categorias || []).map((c) => c.categoria)
     .sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   destacado.innerHTML = `
@@ -2478,6 +2474,15 @@ function estaEnVivo(t) {
   return t.fecha_inicio <= hoy && (t.fecha_fin || t.fecha_inicio) >= hoy;
 }
 
+// "Jue 8 oct al dom 11 oct" -- fechas de un torneo en lenguaje de evento, en
+// vez de las fechas ISO crudas (2026-10-08). Lo usan la tarjeta del próximo
+// torneo (Inicio) y la portada/Info de cada torneo.
+function rangoFechasTorneo(t) {
+  const f = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") : "";
+  const txt = t.fecha_fin && t.fecha_fin !== t.fecha_inicio ? `${f(t.fecha_inicio)} al ${f(t.fecha_fin)}` : f(t.fecha_inicio);
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
 function badgeEstadoTorneo(t) {
   if (estaEnVivo(t)) return `<span class="badge live"><span class="live-dot"></span>EN VIVO</span>`;
   if (t.estado === "inscripcion") return `<span class="badge solid">Inscripción abierta</span>`;
@@ -3341,9 +3346,12 @@ async function refrescarDetalleTorneo() {
   // del rediseño): mismo dato, solo se muestra también acá en grande.
   document.getElementById("dtNombreHero").textContent = t.nombre;
   document.getElementById("dtEstadoHero").innerHTML = badgeEstadoTorneo(t);
+  document.getElementById("dtMetaHero").innerHTML =
+    `<span>${iconoCalendarioChico()} ${rangoFechasTorneo(t)}</span>` +
+    (t.complejos?.nombre ? `<span>${iconoPin()} ${escapeHtml(t.complejos.nombre)}</span>` : "");
   categoriasTorneoActual = (t.torneo_categorias || []).map((c) => c.categoria);
   const categorias = categoriasTorneoActual.join(", ") || "todas las categorías";
-  document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${t.fecha_inicio} a ${t.fecha_fin}`;
+  document.getElementById("dtInfo").textContent = `${t.complejos?.nombre || "sin complejo"} · ${categorias} · ${rangoFechasTorneo(t)}`;
 
   // una vez que se cerró la inscripción (etapa "inscripcion_cerrada" en
   // adelante: en_curso, finalizado) coordinar el pago o anotarse ya no tiene
@@ -3354,7 +3362,7 @@ async function refrescarDetalleTorneo() {
   const contCosto = document.getElementById("dtCosto");
   if (t.costo && Number(t.costo) > 0 && !inscripcionYaCerrada) {
     contCosto.style.display = "block";
-    contCosto.innerHTML = `<span class="badge solid">Costo: $${t.costo}</span>` +
+    contCosto.innerHTML = `<span class="badge solid">Costo: $${Number(t.costo).toLocaleString("es-AR")}</span>` +
       (configApp.whatsapp_numero ? botonWhatsappPagoHtml("btnPagarWhatsapp", "margin-left:8px") : "");
     wirearBotonWhatsappPago("btnPagarWhatsapp", t);
   } else {

@@ -346,7 +346,7 @@
        sin volver atrás cada vez. -->
   <div id="torneoContextBar" style="display:none">
     <div class="torneo-context-top">
-      <button class="secondary small" id="btnVolverTorneos">← Volver a torneos</button>
+      <button class="secondary small" id="btnVolverTorneos" aria-label="Volver a torneos"><span aria-hidden="true">←</span> Torneos</button>
       <h2 id="dtNombre"></h2>
       <p id="dtEstado"></p>
     </div>
@@ -365,6 +365,7 @@
       <div class="torneo-hero-overlay">
         <p id="dtEstadoHero"></p>
         <h2 id="dtNombreHero"></h2>
+        <p class="torneo-hero-meta" id="dtMetaHero"></p>
       </div>
     </div>
     <div class="card card-glow" id="dtInscripcionCard">

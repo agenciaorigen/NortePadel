@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v126";
+const CACHE = "norte-padel-v127";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -10,12 +10,14 @@ const APP_SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./icon-512-maskable.png",
-  "./hero-cancha.jpg",
+  "./foto-portada-movil.jpg",
+  "./foto-portada.jpg",
+  "./foto-cancha.jpg",
   "./brasil-tour.jpg",
   "./destacados-fondo.jpg",
   "./pelotas.jpg",
-  "./hero-torneos.jpg",
-  "./hero-ranking.jpg"
+  "./foto-torneos.jpg",
+  "./foto-ranking.jpg"
 ];
 
 self.addEventListener("install", (event) => {
