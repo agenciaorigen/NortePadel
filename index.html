@@ -93,8 +93,9 @@
        Próximo torneo -> Ranking -> Resultados -> Próximos partidos ->
        Noticias -> Partners -> Footer. Son los MISMOS bloques de siempre (mismos
        ids, mismo JS), solo reordenados y agrupados bajo un título de sección.
-       "Tus partidos" (solo con sesión iniciada) queda arriba, pero es lo único
-       personal de esta pantalla: un visitante ve exactamente el orden de arriba. -->
+       Inicio es el circuito PÚBLICO: "Tus partidos" (lo personal del jugador)
+       vive en Mi Perfil (#view-perfil) -- lo único propio que queda acá es el
+       chip "Tu posición" del hero. -->
   <section id="view-inicio" class="view active">
 
     <div class="hero-carousel" id="heroCarousel">
@@ -136,15 +137,6 @@
         <span>NORTE PADEL</span><span class="marquee-dot">•</span><span>RANKING EN VIVO</span><span class="marquee-dot">•</span><span>INSCRIBITE YA</span><span class="marquee-dot">•</span>
       </div>
     </button>
-
-    <div class="seccion" id="inicioMisPartidosWrap" style="display:none">
-      <div id="inicioMiProximoWrap" style="display:none">
-        <h3>Tu próximo partido</h3>
-        <div class="inicio-partidos-grid" id="inicioMiProximoGrid"></div>
-      </div>
-      <h3>Tus últimos partidos</h3>
-      <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
-    </div>
 
     <section class="seccion seccion-torneo" aria-labelledby="tituloProximoTorneo">
       <div class="seccion-head">
@@ -515,7 +507,7 @@
   <!-- PERFIL PÚBLICO DE UN JUGADOR (se abre desde ranking / campeones / jugador del mes) -->
   <section id="view-perfil-jugador" class="view">
     <div class="card">
-      <button class="secondary small" id="btnVolverPerfilJugador">← Volver</button>
+      <button class="secondary small" id="btnVolverPerfilJugador"><span aria-hidden="true">←</span> Volver</button>
       <div class="pj-header">
         <div id="pjFoto"></div>
         <div>
@@ -552,8 +544,10 @@
 
   <!-- MI PERFIL (login / registro / edición) -->
   <section id="view-perfil" class="view">
+    <p class="perfil-eyebrow">Mi Norte Padel · Área del jugador</p>
     <div class="card card-glow" id="authCard">
       <h2 id="authTitulo">Ingresar</h2>
+      <p class="match-meta perfil-auth-sub">Tus partidos, tu posición en el ranking y tus datos de jugador, en un solo lugar.</p>
       <label for="authEmail">Email</label>
       <input id="authEmail" type="email" autocomplete="email" />
       <label for="authPassword">Contraseña</label>
@@ -601,12 +595,45 @@
       <button class="primary" id="btnGuardarPerfil">Guardar perfil</button>
     </div>
 
-    <div class="card" id="miPerfilCard" style="display:none">
-      <h2>Mi perfil</h2>
-      <p class="match-meta" id="miPerfilResumen"></p>
-      <button class="secondary" id="btnVerMiPerfilPublico" style="width:100%;margin-top:12px">Ver mis estadísticas</button>
-      <button class="secondary small" id="btnEditarPerfil" style="margin-top:10px">Editar mis datos y horarios</button>
-      <button class="secondary small danger" id="btnLogout" style="margin-top:10px">Cerrar sesión</button>
+    <!-- Mi perfil: "ficha de jugador" (foto, nombre, categoría, posición y
+         puntos) + accesos + sus partidos. Todo lo privado del jugador vive
+         acá; Inicio queda para el circuito público. -->
+    <div id="miPerfilCard" style="display:none">
+      <div class="card ficha-jugador">
+        <div class="ficha-jugador-top">
+          <div id="miPerfilFoto"></div>
+          <div class="ficha-jugador-id">
+            <h2 id="miPerfilNombre"></h2>
+            <p class="match-meta" id="miPerfilResumen"></p>
+          </div>
+        </div>
+        <div class="pj-stats ficha-jugador-stats">
+          <div><strong id="miPerfilPosicion">—</strong><span>Posición</span></div>
+          <div><strong id="miPerfilPuntos">—</strong><span>Puntos</span></div>
+          <div><strong id="miPerfilLado">—</strong><span>Lado</span></div>
+        </div>
+        <div class="ficha-jugador-acciones">
+          <button class="secondary" id="btnVerMiPerfilPublico">Ver mis estadísticas</button>
+          <button class="secondary" id="btnMiPerfilRanking">Ver ranking</button>
+        </div>
+      </div>
+
+      <div class="seccion" id="inicioMisPartidosWrap" style="display:none">
+        <div id="inicioMiProximoWrap" style="display:none">
+          <h3>Tu próximo partido</h3>
+          <div class="inicio-partidos-grid" id="inicioMiProximoGrid"></div>
+        </div>
+        <h3>Tus últimos partidos</h3>
+        <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
+      </div>
+
+      <div class="card perfil-cuenta">
+        <h3>Cuenta</h3>
+        <div class="perfil-cuenta-acciones">
+          <button class="secondary small" id="btnEditarPerfil">Editar mis datos y horarios</button>
+          <button class="secondary small danger" id="btnLogout">Cerrar sesión</button>
+        </div>
+      </div>
     </div>
   </section>
 

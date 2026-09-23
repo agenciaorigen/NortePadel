@@ -324,7 +324,7 @@ tr:first-child td { font-weight: 700; }
 /* ---------- Perfil público de jugador ---------- */
 .pj-header { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
 .pj-header .avatar { border: 2px solid rgba(245,245,245,.4); font-size: 34px; }
-.pj-header h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -.01em; line-height: 1.1; }
+.pj-header h2 { margin: 0 0 8px; font-size: 34px; font-weight: 800; font-style: italic; letter-spacing: 0; line-height: .92; }
 .pj-trofeos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pj-medalla {
   font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
@@ -970,11 +970,11 @@ header.topbar #perfilNombreCorto { max-width: 70px; overflow: hidden; text-overf
 .torneo-context-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .torneo-context-top h2 { margin: 0; flex: 1; min-width: 140px; font-style: italic; }
 /* "← Torneos": acción de navegación, no un botón más -- va como texto */
-#btnVolverTorneos {
+#btnVolverTorneos, #btnVolverPerfilJugador {
   background: none; border: none; padding: 6px 0; color: var(--muted);
   text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
 }
-#btnVolverTorneos:hover { color: var(--text); }
+#btnVolverTorneos:hover, #btnVolverPerfilJugador:hover { color: var(--text); }
 /* en la pantalla principal del torneo el nombre y el estado ya están en la
    portada grande de abajo -- no se repiten en la barra */
 body:has(#view-torneo-resultados.active) .torneo-context-top h2,
@@ -1512,6 +1512,35 @@ body.is-admin #btnAdminPanel { display: flex; }
   .evento-info { padding: 32px 36px; justify-content: center; }
   .evento-nombre { font-size: 52px; }
 }
+
+/* ============================================================
+   MI PERFIL: área privada del jugador. Se separa del circuito público
+   con su propio encabezado ("Mi Norte Padel · Área del jugador") y una
+   ficha de jugador arriba de todo.
+   ============================================================ */
+.perfil-eyebrow {
+  margin: 0 0 12px; font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  text-transform: uppercase; letter-spacing: .18em; color: var(--accent-bright);
+}
+.perfil-auth-sub { margin: -6px 0 6px; font-size: 13.5px; line-height: 1.45; }
+.ficha-jugador {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(var(--accent-rgb),.10), transparent 60%),
+    var(--card);
+}
+.ficha-jugador-top { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.ficha-jugador-top .avatar { border: 2px solid var(--accent); }
+.ficha-jugador-id { min-width: 0; }
+.ficha-jugador-id h2 { margin: 0 0 6px; font-size: 34px; font-style: italic; line-height: .92; }
+.ficha-jugador-id .match-meta { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.ficha-jugador-stats {
+  grid-template-columns: repeat(3, 1fr); gap: 12px;
+  padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.ficha-jugador-stats > div:first-child strong { color: var(--accent-bright); }
+.ficha-jugador-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.ficha-jugador-acciones button { width: 100%; }
+.perfil-cuenta-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* ============================================================
    ESCRITORIO: nav horizontal arriba + una sola columna de contenido

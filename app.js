@@ -296,6 +296,7 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
   cambiarVista("inicio");
 });
 
+document.getElementById("btnMiPerfilRanking").addEventListener("click", () => cambiarVista("ranking"));
 document.getElementById("btnEditarPerfil").addEventListener("click", () => {
   editandoPerfil = true;
   renderVistaPerfil();
@@ -462,8 +463,12 @@ function renderVistaPerfil() {
     completarCard.style.display = "none";
     miCard.style.display = "block";
     const pendiente = miJugador.categoria_pendiente ? ` (pendiente: ${miJugador.categoria_pendiente})` : "";
-    document.getElementById("miPerfilResumen").textContent =
-      `${miJugador.nombre} ${miJugador.apellido} · Categoría ${miJugador.categoria}${pendiente} · ${miJugador.puntos_ranking} pts`;
+    document.getElementById("miPerfilFoto").innerHTML = avatarHtml(miJugador.foto_url, 76, "", true);
+    document.getElementById("miPerfilNombre").textContent = `${miJugador.nombre} ${miJugador.apellido}`;
+    document.getElementById("miPerfilResumen").textContent = `Categoría ${miJugador.categoria}${pendiente}`;
+    document.getElementById("miPerfilPuntos").textContent = miJugador.puntos_ranking ?? 0;
+    document.getElementById("miPerfilLado").textContent =
+      { drive: "Drive", reves: "Revés" }[miJugador.lado_preferido] || "Indistinto";
   }
 }
 renderDisponibilidadForm();
@@ -1294,6 +1299,8 @@ async function cargarEnVivo() {
 
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
+  const posPerfil = document.getElementById("miPerfilPosicion"); // misma posición, en la ficha de Mi Perfil
+  posPerfil.textContent = "—";
   if (!miJugador) { card.style.display = "none"; return; }
   const { data } = await sb.rpc("ranking_categoria_publico");
   const delGrupo = (data || []).filter((j) => j.categoria === miJugador.categoria)
@@ -1301,6 +1308,7 @@ async function cargarHeroPosicion() {
   const pos = delGrupo.findIndex((j) => j.id === miJugador.id);
   if (pos === -1) { card.style.display = "none"; return; }
   document.getElementById("heroPosicionValor").textContent = `#${pos + 1}`;
+  posPerfil.textContent = `#${pos + 1}`;
   document.getElementById("heroPosicionSub").textContent = miJugador.categoria;
   card.style.display = "flex";
 }
