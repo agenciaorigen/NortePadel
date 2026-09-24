@@ -6854,6 +6854,13 @@ function renderEventosAdmin() {
   cont.innerHTML = cacheEventos.length ? cacheEventos.map((e) => `
     <details class="ajuste-bloque" data-evento-admin="${e.id}"${e.id === abierto ? " open" : ""}>
       <summary><span><strong>${escapeHtml(e.titulo)}</strong><br /><small class="match-meta">${fechaEvento(e.fecha) || "Sin fecha"} · ${plural(e.evento_fotos.length, "foto")}</small></span></summary>
+      <label for="admEvTitulo-${e.id}">Nombre</label>
+      <input id="admEvTitulo-${e.id}" maxlength="120" value="${escapeHtml(e.titulo)}" />
+      <label for="admEvFecha-${e.id}">Fecha</label>
+      <input id="admEvFecha-${e.id}" type="date" value="${e.fecha || ""}" />
+      <label for="admEvDescripcion-${e.id}">Descripción (opcional)</label>
+      <textarea id="admEvDescripcion-${e.id}" rows="3" maxlength="2000">${escapeHtml(e.descripcion || "")}</textarea>
+      <button type="button" class="secondary small" data-guardar-evento="${e.id}" style="margin:8px 0 18px">Guardar cambios</button>
       <label for="admEvArchivos-${e.id}">Agregar fotos</label>
       <input id="admEvArchivos-${e.id}" type="file" accept="image/*" multiple />
       <button type="button" class="secondary small" data-subir-fotos-evento="${e.id}" style="margin-top:8px">Subir fotos</button>
@@ -6885,12 +6892,23 @@ document.getElementById("btnCrearEvento").addEventListener("click", async () => 
 });
 
 document.getElementById("listaEventosAdmin").addEventListener("click", async (e) => {
-  const btn = e.target.closest("[data-subir-fotos-evento], [data-quitar-foto-evento], [data-borrar-evento]");
+  const btn = e.target.closest("[data-guardar-evento], [data-subir-fotos-evento], [data-quitar-foto-evento], [data-borrar-evento]");
   if (!btn || btn.disabled) return;
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   try {
-    if (btn.dataset.subirFotosEvento) {
+    if (btn.dataset.guardarEvento) {
+      const id = btn.dataset.guardarEvento;
+      const titulo = document.getElementById(`admEvTitulo-${id}`).value.trim();
+      if (!titulo) { toast("El evento necesita un nombre"); return; }
+      const { error } = await sb.from("eventos").update({
+        titulo,
+        fecha: document.getElementById(`admEvFecha-${id}`).value || null,
+        descripcion: document.getElementById(`admEvDescripcion-${id}`).value.trim() || null
+      }).eq("id", id);
+      if (error) { toast("Error: " + error.message); return; }
+      toast("Evento guardado");
+    } else if (btn.dataset.subirFotosEvento) {
       const id = btn.dataset.subirFotosEvento;
       const archivos = Array.from(document.getElementById(`admEvArchivos-${id}`).files || []);
       if (!archivos.length) { toast("Elegí una o más fotos"); return; }
