@@ -158,6 +158,7 @@ async function despacharRuta() {
     }
     if (raiz === "torneo" && a) { await abrirTorneo(a, sub); return; }
     if (raiz === "perfil-jugador" && a) { await abrirPerfilJugador(a); return; }
+    if (raiz === "evento" && a) { await abrirEvento(a); return; }
     cambiarVista("inicio");
   } finally {
     syncingDesdeHash = false;
@@ -3823,6 +3824,7 @@ const SECCIONES_CONFIG_GENERAL = {
   complejos: { id: "admCfgComplejos", label: "Sedes y canchas", grupo: "club" },
   categorias: { id: "admCfgCategorias", label: "Categorías", grupo: "club" },
   etiquetas: { id: "admCfgEtiquetas", label: "Etiquetas", grupo: "club" },
+  eventos: { id: "admCfgEventos", label: "Eventos", grupo: "contenido" },
   noticias: { id: "admCfgNoticias", label: "Noticias", grupo: "contenido" },
   auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes", grupo: "contenido" },
   jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes", grupo: "contenido" },
@@ -6644,8 +6646,8 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 // "fotos-torneos" es privado y cada foto se muestra con un link firmado que
 // vence en una hora. torneo_fotos.url guarda la dirección de siempre; de ahí
 // sale la ruta del archivo dentro del bucket.
-function rutaFotoTorneo(url) {
-  const marca = "/fotos-torneos/";
+function rutaFotoTorneo(url, bucket = "fotos-torneos") {
+  const marca = `/${bucket}/`;
   const i = String(url || "").indexOf(marca);
   return i === -1 ? "" : decodeURIComponent(String(url).slice(i + marca.length).split("?")[0]);
 }
@@ -6772,6 +6774,152 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
     input.value = "";
     cargarFotosTorneoAdmin();
     if (torneoActualId === torneoGestionId) cargarFotosTorneo();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+// ============================================================
+// EVENTOS (inauguraciones, viajes... lo que no es un torneo). Las fotos son
+// públicas: el más reciente con fotos se muestra en Inicio como tira
+// deslizable y cada evento tiene su galería completa en #/evento/:id.
+// ============================================================
+let cacheEventos = [];
+const fechaEvento = (f) => f ? new Date(f + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "";
+function fotoEventoHtml(f, admin) {
+  const url = urlSegura(f.url);
+  if (!url) return "";
+  const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-quitar-foto-evento="${f.id}" data-url="${url}" aria-label="Borrar esta foto">✕</button>` : "";
+  return `<div class="foto-item"><img src="${url}" alt="Foto del evento" loading="lazy" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />${borrar}</div>`;
+}
+function eventoCardHtml(e) {
+  const portada = urlSegura(e.evento_fotos?.[0]?.url);
+  return `<button type="button" class="evento-card" data-evento="${e.id}">${portada ? `<img src="${portada}" alt="" loading="lazy" />` : ""}<span><strong>${escapeHtml(e.titulo)}</strong><small>${fechaEvento(e.fecha)}</small></span></button>`;
+}
+const plural = (n, palabra) => `${n} ${palabra}${n === 1 ? "" : "s"}`;
+
+async function cargarEventos() {
+  const { data } = await sb.from("eventos").select("id, titulo, fecha, descripcion, evento_fotos(id, url, created_at)")
+    .order("fecha", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false })
+    .order("created_at", { referencedTable: "evento_fotos" });
+  cacheEventos = data || [];
+  const conFotos = cacheEventos.filter((e) => e.evento_fotos?.length);
+  document.getElementById("inicioEventos").hidden = !conFotos.length;
+  if (conFotos.length) {
+    const [ultimo, ...otros] = conFotos;
+    document.getElementById("inicioEventoTitulo").innerHTML = `<strong>${escapeHtml(ultimo.titulo)}</strong>${fechaEvento(ultimo.fecha)}`;
+    document.getElementById("inicioEventoCarrusel").innerHTML = ultimo.evento_fotos.slice(0, 12).map((f) => fotoEventoHtml(f)).join("");
+    const btnVer = document.getElementById("btnInicioVerEvento");
+    btnVer.innerHTML = `Ver las ${plural(ultimo.evento_fotos.length, "foto")} <span aria-hidden="true">→</span>`;
+    btnVer.onclick = () => abrirEvento(ultimo.id);
+    document.getElementById("inicioEventosOtros").innerHTML = otros.map(eventoCardHtml).join("");
+  }
+  renderEventosAdmin();
+}
+
+async function abrirEvento(id) {
+  cambiarVista("evento", `/evento/${id}`);
+  window.scrollTo(0, 0);
+  const [{ data: ev }, { data: fotos }] = await Promise.all([
+    sb.from("eventos").select("titulo, fecha, descripcion").eq("id", id).maybeSingle(),
+    sb.from("evento_fotos").select("url").eq("evento_id", id).order("created_at")
+  ]);
+  if (!ev) { toast("Ese evento ya no está publicado"); cambiarVista("inicio"); return; }
+  document.getElementById("evTituloTxt").textContent = ev.titulo;
+  document.getElementById("evFechaTxt").textContent = fechaEvento(ev.fecha);
+  document.getElementById("evDescripcionTxt").textContent = ev.descripcion || "";
+  document.getElementById("evGaleria").innerHTML = (fotos || []).map((f) => fotoEventoHtml(f)).join("");
+  document.getElementById("evVacio").hidden = !!fotos?.length;
+  const otros = cacheEventos.filter((e) => e.id !== id && e.evento_fotos?.length);
+  document.getElementById("evOtros").innerHTML = otros.map(eventoCardHtml).join("");
+  document.getElementById("evOtrosWrap").hidden = !otros.length;
+}
+document.getElementById("btnVolverEvento").addEventListener("click", () => cambiarVista("inicio"));
+document.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-evento]");
+  if (card) abrirEvento(card.dataset.evento);
+});
+document.querySelectorAll(".evento-carrusel-nav").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const tira = document.getElementById("inicioEventoCarrusel");
+    tira.scrollBy({ left: Number(btn.dataset.mover) * tira.clientWidth * 0.8, behavior: "smooth" });
+  });
+});
+
+// ---------- Gestión › Contenido › Eventos ----------
+function renderEventosAdmin() {
+  const cont = document.getElementById("listaEventosAdmin");
+  const abierto = cont.querySelector("details[open]")?.dataset.eventoAdmin;
+  cont.innerHTML = cacheEventos.length ? cacheEventos.map((e) => `
+    <details class="ajuste-bloque" data-evento-admin="${e.id}"${e.id === abierto ? " open" : ""}>
+      <summary><span><strong>${escapeHtml(e.titulo)}</strong><br /><small class="match-meta">${fechaEvento(e.fecha) || "Sin fecha"} · ${plural(e.evento_fotos.length, "foto")}</small></span></summary>
+      <label for="admEvArchivos-${e.id}">Agregar fotos</label>
+      <input id="admEvArchivos-${e.id}" type="file" accept="image/*" multiple />
+      <button type="button" class="secondary small" data-subir-fotos-evento="${e.id}" style="margin-top:8px">Subir fotos</button>
+      <div class="fotos-galeria fotos-galeria-admin">${e.evento_fotos.map((f) => fotoEventoHtml(f, true)).join("")}</div>
+      <button type="button" class="secondary small danger" data-borrar-evento="${e.id}" style="margin-top:14px">Borrar evento</button>
+    </details>`).join("") : '<p class="empty">Todavía no creaste ningún evento.</p>';
+}
+
+document.getElementById("btnCrearEvento").addEventListener("click", async () => {
+  const btn = document.getElementById("btnCrearEvento");
+  if (btn.disabled) return;
+  const titulo = document.getElementById("admEvTitulo").value.trim();
+  if (!titulo) { toast("Poné el nombre del evento"); return; }
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.from("eventos").insert({
+      titulo,
+      fecha: document.getElementById("admEvFecha").value || null,
+      descripcion: document.getElementById("admEvDescripcion").value.trim() || null
+    }).select("id").single();
+    if (error) { toast("Error: " + error.message); return; }
+    ["admEvTitulo", "admEvFecha", "admEvDescripcion"].forEach((id) => { document.getElementById(id).value = ""; });
+    toast("Evento creado: ahora subile las fotos");
+    await cargarEventos();
+    document.querySelector(`[data-evento-admin="${data.id}"]`)?.setAttribute("open", "");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("listaEventosAdmin").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-subir-fotos-evento], [data-quitar-foto-evento], [data-borrar-evento]");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  try {
+    if (btn.dataset.subirFotosEvento) {
+      const id = btn.dataset.subirFotosEvento;
+      const archivos = Array.from(document.getElementById(`admEvArchivos-${id}`).files || []);
+      if (!archivos.length) { toast("Elegí una o más fotos"); return; }
+      for (let i = 0; i < archivos.length; i++) {
+        btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
+        const comprimida = await comprimirFoto(archivos[i]);
+        const path = `${id}/${Date.now()}-${archivos[i].name.replace(/\.[^.]+$/, "")}.jpg`;
+        const { error: upErr } = await sb.storage.from("fotos-eventos").upload(path, comprimida, { contentType: "image/jpeg" });
+        if (upErr) { toast("Error subiendo " + archivos[i].name + ": " + upErr.message); continue; }
+        const { data: pub } = sb.storage.from("fotos-eventos").getPublicUrl(path);
+        const { error } = await sb.from("evento_fotos").insert({ evento_id: id, url: pub.publicUrl });
+        if (error) toast("Error guardando " + archivos[i].name + ": " + error.message);
+      }
+      toast("Fotos subidas");
+    } else if (btn.dataset.quitarFotoEvento) {
+      const { error } = await sb.from("evento_fotos").delete().eq("id", btn.dataset.quitarFotoEvento);
+      if (error) { toast("Error: " + error.message); return; }
+      await sb.storage.from("fotos-eventos").remove([rutaFotoTorneo(btn.dataset.url, "fotos-eventos")]);
+      toast("Foto eliminada");
+    } else {
+      const ev = cacheEventos.find((x) => x.id === btn.dataset.borrarEvento);
+      if (!ev || !confirm(`¿Borrar "${ev.titulo}" y sus ${plural(ev.evento_fotos.length, "foto")}? No se puede deshacer.`)) return;
+      const { error } = await sb.from("eventos").delete().eq("id", ev.id);
+      if (error) { toast("Error: " + error.message); return; }
+      const rutas = ev.evento_fotos.map((f) => rutaFotoTorneo(f.url, "fotos-eventos")).filter(Boolean);
+      if (rutas.length) await sb.storage.from("fotos-eventos").remove(rutas);
+      toast("Evento borrado");
+    }
+    await cargarEventos();
   } finally {
     btn.disabled = false;
     btn.textContent = textoOriginal;
@@ -6944,7 +7092,7 @@ document.getElementById("notifOverlay").addEventListener("click", (e) => {
 // flechas, ←/→, deslizar con el dedo, contador y "Pedir original".
 let galeriaFotos = [], galeriaPos = 0, fotoGrandeOrigen = null;
 function abrirFotoGrande(el) {
-  const galeria = el.closest(".fotos-galeria");
+  const galeria = el.closest(".fotos-galeria, [data-galeria]");
   galeriaFotos = galeria ? [...galeria.querySelectorAll("[data-foto-grande]")] : [];
   galeriaPos = galeriaFotos.indexOf(el);
   fotoGrandeOrigen = el;
@@ -7112,7 +7260,8 @@ async function init() {
     cargarSponsors(),
     cargarRanking(),
     cargarConfig(),
-    cargarNoticias()
+    cargarNoticias(),
+    cargarEventos()
   ]);
   // después del bloque de arriba, no adentro: necesita que cargarConfig() ya haya
   // llenado configApp (el link de YouTube vive ahí) antes de leerlo

@@ -154,6 +154,23 @@
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </section>
 
+    <!-- EVENTOS: lo que no es un torneo (inauguraciones, viajes...). Muestra
+         el más reciente con fotos como tira deslizable; cada foto se abre en
+         el visor y "Ver las N fotos" lleva a la galería completa. -->
+    <section class="bloque-inicio" id="inicioEventos" aria-labelledby="tituloEventos" hidden>
+      <div class="seccion-head">
+        <h2 id="tituloEventos">Eventos</h2>
+        <button type="button" class="link-mas" id="btnInicioVerEvento">Ver todas las fotos <span aria-hidden="true">→</span></button>
+      </div>
+      <p class="evento-inicio-titulo" id="inicioEventoTitulo"></p>
+      <div class="evento-carrusel-wrap">
+        <button type="button" class="fotogrande-nav evento-carrusel-nav" data-mover="-1" aria-label="Fotos anteriores">‹</button>
+        <div class="evento-carrusel" id="inicioEventoCarrusel" data-galeria></div>
+        <button type="button" class="fotogrande-nav evento-carrusel-nav" data-mover="1" aria-label="Fotos siguientes">›</button>
+      </div>
+      <div class="eventos-otros" id="inicioEventosOtros"></div>
+    </section>
+
     <section class="bloque-inicio" aria-labelledby="tituloRanking">
       <div class="seccion-head">
         <h2 id="tituloRanking">Ranking</h2>
@@ -462,6 +479,23 @@
         <h3>Próximos partidos</h3>
         <div class="inicio-partidos-grid" id="enVivoProximosGrid"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- EVENTO: galería completa de un evento especial -->
+  <section id="view-evento" class="view">
+    <div class="card">
+      <button type="button" class="secondary small" id="btnVolverEvento"><span aria-hidden="true">←</span> Inicio</button>
+      <p class="match-meta" id="evFechaTxt" style="margin-top:14px"></p>
+      <h2 id="evTituloTxt"></h2>
+      <p class="evento-descripcion" id="evDescripcionTxt"></p>
+      <div id="evGaleria" class="fotos-galeria"></div>
+      <p class="empty" id="evVacio" hidden>Todavía no hay fotos de este evento.</p>
+      <p class="match-meta fotos-aviso">¿Aparecés en una foto y preferís que no esté publicada? Escribinos por WhatsApp y la sacamos. Más info en <a href="privacidad.html#imagenes" target="_blank" rel="noopener">Privacidad</a>.</p>
+    </div>
+    <div id="evOtrosWrap" hidden>
+      <h3 class="eventos-otros-titulo">Otros eventos</h3>
+      <div class="eventos-otros" id="evOtros"></div>
     </div>
   </section>
 
@@ -1114,6 +1148,19 @@
     </div>
 
     <div id="admConfigGeneralWrap2">
+    <div class="card card-accent" id="admCfgEventos">
+      <h2>Eventos</h2>
+      <p class="match-meta" style="margin-bottom:6px">Inauguraciones, viajes, fiestas: todo lo que no es un torneo. El evento más reciente con fotos aparece en Inicio. Sus fotos son públicas (no hace falta iniciar sesión).</p>
+      <label for="admEvTitulo">Nombre</label>
+      <input id="admEvTitulo" maxlength="120" placeholder="Ej: Inauguración de Flaco Padel" />
+      <label for="admEvFecha">Fecha</label>
+      <input id="admEvFecha" type="date" />
+      <label for="admEvDescripcion">Descripción (opcional)</label>
+      <textarea id="admEvDescripcion" rows="3" maxlength="2000" placeholder="Contá de qué se trató..."></textarea>
+      <button type="button" class="secondary small" id="btnCrearEvento" style="margin-top:12px">Crear evento</button>
+      <div id="listaEventosAdmin" style="margin-top:16px"></div>
+    </div>
+
     <div class="card card-accent" id="admCfgNoticias">
       <h2>Noticias</h2>
       <p class="match-meta" style="margin-bottom:6px">Aparecen en Inicio, más recientes primero. Si además cargaste tu Instagram en Contenido › Contacto y redes, el botón para seguirlos aparece ahí mismo.</p>
