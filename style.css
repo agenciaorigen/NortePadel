@@ -1391,7 +1391,12 @@ body.is-admin #btnAdminPanel { display: flex; }
   background: rgba(var(--bg-rgb),.6); color: var(--text); border: 1px solid var(--border); cursor: pointer;
 }
 .fotogrande-nav:hover, .fotogrande-nav:focus-visible { border-color: var(--accent); color: var(--accent); }
-.fotogrande-nav[hidden], #fotoGrandePedir[hidden] { display: none; }
+button[hidden] { display: none !important; }
+/* Mi inscripción: una fila por categoría, cada una con su estado */
+.mi-insc-cat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); color: var(--text); }
+.mi-insc-cat:first-child { border-top: none; }
+.mi-insc-cat small { flex-basis: 100%; color: var(--muted); }
+#miInscBtnOtraCategoria { margin-top: 12px; }
 #fotoGrandePedir { width: auto; margin: 0; background: var(--accent); color: var(--accent-ink); text-transform: none; letter-spacing: 0; }
 .fotogrande-acciones > * { white-space: nowrap; }
 #fotoGrandeAnterior { left: max(12px, 2vw); }

@@ -14,6 +14,7 @@ let isAdmin = false;
 let editandoPerfil = false;
 let torneoActualId = null;
 let torneoActualData = null; // torneo completo cargado en refrescarDetalleTorneo, para prefill de "Editar torneo"
+let puedeSumarCategoria = false; // ya anotado pero quedan categorías del torneo en las que no juega
 let yaInscriptoEnTorneoActual = false; // lo setea actualizarAccesoInscripcion — evita volver a mostrar el wizard de inscripción si se llega por un link directo o "Atrás" del navegador estando ya anotado
 let categoriaRankingActual = localStorage.getItem("np_categoria_ranking") || null;
 let cacheComplejos = [];
@@ -1858,7 +1859,7 @@ function parejaRowHtml(p, editable, dispPorJugador) {
   const nombrePareja = `${escapeHtml(p.jugador1_nombre)} / ${escapeHtml(p.jugador2_nombre)}`;
   const dispResumenJ1 = editable ? dispResumenHtml(p.jugador1_nombre, dispPorJugador?.[p.jugador1_id]) : "";
   const dispResumenJ2 = editable ? dispResumenHtml(p.jugador2_nombre, dispPorJugador?.[p.jugador2_id]) : "";
-  // Pago (ver inscripciones.pago): independiente de "estado", que solo habla
+  // Pago (parejas.pago1/pago2 -- cada categoría se paga aparte): independiente de "estado", que solo habla
   // de la categoría/confirmación. Un admin puede tocar cada 💰 para marcar/
   // desmarcar el pago de ESE jugador, o el atajo de "los 2" cuando falta alguno.
   // El pago es información solo para el admin (no tiene sentido exponer
@@ -1867,17 +1868,17 @@ function parejaRowHtml(p, editable, dispPorJugador) {
   const pagoHtml = editable
     ? `<div class="pareja-pago-row">
         <span class="match-meta meta-caption">Pago:</span>
-        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador1_id}" data-pago="${p.jugador1_pago ? "1" : "0"}">${iconoCasilla(p.jugador1_pago)} ${escapeHtml((p.jugador1_nombre || "").split(" ")[0])}</button>
-        <button type="button" class="secondary small btnTogglePago" data-jugador="${p.jugador2_id}" data-pago="${p.jugador2_pago ? "1" : "0"}">${iconoCasilla(p.jugador2_pago)} ${escapeHtml((p.jugador2_nombre || "").split(" ")[0])}</button>
-        ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Marcar pago de los 2</button>` : ""}
+        <button type="button" class="secondary small btnTogglePago" data-pareja="${p.id}" data-slot="1" data-pago="${p.jugador1_pago ? "1" : "0"}">${iconoCasilla(p.jugador1_pago)} ${escapeHtml((p.jugador1_nombre || "").split(" ")[0])}</button>
+        <button type="button" class="secondary small btnTogglePago" data-pareja="${p.id}" data-slot="2" data-pago="${p.jugador2_pago ? "1" : "0"}">${iconoCasilla(p.jugador2_pago)} ${escapeHtml((p.jugador2_nombre || "").split(" ")[0])}</button>
+        ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-pareja="${p.id}">Marcar pago de los 2</button>` : ""}
       </div>`
     : "";
   return `<div class="pareja-row-wrap">
     <div class="pareja-row">
       <span>${etiquetas}${nombrePareja} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-        ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
-        ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
+        ${pendiente ? `<button type="button" class="secondary small btnConfirmarPareja" data-p="${p.id}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Confirmar</button>` : ""}
+        ${pendiente ? `<button type="button" class="secondary small btnRechazarPareja" data-p="${p.id}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}">Rechazar</button>` : ""}
         ${editable ? `<button type="button" class="secondary small btnToggleDispPareja" data-p="${p.id}" title="Cargar horarios en que no pueden jugar" aria-label="Cargar horarios en que no pueden jugar">${iconoReloj()}</button>` : ""}
         ${editable ? `<button type="button" class="secondary small btnTogglePareja" data-p="${p.id}" title="Reemplazar un jugador de esta pareja" aria-label="Reemplazar un jugador de esta pareja">${iconoLapiz()}</button>` : ""}
         ${editable ? `<button type="button" class="danger btnBorrarPareja" data-id="${p.id}" data-nombre="${escapeHtml(nombrePareja)}" data-j1="${p.jugador1_id}" data-j2="${p.jugador2_id}" aria-label="Sacar del torneo a la pareja ${nombrePareja}">×</button>` : ""}
@@ -1939,7 +1940,10 @@ function wireTogglesPago(cont) {
       btn.disabled = true;
       try {
         const nuevoPago = btn.dataset.pago !== "1";
-        const { error } = await sb.from("inscripciones").update({ pago: nuevoPago }).eq("torneo_id", torneoGestionId).eq("jugador_id", btn.dataset.jugador);
+        // en una pareja el pago es de esa categoría; un jugador suelto, del torneo
+        const { error } = btn.dataset.pareja
+          ? await sb.from("parejas").update({ ["pago" + btn.dataset.slot]: nuevoPago }).eq("id", btn.dataset.pareja)
+          : await sb.from("inscripciones").update({ pago: nuevoPago }).eq("torneo_id", torneoGestionId).eq("jugador_id", btn.dataset.jugador);
         if (error) { toast("Error: " + error.message); return; }
         refrescarTrasAccionGestion();
       } finally {
@@ -1952,7 +1956,7 @@ function wireTogglesPago(cont) {
       if (btn.disabled) return;
       btn.disabled = true;
       try {
-        const { error } = await sb.from("inscripciones").update({ pago: true }).eq("torneo_id", torneoGestionId).in("jugador_id", [btn.dataset.j1, btn.dataset.j2]);
+        const { error } = await sb.from("parejas").update({ pago1: true, pago2: true }).eq("id", btn.dataset.pareja);
         if (error) { toast("Error: " + error.message); return; }
         toast("Pago marcado para los dos");
         refrescarTrasAccionGestion();
@@ -2002,7 +2006,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         if (btn.disabled) return;
         btn.disabled = true;
         try {
-          await confirmarPareja(btn.dataset.j1, btn.dataset.j2);
+          await confirmarPareja(btn.dataset.p, btn.dataset.j1, btn.dataset.j2);
         } finally {
           btn.disabled = false;
         }
@@ -2013,7 +2017,7 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
         if (btn.disabled) return;
         btn.disabled = true;
         try {
-          await rechazarPareja(btn.dataset.j1, btn.dataset.j2);
+          await rechazarPareja(btn.dataset.p, btn.dataset.j1, btn.dataset.j2);
         } finally {
           btn.disabled = false;
         }
@@ -2940,7 +2944,7 @@ document.getElementById("btnVolverTorneos").addEventListener("click", () => camb
 function mostrarPantallaTorneo(pantalla) {
   // si ya está anotado, un link directo o "Atrás" del navegador a /inscripcion
   // nunca debe volver a mostrar el wizard — se redirige a "Mi inscripción"
-  if (pantalla === "inscripcion" && yaInscriptoEnTorneoActual) pantalla = "mi-inscripcion";
+  if (pantalla === "inscripcion" && yaInscriptoEnTorneoActual && !puedeSumarCategoria) pantalla = "mi-inscripcion";
   const clave = pantalla || "";
   const info = PANTALLAS_TORNEO[clave];
   // clave desconocida (ej. un link viejo a /calendario o /resultados, de
@@ -3018,10 +3022,19 @@ document.getElementById("buscarPareja").addEventListener("input", (e) => {
 // mostrar ningún formulario ahí mismo — Inicio nunca tiene formularios
 // embebidos, solo accesos. La inscripción en sí vive en su propia pantalla
 // (view-torneo-inscripcion, ver prepararFormularioInscripcion).
+// categorías del torneo en las que el jugador logueado tiene una pareja vigente
+function misCategoriasActivas(parejas) {
+  return (parejas || [])
+    .filter((p) => (p.jugador1_id === miJugador?.id || p.jugador2_id === miJugador?.id) && p.estado !== "rechazada" && p.estado !== "cancelada")
+    .map((p) => p.categoria);
+}
 async function actualizarAccesoInscripcion() {
   const estado = document.getElementById("inscripcionEstado");
   const btn = document.getElementById("btnIrAInscribirme");
+  const btnOtra = document.getElementById("btnOtraCategoria");
   yaInscriptoEnTorneoActual = false;
+  puedeSumarCategoria = false;
+  btnOtra.hidden = true;
   if (!currentUser) {
     estado.textContent = "Iniciá sesión para poder inscribirte.";
     btn.textContent = "Iniciar sesión";
@@ -3039,14 +3052,23 @@ async function actualizarAccesoInscripcion() {
   // cancelada/rechazada no cuentan como "ya inscripto" — la fila sigue existiendo
   // como historial (ver schema.sql), pero para la UI es como si no se hubiera
   // anotado: puede volver a hacerlo (inscribirse_con_pareja la reactiva).
-  const { data } = await sb.from("inscripciones").select("id, estado, motivo_rechazo").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle();
-  const inscActiva = data && data.estado !== "cancelada" && data.estado !== "rechazada";
+  const [{ data }, { data: parejasT }] = await Promise.all([
+    sb.from("inscripciones").select("id, estado, motivo_rechazo").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle(),
+    sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId })
+  ]);
+  // se puede jugar más de una categoría: cada una es una pareja aparte
+  const misCats = misCategoriasActivas(parejasT);
+  const inscActiva = misCats.length > 0 || (data && data.estado !== "cancelada" && data.estado !== "rechazada");
   yaInscriptoEnTorneoActual = !!inscActiva;
+  puedeSumarCategoria = !!inscActiva && torneoActualData?.estado === "inscripcion"
+    && categoriasTorneoActual.some((c) => !misCats.includes(c));
   if (inscActiva) {
-    estado.textContent = "Ya estás inscripto en este torneo.";
+    estado.textContent = misCats.length ? `Ya estás anotado en ${misCats.join(" y ")}.` : "Ya estás inscripto en este torneo.";
     btn.textContent = "Ver mi inscripción";
     btn.style.display = "block";
     btn.onclick = () => mostrarPantallaTorneo("mi-inscripcion");
+    btnOtra.hidden = !puedeSumarCategoria;
+    btnOtra.onclick = () => mostrarPantallaTorneo("inscripcion");
   } else if (data && data.estado === "rechazada") {
     estado.textContent = `Tu inscripción fue rechazada${data.motivo_rechazo ? ": " + data.motivo_rechazo : ""}. Podés volver a anotarte.`;
     btn.textContent = "Anotarme de nuevo";
@@ -3072,9 +3094,10 @@ async function prepararFormularioInscripcion() {
 
   const { data: parejasDb } = await sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId });
   const conteoPorCategoria = {};
-  (parejasDb || []).forEach((p) => { if (p.categoria) conteoPorCategoria[p.categoria] = (conteoPorCategoria[p.categoria] || 0) + 1; });
+  (parejasDb || []).forEach((p) => { if (p.categoria && p.estado !== "rechazada" && p.estado !== "cancelada") conteoPorCategoria[p.categoria] = (conteoPorCategoria[p.categoria] || 0) + 1; });
 
   const selCat = document.getElementById("anotarmeCategoria");
+  const misCats = misCategoriasActivas(parejasDb);
   if (categoriasTorneoActual.length === 0) {
     // sin esto, el select quedaba vacío y "Inscribirme" nunca se habilitaba, sin
     // ninguna pista de por qué — este torneo directamente no tiene categorías
@@ -3085,6 +3108,7 @@ async function prepararFormularioInscripcion() {
     selCat.innerHTML = `<option value="">Elegí la categoría</option>` +
       categoriasTorneoActual.map((c) => {
         const n = conteoPorCategoria[c] || 0;
+        if (misCats.includes(c)) return `<option value="${c}" disabled>${c} (ya estás anotado)</option>`;
         return `<option value="${c}">${c}${n ? ` (${n} pareja${n === 1 ? "" : "s"} anotada${n === 1 ? "" : "s"})` : ""}</option>`;
       }).join("");
   }
@@ -3108,35 +3132,36 @@ async function cargarMiInscripcion() {
   const contEstado = document.getElementById("miInscEstado");
   const contResumen = document.getElementById("miInscResumen");
   if (!miJugador || !torneoActualId) return;
+  await actualizarAccesoInscripcion(); // deja al día puedeSumarCategoria
+  document.getElementById("miInscBtnOtraCategoria").hidden = !puedeSumarCategoria;
   const [{ data: insc }, { data: parejas }] = await Promise.all([
     sb.from("inscripciones").select("*").eq("torneo_id", torneoActualId).eq("jugador_id", miJugador.id).maybeSingle(),
     sb.rpc("parejas_publicas", { p_torneo_id: torneoActualId })
   ]);
-  if (!insc || insc.estado === "cancelada" || insc.estado === "rechazada") {
-    contEstado.innerHTML = insc?.estado === "rechazada" ? '<span class="badge danger">Rechazada</span>' : "";
-    contResumen.textContent = insc?.estado === "rechazada"
-      ? `Tu inscripción fue rechazada${insc.motivo_rechazo ? ": " + insc.motivo_rechazo : ""}.`
-      : "Todavía no estás inscripto en este torneo.";
-    return;
-  }
-  contEstado.innerHTML = insc.estado === "confirmada"
-    ? '<span class="badge solid">Confirmada</span>'
-    : '<span class="badge orange">Pendiente de confirmar</span>';
-  // un jugador puede tener más de una pareja en este torneo si juega más de
-  // una categoría (cada pareja guarda su propia categoría) -- se muestran
-  // todas, no solo la primera que aparezca
+  // una pareja por categoría: cada una con su propio estado (se confirma y se
+  // paga por separado)
   const misParejas = (parejas || []).filter((p) => p.jugador1_id === miJugador.id || p.jugador2_id === miJugador.id);
   if (misParejas.length === 0) {
-    contResumen.textContent = `Categoría ${insc.categoria} · todavía sin pareja confirmada.`;
-  } else {
-    contResumen.textContent = misParejas
-      .map((p) => {
-        const companero = p.jugador1_id === miJugador.id ? p.jugador2_nombre : p.jugador1_nombre;
-        return `Jugás con ${companero}, categoría ${p.categoria || insc.categoria}.`;
-      })
-      .join(" ");
+    const muerta = !insc || insc.estado === "cancelada" || insc.estado === "rechazada";
+    contEstado.innerHTML = insc?.estado === "rechazada" ? '<span class="badge danger">Rechazada</span>'
+      : muerta ? "" : insc.estado === "confirmada" ? '<span class="badge solid">Confirmada</span>' : '<span class="badge orange">Pendiente de confirmar</span>';
+    contResumen.textContent = insc?.estado === "rechazada"
+      ? `Tu inscripción fue rechazada${insc.motivo_rechazo ? ": " + insc.motivo_rechazo : ""}.`
+      : muerta ? "Todavía no estás inscripto en este torneo." : `Categoría ${insc.categoria} · todavía sin pareja confirmada.`;
+    return;
   }
+  contEstado.innerHTML = "";
+  contResumen.innerHTML = misParejas.map((p) => {
+    const companero = p.jugador1_id === miJugador.id ? p.jugador2_nombre : p.jugador1_nombre;
+    const badge = p.estado === "confirmada" ? '<span class="badge solid">Confirmada</span>'
+      : p.estado === "rechazada" ? '<span class="badge danger">Rechazada</span>'
+      : p.estado === "cancelada" ? '<span class="badge">Cancelada</span>'
+      : '<span class="badge orange">Pendiente de confirmar</span>';
+    const motivo = p.estado === "rechazada" && p.motivo_rechazo ? `<small>Motivo: ${escapeHtml(p.motivo_rechazo)}</small>` : "";
+    return `<div class="mi-insc-cat"><span class="badge">${escapeHtml(p.categoria || insc?.categoria || "")}</span> <span>con ${escapeHtml(companero)}</span> ${badge}${motivo}</div>`;
+  }).join("");
 }
+document.getElementById("miInscBtnOtraCategoria").addEventListener("click", () => mostrarPantallaTorneo("inscripcion"));
 document.getElementById("miInscBtnDisponibilidad").addEventListener("click", () => mostrarPantallaTorneo("mi-disponibilidad"));
 document.getElementById("miInscBtnMisPartidos").addEventListener("click", () => mostrarPantallaTorneo(""));
 document.getElementById("miInscBtnCancelar").addEventListener("click", async () => {
@@ -4473,10 +4498,16 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   if (!categoria) { toast("Elegí en qué categoría los inscribís"); return; }
   // lo inscribe el admin a mano, así que queda confirmado directo (no hace falta el paso
   // de "pendiente" que sí aplica cuando se anotan ellos mismos desde la app)
-  const { error: e1 } = await sb.from("inscripciones").insert({ torneo_id: torneoGestionId, jugador_id: jugador1Id, categoria, estado: "confirmada" });
-  const { error: e2 } = await sb.from("inscripciones").insert({ torneo_id: torneoGestionId, jugador_id: jugador2Id, categoria, estado: "confirmada" });
-  if (e1 || e2) { toast("Alguno de los dos ya está inscripto u ocurrió un error"); return; }
-  const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id, categoria });
+  // se puede jugar más de una categoría, pero no dos veces la misma
+  const { data: yaEnCat } = await sb.from("parejas").select("estado").eq("torneo_id", torneoGestionId).eq("categoria", categoria)
+    .or(`jugador1_id.in.(${jugador1Id},${jugador2Id}),jugador2_id.in.(${jugador1Id},${jugador2Id})`);
+  if ((yaEnCat || []).some((p) => p.estado !== "rechazada" && p.estado !== "cancelada")) { toast(`Alguno de los dos ya está anotado en ${categoria}`); return; }
+  const { error: e1 } = await sb.from("inscripciones").upsert(
+    [jugador1Id, jugador2Id].map((jugador_id) => ({ torneo_id: torneoGestionId, jugador_id, categoria, estado: "confirmada" })),
+    { onConflict: "torneo_id,jugador_id", ignoreDuplicates: true }
+  );
+  if (e1) { toast("Error: " + e1.message); return; }
+  const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id, categoria, estado: "confirmada" });
   if (e3) { toast("Se inscribieron pero no se pudo armar la pareja: " + e3.message); refrescarTrasAccionGestion(); return; }
   toast("Pareja inscripta");
   in1.value = "";
@@ -4501,18 +4532,28 @@ async function borrarInscripcion(jugadorId, nombreJugador) {
 
 // ---------- admin confirma que la pareja pagó y que la categoría es correcta ----------
 // (recién ahí la inscripción de los dos pasa de "pendiente" a "confirmada")
-async function confirmarPareja(jugador1Id, jugador2Id) {
-  const { error: e1 } = await sb.from("inscripciones").update({ estado: "confirmada" }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador1Id);
-  const { error: e2 } = await sb.from("inscripciones").update({ estado: "confirmada" }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador2Id);
-  if (e1 || e2) { toast("Error: " + (e1 || e2).message); return; }
+// Se confirma la pareja (= esa categoría); la inscripción de cada jugador al
+// torneo queda confirmada también.
+async function confirmarPareja(parejaId, jugador1Id, jugador2Id) {
+  const { error } = await sb.from("parejas").update({ estado: "confirmada", motivo_rechazo: null }).eq("id", parejaId);
+  if (error) { toast("Error: " + error.message); return; }
+  await sb.from("inscripciones").update({ estado: "confirmada" }).eq("torneo_id", torneoGestionId).in("jugador_id", [jugador1Id, jugador2Id]);
   toast("Inscripción confirmada");
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
 }
 
-// Borra la pareja completa del torneo: los dos jugadores quedan totalmente
-// desinscriptos (no "sin pareja" sueltos) — para volver a anotarse tienen que
-// hacerlo de nuevo, siempre de a dos.
+// De estos jugadores, los que no tienen otra pareja vigente en el torneo (en
+// otra categoría).
+async function jugadoresSinOtraPareja(parejaId, ids) {
+  const { data } = await sb.from("parejas").select("jugador1_id, jugador2_id, estado").eq("torneo_id", torneoGestionId).neq("id", parejaId);
+  const ocupados = new Set((data || []).filter((p) => p.estado !== "rechazada" && p.estado !== "cancelada").flatMap((p) => [p.jugador1_id, p.jugador2_id]));
+  return ids.filter((id) => !ocupados.has(id));
+}
+
+// Borra la pareja completa del torneo: los dos jugadores quedan desinscriptos
+// (no "sin pareja" sueltos), salvo el que siga jugando otra categoría — para
+// volver a anotarse tienen que hacerlo de nuevo, siempre de a dos.
 async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
   const { data: partidosPareja } = await sb.from("partidos").select("id, estado")
     .eq("torneo_id", torneoGestionId)
@@ -4526,10 +4567,11 @@ async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
   // así que se avisa antes en vez de hacerlo silencioso.
   const programados = (partidosPareja || []).length;
   if (programados > 0 && !confirm(`${nombrePareja} tiene ${programados} partido(s) programado(s) sin jugar. Al sacarla del torneo esos partidos también se borran. ¿Confirmás?`)) return;
+  // quien juega otra categoría sigue inscripto al torneo
+  const sinOtra = await jugadoresSinOtraPareja(parejaId, [jugador1Id, jugador2Id]);
   const { error } = await sb.from("parejas").delete().eq("id", parejaId); // borra también sus partidos pendientes (en cascada)
   if (error) { toast("Error: " + error.message); return; }
-  await sb.from("inscripciones").delete().eq("torneo_id", torneoGestionId).eq("jugador_id", jugador1Id);
-  await sb.from("inscripciones").delete().eq("torneo_id", torneoGestionId).eq("jugador_id", jugador2Id);
+  if (sinOtra.length) await sb.from("inscripciones").delete().eq("torneo_id", torneoGestionId).in("jugador_id", sinOtra);
   toast(`Se sacó del torneo a la pareja ${nombrePareja}`);
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
@@ -4539,12 +4581,15 @@ async function borrarPareja(parejaId, nombrePareja, jugador1Id, jugador2Id) {
 // A diferencia de "Confirmar", rechazar no borra nada: la fila queda con
 // estado 'rechazada' + motivo, para que el jugador entienda qué pasó (y para
 // no perder el historial, mismo criterio que "cancelada" — ver schema.sql).
-async function rechazarPareja(jugador1Id, jugador2Id) {
+// Se rechaza esa pareja/categoría; la inscripción al torneo de cada jugador
+// solo pasa a rechazada si no juega ninguna otra categoría.
+async function rechazarPareja(parejaId, jugador1Id, jugador2Id) {
   const motivo = prompt("¿Por qué se rechaza esta inscripción? (se le va a mostrar al jugador)");
   if (motivo === null) return; // canceló el prompt
-  const { error: e1 } = await sb.from("inscripciones").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador1Id);
-  const { error: e2 } = await sb.from("inscripciones").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("torneo_id", torneoGestionId).eq("jugador_id", jugador2Id);
-  if (e1 || e2) { toast("Error: " + (e1 || e2).message); return; }
+  const { error } = await sb.from("parejas").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("id", parejaId);
+  if (error) { toast("Error: " + error.message); return; }
+  const sinOtra = await jugadoresSinOtraPareja(parejaId, [jugador1Id, jugador2Id]);
+  if (sinOtra.length) await sb.from("inscripciones").update({ estado: "rechazada", motivo_rechazo: motivo || null }).eq("torneo_id", torneoGestionId).in("jugador_id", sinOtra);
   toast("Inscripción rechazada");
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
@@ -4900,7 +4945,7 @@ document.getElementById("btnArmarPartidos").addEventListener("click", async () =
   // fase de grupos para las parejas que todavía no tienen ningún partido
   const { data: partidosExistentes } = await sb.from("partidos").select("pareja1_id, pareja2_id").eq("torneo_id", torneoGestionId);
   const yaJuegan = new Set((partidosExistentes || []).flatMap((p) => [p.pareja1_id, p.pareja2_id]));
-  const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id));
+  const parejasSinPartido = parejasDb.filter((p) => !yaJuegan.has(p.id) && p.estado !== "rechazada" && p.estado !== "cancelada");
   if (parejasSinPartido.length < 2) { toast("Todas las parejas ya tienen un partido de fase de grupos asignado"); return; }
 
   // Solo entran al cuadro las parejas con el pago de LOS DOS jugadores
