@@ -524,29 +524,37 @@
     </div>
     <div class="sp-temporada">
       <p>El pago puede hacerse <strong>fecha por fecha</strong> o <strong>por adelantado para toda la temporada</strong> (8 fechas + Master). Reservar el año asegura el lugar elegido: los lugares se asignan por orden de cierre.</p>
+      <p><strong>Cada fecha tiene su propia remera:</strong> los lugares se venden fecha por fecha y se cierran unos días antes de cada torneo para llegar con la impresión.</p>
       <p><strong>Próxima fecha disponible:</strong> Fecha 8, del 8 al 11 de octubre · Master en noviembre. Ya estamos reservando lugares para 2026 y 2027.</p>
+    </div>
+
+    <div class="sp-acompanan" id="spAcompanan" hidden>
+      <h3>Nos acompañan</h3>
+      <div id="spAcompananLista"></div>
     </div>
 
     <div class="sp-remera-wrap" aria-labelledby="spRemeraTitulo">
       <h3 id="spRemeraTitulo">Dónde va tu logo</h3>
-      <figure class="sp-remera">
+      <figure class="sp-remera" id="spRemera">
         <img src="remera-sponsors.jpg" width="1496" height="970" loading="lazy"
-          alt="Remera oficial de El Norte Pádel. Frente: Sponsor 1 arriba a la izquierda del pecho, logo de Encuentros de Pádel a la derecha, Sponsor 2 grande en el centro, Sponsor 3 y 4 abajo. Mangas: Sponsor 13 en la manga derecha y 14 en la izquierda. Espalda: logo de El Norte Pádel arriba y Sponsors 5 a 12 en dos filas de cuatro." />
+          alt="Remera oficial de El Norte Pádel. Frente: Sponsor 1 arriba a la izquierda del pecho, logo de Encuentros de Pádel a la derecha, Sponsor 2 grande en el centro, Sponsor 3 y 4 abajo. Mangas: Sponsor 13 en la manga derecha y 14 en la izquierda. Espalda: logo de El Norte Pádel con «presentado por» el Patrocinador General debajo, y Sponsors 5 a 12 en dos filas de cuatro." />
       </figure>
       <ul class="sp-leyenda">
+        <li><b>Espalda</b> Patrocinador General · "presentado por" bajo el logo</li>
         <li><b>2</b> Sponsor Principal de la Fecha · centro del frente</li>
         <li><b>1 · 3 · 4</b> Sponsor Frente</li>
         <li><b>13 · 14</b> Sponsor Manga</li>
         <li><b>5 a 12</b> Sponsor Espalda</li>
       </ul>
+      <p class="sp-ocupadas" id="spOcupadas" hidden></p>
     </div>
 
     <div class="sp-niveles">
       <article class="sp-nivel sp-n1" aria-labelledby="spN1">
-        <p class="sp-kicker">Exclusivo · un solo lugar por fecha</p>
+        <p class="sp-kicker">Exclusivo · <span data-cupo="general">un solo lugar por fecha</span></p>
         <h3 id="spN1">Patrocinador General de El Norte Pádel</h3>
         <ul>
-          <li>Naming rights: <em>"El Norte Pádel presentado por [tu marca]"</em></li>
+          <li>Naming rights: <em>"El Norte Pádel presentado por [tu marca]"</em>, también en la espalda de la remera</li>
           <li>Exclusividad de rubro en esa fecha</li>
           <li>Banner destacado en la página web, en todas las secciones</li>
           <li>Presencia en cada posteo, reel e historia de Instagram</li>
@@ -560,7 +568,7 @@
       </article>
 
       <article class="sp-nivel sp-n2" aria-labelledby="spN2">
-        <p class="sp-kicker">Posición 2 · frente de la remera</p>
+        <p class="sp-kicker">Posición 2 · pecho de la remera · <span data-cupo="principal">un solo lugar</span></p>
         <h3 id="spN2">Sponsor Principal de la Fecha</h3>
         <ul>
           <li>Logo principal en el frente de la remera</li>
@@ -576,7 +584,7 @@
       </article>
 
       <article class="sp-nivel sp-n3" aria-labelledby="spN3">
-        <p class="sp-kicker">Posiciones 1, 3 y 4 · 3 lugares disponibles</p>
+        <p class="sp-kicker">Posiciones 1, 3 y 4 · <span data-cupo="frente">3 lugares disponibles</span></p>
         <h3 id="spN3">Sponsor Frente</h3>
         <ul>
           <li>Logo en el frente de la remera</li>
@@ -589,7 +597,7 @@
       </article>
 
       <article class="sp-nivel sp-nmanga" aria-labelledby="spNManga">
-        <p class="sp-kicker">Posiciones 13 y 14 · 2 lugares disponibles</p>
+        <p class="sp-kicker">Posiciones 13 y 14 · <span data-cupo="manga">2 lugares disponibles</span></p>
         <h3 id="spNManga">Sponsor Manga</h3>
         <ul>
           <li>Logo en una manga: se ve de frente, de costado y de espalda</li>
@@ -601,7 +609,7 @@
       </article>
 
       <article class="sp-nivel sp-n4" aria-labelledby="spN4">
-        <p class="sp-kicker">Posiciones 5 a 12 · 8 lugares disponibles</p>
+        <p class="sp-kicker">Posiciones 5 a 12 · <span data-cupo="espalda">8 lugares disponibles</span></p>
         <h3 id="spN4">Sponsor Espalda</h3>
         <ul>
           <li>Logo en la espalda de la remera</li>

@@ -6465,6 +6465,37 @@ function renderUbicacionesSponsors(vigentes) {
   mostrarEn("inicioSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
 }
 
+// Página Sponsors: "Nos acompañan" (los vigentes, con la jerarquía de su
+// nivel), lugares libres por nivel y posiciones ocupadas marcadas en la remera.
+const CUPOS_NIVEL = { general: 1, principal: 1, frente: 3, manga: 2, espalda: 8 };
+// dónde va la marca de "ocupado" de cada posición (arriba a la derecha del
+// número) en remera-sponsors.jpg, en % del ancho y alto
+const POS_REMERA = {
+  general: [86, 40.1], 1: [20.3, 25.5], 2: [30, 48], 3: [21.5, 75], 4: [35.4, 75], 13: [7.5, 31], 14: [48.2, 31],
+  5: [66.8, 41], 6: [74.2, 41], 7: [81.6, 41], 8: [89, 41], 9: [66.8, 62], 10: [75, 62], 11: [82.4, 62], 12: [89.8, 62]
+};
+function renderSponsorsPagina(vigentes) {
+  const grupos = ["general", "principal", "frente", "manga", "espalda", ""].map((n) => vigentes.filter((s) => (s.nivel || "") === n));
+  document.getElementById("spAcompananLista").innerHTML = grupos.map((g, i) => g.length
+    ? `<div class="sponsor-strip sp-acomp-${i}">${g.map((s) => renderSponsorItem(s)).join("")}</div>` : "").join("");
+  document.getElementById("spAcompanan").hidden = !vigentes.length;
+  document.querySelectorAll("[data-cupo]").forEach((el) => {
+    const n = el.dataset.cupo;
+    const libres = CUPOS_NIVEL[n] - vigentes.filter((s) => s.nivel === n).length;
+    el.textContent = libres <= 0 ? "completo en esta fecha" : CUPOS_NIVEL[n] === 1 ? "disponible" : libres === 1 ? "1 lugar disponible" : `${libres} lugares disponibles`;
+  });
+  const ocupadas = vigentes.filter((s) => s.nivel === "general" || s.posicion).map((s) => s.nivel === "general" ? "general" : s.posicion);
+  const figura = document.getElementById("spRemera");
+  figura.querySelectorAll(".sp-ocupado").forEach((el) => el.remove());
+  ocupadas.filter((p) => POS_REMERA[p]).forEach((p) => {
+    const [x, y] = POS_REMERA[p];
+    figura.insertAdjacentHTML("beforeend", `<span class="sp-ocupado" style="left:${x}%;top:${y}%" aria-hidden="true">✓</span>`);
+  });
+  const txt = document.getElementById("spOcupadas");
+  txt.hidden = !ocupadas.length;
+  txt.textContent = `✓ Ocupadas en esta fecha: ${ocupadas.map((p) => p === "general" ? "Patrocinador General" : p).join(", ")}.`;
+}
+
 async function cargarSponsors() {
   const { data: todos } = await sb.from("sponsors").select("*").eq("activo", true).order("orden");
   // un sponsor de una fecha puntual se muestra en todo el sitio mientras esa
@@ -6475,6 +6506,7 @@ async function cargarSponsors() {
   const data = (todos || []).filter((s) => !s.torneo_id || vivos.has(s.torneo_id))
     .sort((a, b) => (ORDEN_NIVEL[a.nivel] ?? 9) - (ORDEN_NIVEL[b.nivel] ?? 9));
   renderUbicacionesSponsors(data);
+  renderSponsorsPagina(data);
   const admin = document.getElementById("listaSponsors");
   const inlineCard = document.getElementById("sponsorsInlineCard");
   const inline = document.getElementById("sponsorsInline");

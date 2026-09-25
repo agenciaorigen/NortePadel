@@ -2102,3 +2102,19 @@ a.sp-banner:hover, a.sp-banner:focus-visible { border-color: var(--accent); }
 
 /* Sponsor Frente: logo más grande en el listado de partners */
 .sponsor-strip .sponsor-frente img { height: 56px; max-width: 190px; }
+
+/* Página Sponsors: "Nos acompañan" y posiciones ocupadas en la remera */
+.sp-acompanan { margin: 0 0 34px; }
+.sp-acompanan > h3 { font-size: 26px; font-style: italic; color: var(--text); letter-spacing: .01em; margin: 0 0 14px; }
+.sp-acompanan .sponsor-strip { flex-wrap: wrap; justify-content: center; overflow: visible; margin-bottom: 12px; }
+.sp-acompanan .sp-acomp-0 img { height: 84px; max-width: 280px; }
+.sp-acompanan .sp-acomp-1 img { height: 66px; max-width: 230px; }
+.sp-acompanan .sp-acomp-2 img, .sp-acompanan .sp-acomp-3 img { height: 48px; max-width: 170px; }
+.sp-remera { position: relative; }
+.sp-ocupado {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 13px;
+  box-shadow: 0 0 0 3px rgba(7,9,11,.55);
+}
+.sp-ocupadas { margin: 8px 0 0; font-size: 13.5px; color: var(--accent-bright); }
