@@ -6432,9 +6432,9 @@ function renderSponsorItem(s, caption, admin) {
 
 // Niveles de patrocinio (página Sponsors): cada uno se muestra en otro lugar
 // del sitio (ver renderUbicacionesSponsors). La posición es la de la remera.
-const NIVELES_SPONSOR = { general: "Patrocinador General", principal: "Sponsor Principal", frente: "Sponsor Frente", espalda: "Sponsor Espalda" };
-const POSICIONES_NIVEL = { principal: [2], frente: [1, 3, 4], espalda: [5, 6, 7, 8, 9, 10, 11, 12] };
-const ORDEN_NIVEL = { general: 0, principal: 1, frente: 2, espalda: 3 };
+const NIVELES_SPONSOR = { general: "Patrocinador General", principal: "Sponsor Principal", frente: "Sponsor Frente", manga: "Sponsor Manga", espalda: "Sponsor Espalda" };
+const POSICIONES_NIVEL = { principal: [2], frente: [1, 3, 4], manga: [13, 14], espalda: [5, 6, 7, 8, 9, 10, 11, 12] };
+const ORDEN_NIVEL = { general: 0, principal: 1, frente: 2, manga: 3, espalda: 4 };
 document.getElementById("spNivelAdmin").addEventListener("change", (e) => {
   const pos = POSICIONES_NIVEL[e.target.value] || [];
   const sel = document.getElementById("spPosicionAdmin");
@@ -6456,8 +6456,8 @@ function mostrarEn(id, html) {
   el.hidden = !html;
 }
 // General: franja "presentado por" arriba de todas las secciones.
-// Principal: banner grande en Inicio. Frente y Espalda (y los auspiciantes sin
-// nivel): listado de partners, Frente primero y más grande.
+// Principal: banner grande en Inicio. Frente, Manga y Espalda (y los
+// auspiciantes sin nivel): listado de partners, Frente primero y más grande.
 function renderUbicacionesSponsors(vigentes) {
   const general = vigentes.find((s) => s.nivel === "general");
   mostrarEn("spPresentado", general ? `<span class="sp-presentado-texto">El Norte Pádel <span>presentado por</span></span>${renderSponsorItem(general)}` : "");
@@ -6507,7 +6507,7 @@ async function cargarSponsors() {
 
   // listado de partners: Frente, Espalda y auspiciantes sin nivel (estos
   // últimos solo si no son de un torneo puntual, como siempre)
-  const generales = data.filter((s) => s.nivel ? (s.nivel === "frente" || s.nivel === "espalda") : !s.torneo_id);
+  const generales = data.filter((s) => s.nivel ? ["frente", "manga", "espalda"].includes(s.nivel) : !s.torneo_id);
   if (generales.length > 0) {
     if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (inlineCard) inlineCard.style.display = "block";
