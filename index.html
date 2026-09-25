@@ -102,6 +102,10 @@
        Inicio es el circuito PÚBLICO: "Tus partidos" (lo personal del jugador)
        vive en Mi Perfil (#view-perfil) -- lo único propio que queda acá es el
        chip "Tu posición" del hero. -->
+  <!-- Patrocinador General: "El Norte Pádel presentado por [marca]" arriba de
+       todas las secciones (ver renderUbicacionesSponsors) -->
+  <div class="sp-presentado" id="spPresentado" hidden></div>
+
   <section id="view-inicio" class="view active">
 
     <div class="hero-carousel" id="heroCarousel">
@@ -153,6 +157,8 @@
       <div class="flyer-grid" id="flyerMini"></div>
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </section>
+
+    <div class="sp-banner-slot" id="inicioSponsorPrincipal" hidden></div>
 
     <!-- EVENTOS: lo que no es un torneo (inauguraciones, viajes...). Muestra
          el más reciente con fotos como tira deslizable; cada foto se abre en
@@ -244,12 +250,13 @@
       <p class="sponsor-label">Partners del circuito</p>
       <div class="sponsor-strip" id="sponsorsInline"></div>
     </div>
+    <a href="#/sponsors" class="link-mas sp-link-partners">Sumá tu marca al circuito <span aria-hidden="true">→</span></a>
     </div>
 
     <footer class="inicio-footer">
       <p class="inicio-footer-marca">NORTE <span>PADEL</span></p>
       <p>Movimiento. Disciplina. Resultado.</p>
-      <p class="inicio-footer-legal">© Norte Padel · Circuito de pádel · <a href="privacidad.html">Privacidad y términos</a></p>
+      <p class="inicio-footer-legal">© Norte Padel · Circuito de pádel · <a href="#/sponsors">Sumá tu marca</a> · <a href="privacidad.html">Privacidad y términos</a></p>
     </footer>
   </section>
 
@@ -331,6 +338,7 @@
       <button class="primary cta-hero" id="btnIrAInscribirme" style="width:100%">Anotarme</button>
       <button type="button" class="secondary" id="btnOtraCategoria" style="width:100%;margin-top:8px" hidden>Anotarme en otra categoría</button>
     </div>
+    <div class="sp-banner-slot" id="dtSponsorPrincipal" hidden></div>
     <div class="card">
       <!-- Este label encabeza tanto los pills de género como el <select> de
            categoría de abajo — no está pegado a un único control, así que no
@@ -496,6 +504,139 @@
     <div id="evOtrosWrap" hidden>
       <h3 class="eventos-otros-titulo">Otros eventos</h3>
       <div class="eventos-otros" id="evOtros"></div>
+    </div>
+  </section>
+
+  <!-- SPONSORS: niveles de patrocinio (de mayor a menor, cada uno más chico y
+       liviano que el anterior), remera con las 12 posiciones y el formulario
+       "Sumate como sponsor" (se guarda en sponsor_consultas y el club lo ve en
+       Gestión › Contenido › Consultas de sponsors). -->
+  <section id="view-sponsors" class="view">
+    <div class="pagina-head">
+      <h2>Sponsors</h2>
+    </div>
+    <p class="sp-intro">Tu marca en el circuito de pádel del norte: en la remera, en la sede, en la web y en cada posteo.</p>
+
+    <div class="sp-stats">
+      <div class="sp-stat"><strong>+300</strong><span>jugadores y jugadoras por fin de semana</span></div>
+      <div class="sp-stat"><strong>+600.000</strong><span>visualizaciones por torneo en Instagram</span></div>
+      <div class="sp-stat"><strong>En vivo</strong><span>transmisiones, placas oficiales del ranking y cobertura permanente en redes</span></div>
+    </div>
+    <div class="sp-temporada">
+      <p>El pago puede hacerse <strong>fecha por fecha</strong> o <strong>por adelantado para toda la temporada</strong> (8 fechas + Master). Reservar el año asegura el lugar elegido: los lugares se asignan por orden de cierre.</p>
+      <p><strong>Próxima fecha disponible:</strong> Fecha 8, del 8 al 11 de octubre · Master en noviembre. Ya estamos reservando lugares para 2026 y 2027.</p>
+    </div>
+
+    <div class="sp-remera-wrap" aria-labelledby="spRemeraTitulo">
+      <h3 id="spRemeraTitulo">Dónde va tu logo</h3>
+      <figure class="sp-remera">
+        <img src="remera-sponsors.jpg" width="1496" height="970" loading="lazy"
+          alt="Remera oficial de El Norte Pádel. Frente: Sponsor 1 arriba a la izquierda del pecho, logo de Encuentros de Pádel a la derecha, Sponsor 2 grande en el centro, Sponsor 3 y 4 abajo. Espalda: logo de El Norte Pádel arriba y Sponsors 5 a 12 en dos filas de cuatro." />
+      </figure>
+      <ul class="sp-leyenda">
+        <li><b>2</b> Sponsor Principal de la Fecha · centro del frente</li>
+        <li><b>1 · 3 · 4</b> Sponsor Frente</li>
+        <li><b>5 a 12</b> Sponsor Espalda</li>
+      </ul>
+    </div>
+
+    <div class="sp-niveles">
+      <article class="sp-nivel sp-n1" aria-labelledby="spN1">
+        <p class="sp-kicker">Exclusivo · un solo lugar por fecha</p>
+        <h3 id="spN1">Patrocinador General de El Norte Pádel</h3>
+        <p class="sp-precio">$500.000 <span>/ fecha</span></p>
+        <ul>
+          <li>Naming rights: <em>"El Norte Pádel presentado por [tu marca]"</em></li>
+          <li>Exclusividad de rubro en esa fecha</li>
+          <li>Banner destacado en la página web, en todas las secciones</li>
+          <li>Presencia en cada posteo, reel e historia de Instagram</li>
+          <li>Cartelería central en la sede</li>
+          <li>Locución de marca durante toda la fecha</li>
+          <li>Espacio de activación o stand propio en cancha</li>
+          <li>Logo grande en el banner de entrega de premios</li>
+        </ul>
+        <p class="sp-bonus"><span aria-hidden="true">🏆</span> <strong>Bonus:</strong> tu marca viaja a Camboriú, Brasil, con la delegación de campeones del Master.</p>
+        <button type="button" class="primary cta-hero" data-sp-nivel="General">Quiero ser Patrocinador General</button>
+      </article>
+
+      <article class="sp-nivel sp-n2" aria-labelledby="spN2">
+        <p class="sp-kicker">Posición 2 · frente de la remera</p>
+        <h3 id="spN2">Sponsor Principal de la Fecha</h3>
+        <p class="sp-precio">$300.000 <span>/ fecha</span></p>
+        <ul>
+          <li>Logo principal en el frente de la remera</li>
+          <li>Banner grande en la cartelería del evento</li>
+          <li>Banner destacado en la página web</li>
+          <li>Publicaciones y publicidades en Instagram y Facebook</li>
+          <li>Transmisiones en vivo durante el torneo</li>
+          <li>Placas oficiales del ranking</li>
+          <li>Entrega de premios con marca presente</li>
+          <li>Posibilidad de cartelería propia en la sede</li>
+        </ul>
+        <button type="button" class="primary" data-sp-nivel="Principal de la Fecha">Quiero ser Sponsor Principal</button>
+      </article>
+
+      <article class="sp-nivel sp-n3" aria-labelledby="spN3">
+        <p class="sp-kicker">Posiciones 1, 3 y 4 · 3 lugares disponibles</p>
+        <h3 id="spN3">Sponsor Frente</h3>
+        <p class="sp-precio">$200.000 <span>/ fecha c/u</span></p>
+        <ul>
+          <li>Logo en el frente de la remera</li>
+          <li>Presencia en la página web (listado de sponsors)</li>
+          <li>Publicaciones en Instagram y Facebook</li>
+          <li>Transmisiones en vivo y placas del ranking</li>
+          <li>Menciones durante todo el evento</li>
+        </ul>
+        <button type="button" class="secondary" data-sp-nivel="Frente">Me interesa</button>
+      </article>
+
+      <article class="sp-nivel sp-n4" aria-labelledby="spN4">
+        <p class="sp-kicker">Posiciones 5 a 12 · 8 lugares disponibles</p>
+        <h3 id="spN4">Sponsor Espalda</h3>
+        <p class="sp-precio">$100.000 <span>/ fecha c/u</span></p>
+        <ul>
+          <li>Logo en la espalda de la remera</li>
+          <li>Presencia en el listado de sponsors de la web</li>
+          <li>Mención en agradecimientos de redes</li>
+        </ul>
+        <button type="button" class="secondary small" data-sp-nivel="Espalda">Me interesa</button>
+      </article>
+    </div>
+    <p class="sp-nota">Solo el Patrocinador General y el Sponsor Principal de la Fecha tienen presencia en el banner y la cartelería del evento. Los niveles Frente y Espalda no.</p>
+
+    <div class="sp-sumate" id="spSumate">
+      <div class="sp-sumate-texto">
+        <h2 id="spSumateTitulo">¿Sumamos tu marca?</h2>
+        <p>Dejanos tus datos y te contactamos para contarte los lugares libres. O escribinos directo:</p>
+        <div class="sp-directo">
+          <a class="sp-btn-wsp" id="spWhatsapp" href="https://wa.me/5493757656783?text=Hola!%20Quiero%20info%20para%20ser%20sponsor%20de%20El%20Norte%20P%C3%A1del." target="_blank" rel="noopener noreferrer">WhatsApp 3757 65-6783</a>
+          <a class="sp-btn-mail" href="mailto:encuentrosdepadeliguazu@gmail.com?subject=Sponsors%20El%20Norte%20P%C3%A1del">encuentrosdepadeliguazu@gmail.com</a>
+        </div>
+      </div>
+      <form id="formSponsor" class="sp-form" aria-labelledby="spSumateTitulo">
+        <label for="sfNombre">Nombre</label>
+        <input id="sfNombre" required maxlength="80" autocomplete="name" />
+        <label for="sfMarca">Marca o empresa</label>
+        <input id="sfMarca" required maxlength="120" autocomplete="organization" />
+        <label for="sfContacto">Teléfono o email</label>
+        <input id="sfContacto" required maxlength="120" autocomplete="email" aria-describedby="sfContactoAyuda" />
+        <p class="match-meta" id="sfContactoAyuda">Por donde prefieras que te contactemos.</p>
+        <label for="sfNivel">Nivel que te interesa</label>
+        <select id="sfNivel" required>
+          <option value="">Elegí un nivel</option>
+          <option value="General">Patrocinador General · $500.000</option>
+          <option value="Principal de la Fecha">Principal de la Fecha · $300.000</option>
+          <option value="Frente">Frente · $200.000</option>
+          <option value="Espalda">Espalda · $100.000</option>
+        </select>
+        <label for="sfComentario">Comentario (opcional)</label>
+        <textarea id="sfComentario" rows="3" maxlength="1000" placeholder="Ej: nos interesa toda la temporada"></textarea>
+        <!-- trampa para bots: invisible para las personas, si viene completo no se guarda -->
+        <div class="sp-trampa" aria-hidden="true"><label for="sfSitio">Sitio web</label><input id="sfSitio" tabindex="-1" autocomplete="off" /></div>
+        <button type="submit" class="primary cta-hero" id="btnEnviarSponsor">Enviar consulta</button>
+        <p class="sp-estado" id="spEstado" role="status" aria-live="polite"></p>
+        <p class="match-meta">Usamos estos datos solo para responderte. Más info en <a href="privacidad.html#sponsors" target="_blank" rel="noopener">Privacidad</a>.</p>
+      </form>
     </div>
   </section>
 
@@ -1133,9 +1274,19 @@
       <div class="card card-accent">
         <button type="button" class="link-btn" id="btnCerrarAuspiciantesTorneo" style="display:none;margin-bottom:8px">← Volver a este torneo</button>
         <h2>Auspiciantes / Publicidad</h2>
-        <p class="match-meta" style="margin-bottom:6px">Un auspiciante "General" aparece en Inicio, la columna lateral y en todos los torneos. Si elegís un torneo puntual, el logo aparece solo ahí.</p>
+        <p class="match-meta" style="margin-bottom:6px">Elegí el nivel que contrató y el sitio lo ubica solo: el <strong>Patrocinador General</strong> va en la franja "presentado por" arriba de todas las secciones; el <strong>Sponsor Principal</strong>, en un banner grande en Inicio y en la página del torneo; <strong>Frente</strong> y <strong>Espalda</strong>, en el listado de partners. Si elegís un torneo puntual, se muestra mientras ese torneo no esté finalizado.</p>
         <label for="spNombre">Nombre del auspiciante</label>
         <input id="spNombre" placeholder="Ej: Wilson Padel" />
+        <label for="spNivelAdmin">Nivel</label>
+        <select id="spNivelAdmin">
+          <option value="">Auspiciante (sin nivel)</option>
+          <option value="general">Patrocinador General</option>
+          <option value="principal">Sponsor Principal de la Fecha (posición 2)</option>
+          <option value="frente">Sponsor Frente (posiciones 1, 3 y 4)</option>
+          <option value="espalda">Sponsor Espalda (posiciones 5 a 12)</option>
+        </select>
+        <label for="spPosicionAdmin">Posición en la remera</label>
+        <select id="spPosicionAdmin" disabled><option value="">No aplica</option></select>
         <label for="spTorneo">Torneo</label>
         <select id="spTorneo"><option value="">General (todos los torneos)</option></select>
         <label for="spLink">Link (opcional, a donde va si tocan el logo)</label>
@@ -1148,6 +1299,12 @@
     </div>
 
     <div id="admConfigGeneralWrap2">
+    <div class="card card-accent" id="admCfgSponsorConsultas">
+      <h2>Consultas de sponsors</h2>
+      <p class="match-meta" style="margin-bottom:10px">Lo que llega desde el formulario de la página Sponsors, más nuevas primero.</p>
+      <div id="listaSponsorConsultas"></div>
+    </div>
+
     <div class="card card-accent" id="admCfgEventos">
       <h2>Eventos</h2>
       <p class="match-meta" style="margin-bottom:6px">Inauguraciones, viajes, fiestas: todo lo que no es un torneo. El evento más reciente con fotos aparece en Inicio. Sus fotos son públicas (no hace falta iniciar sesión).</p>
@@ -1222,6 +1379,10 @@
   <button data-view="en-vivo" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9L17 14"/></svg></span>
     En vivo
+  </button>
+  <button data-view="sponsors" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="m8.6 13.4-1.6 7.1 5-2.6 5 2.6-1.6-7.1"/></svg></span>
+    Sponsors
   </button>
   <!-- Perfil ya no se repite acá: el ícono de arriba (#btnPerfil) es el único
        acceso, así no hay dos caminos al mismo lugar. Admin/Config se muestra acá

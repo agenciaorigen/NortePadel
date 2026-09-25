@@ -1943,3 +1943,153 @@ button.primary[data-cuenta]::after { color: inherit; opacity: .75; }
 .evento-card small { color: var(--muted); }
 .evento-descripcion { white-space: pre-line; color: var(--muted); margin: 8px 0 4px; max-width: 65ch; }
 .evento-descripcion:empty { display: none; }
+
+/* ============================================================
+   SPONSORS: cuatro niveles con jerarquía decreciente (tamaño, peso y
+   contraste bajan junto con el precio), remera con posiciones y formulario
+   ============================================================ */
+#view-sponsors { padding-bottom: 32px; }
+.sp-intro { font-size: 17px; color: var(--muted); max-width: 60ch; margin: 0 0 22px; }
+.sp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; margin-bottom: 14px; }
+.sp-stat { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 4px; }
+.sp-stat strong { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 40px; line-height: 1; color: var(--accent-bright); font-variant-numeric: tabular-nums; }
+.sp-stat span { color: var(--muted); font-size: 14px; }
+.sp-temporada { border-left: 0; background: rgba(var(--accent-rgb),.06); border: 1px solid rgba(var(--accent-rgb),.18); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 34px; display: grid; gap: 6px; }
+.sp-temporada p { margin: 0; font-size: 14.5px; }
+
+/* remera (diseño oficial) */
+.sp-remera-wrap { margin-bottom: 34px; }
+.sp-remera-wrap h3, .sp-niveles h3 { margin: 0; color: var(--text); letter-spacing: .01em; }
+.sp-remera-wrap > h3 { font-size: 26px; font-style: italic; margin-bottom: 14px; }
+.sp-remera { margin: 0 auto; max-width: 900px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: #111; }
+.sp-remera img { width: 100%; height: auto; display: block; }
+.sp-leyenda { list-style: none; padding: 0; margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14px; color: var(--muted); }
+.sp-leyenda li { display: flex; align-items: center; gap: 8px; }
+.sp-leyenda b { font-family: var(--font-display); font-weight: 800; font-size: 15px; color: var(--accent-ink); background: var(--accent); border-radius: var(--radius-sm); padding: 2px 8px; }
+
+/* niveles */
+.sp-niveles { display: grid; gap: 14px; }
+.sp-nivel { border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 10px; }
+.sp-nivel ul { margin: 4px 0 6px; padding-left: 18px; display: grid; gap: 6px; }
+.sp-nivel .sp-kicker { margin: 0; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+.sp-precio { margin: 0; font-family: var(--font-display); font-weight: 800; font-style: italic; line-height: 1; font-variant-numeric: tabular-nums; }
+.sp-precio span { display: inline-block; white-space: nowrap; font-style: normal; font-weight: 600; font-size: .42em; letter-spacing: .04em; color: var(--muted); }
+.sp-nivel button { align-self: flex-start; width: auto; margin-top: 4px; }
+
+.sp-n1 {
+  background: radial-gradient(120% 90% at 100% 0%, rgba(var(--accent-rgb),.16), transparent 55%), #030405;
+  border: 2px solid var(--accent); padding: 30px 24px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 0 6px rgba(var(--accent-rgb),.06);
+}
+.sp-n1 .sp-kicker { color: var(--accent-bright); font-size: 14px; }
+.sp-n1 h3 { font-size: 38px; line-height: .95; font-style: italic; font-weight: 800; }
+.sp-n1 .sp-precio { font-size: 52px; color: var(--accent-bright); }
+.sp-n1 ul { font-size: 16px; color: var(--text); }
+.sp-n1 li::marker { color: var(--accent); }
+.sp-bonus { margin: 4px 0; background: var(--accent); color: var(--accent-ink); border-radius: var(--radius); padding: 12px 16px; font-size: 16px; font-weight: 600; }
+.sp-bonus strong { font-weight: 800; }
+
+.sp-n2 { background: var(--card); border: 1px solid rgba(var(--accent-rgb),.4); padding: 24px 22px; }
+.sp-n2 .sp-kicker { color: var(--accent-bright); font-size: 13px; }
+.sp-n2 h3 { font-size: 30px; font-style: italic; font-weight: 800; line-height: .95; }
+.sp-n2 .sp-precio { font-size: 44px; color: var(--text); }
+.sp-n2 ul { font-size: 15px; color: #d5dade; }
+
+.sp-n3 { background: var(--bg-elev); border: 1px solid var(--border); padding: 20px 18px; }
+.sp-n3 .sp-kicker { color: var(--muted); font-size: 12.5px; }
+.sp-n3 h3 { font-size: 24px; font-weight: 700; color: #d5dade; }
+.sp-n3 .sp-precio { font-size: 32px; color: #d5dade; }
+.sp-n3 ul { font-size: 14px; color: var(--muted); }
+
+.sp-n4 { background: transparent; border: 1px dashed var(--border); padding: 16px; }
+.sp-n4 .sp-kicker { color: var(--muted); font-size: 12px; }
+.sp-n4 h3 { font-size: 19px; font-weight: 600; color: #c9cfd3; }
+.sp-n4 .sp-precio { font-size: 24px; font-style: normal; font-weight: 700; color: var(--muted); }
+.sp-n4 ul { font-size: 13px; color: var(--muted); }
+
+.sp-nota { font-size: 13px; color: var(--muted); margin: 12px 0 40px; max-width: 70ch; }
+
+/* sumate */
+.sp-sumate { display: grid; gap: 22px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px 20px; }
+.sp-sumate h2 { margin: 0 0 8px; font-size: 38px; font-style: italic; line-height: .95; }
+.sp-sumate-texto p { color: var(--muted); margin: 0 0 14px; }
+.sp-directo { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-directo a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.sp-btn-wsp { background: var(--accent); color: var(--accent-ink); }
+.sp-btn-mail { border: 1px solid var(--border); color: var(--text); }
+.sp-btn-wsp:hover, .sp-btn-wsp:focus-visible { background: var(--accent-bright); }
+.sp-btn-mail:hover, .sp-btn-mail:focus-visible { border-color: var(--accent); }
+.sp-form { display: grid; gap: 4px; }
+.sp-form label { margin-top: 8px; }
+.sp-form .match-meta { margin: 2px 0 0; }
+.sp-form textarea { font: inherit; }
+.sp-form a { color: var(--accent-bright); }
+.sp-form button[type="submit"] { margin-top: 14px; }
+.sp-estado { margin: 8px 0 0; font-weight: 600; color: var(--accent-bright); min-height: 1.4em; }
+.sp-trampa { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.sp-link-partners { display: inline-block; margin-top: 10px; }
+
+/* admin: consultas */
+.sp-consulta p { margin: 0 0 4px; }
+.sp-consulta-nueva { border-color: rgba(var(--accent-rgb),.45); }
+.sp-consulta-comentario { white-space: pre-line; color: #d5dade; }
+
+@media (min-width: 700px) {
+  .sp-niveles { grid-template-columns: repeat(12, 1fr); }
+  .sp-n1 { grid-column: 1 / -1; }
+  .sp-n2 { grid-column: 2 / 12; }
+  .sp-n1 ul, .sp-n2 ul { grid-template-columns: 1fr 1fr; column-gap: 32px; }
+  .sp-n3 { grid-column: 2 / 8; }
+  .sp-n4 { grid-column: 8 / 12; align-self: start; }
+  .sp-sumate { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); padding: 34px; gap: 40px; }
+}
+@media (min-width: 960px) {
+  .sp-n1 { padding: 44px 48px; }
+  .sp-n1 h3 { font-size: 56px; }
+  .sp-n1 .sp-precio { font-size: 84px; }
+  .sp-n1 .sp-precio span { font-size: .36em; }
+  .sp-n1 ul { font-size: 17px; }
+  .sp-n2 { padding: 32px 36px; }
+  .sp-n2 h3 { font-size: 38px; }
+  .sp-n2 .sp-precio { font-size: 54px; }
+  .sp-sumate h2 { font-size: 52px; }
+}
+@media (prefers-reduced-motion: reduce) { #view-sponsors * { scroll-behavior: auto; } }
+
+/* Patrocinador General: franja "presentado por" arriba de todas las secciones */
+.sp-presentado {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 14px;
+  margin: 0 0 16px; padding: 8px 14px; border: 1px solid rgba(var(--accent-rgb),.22);
+  border-radius: var(--radius); background: linear-gradient(90deg, rgba(var(--accent-rgb),.07), transparent 70%), var(--bg-elev);
+}
+.sp-presentado[hidden], .app-body:has(#view-admin.active) .sp-presentado { display: none; }
+.sp-presentado-texto { font-family: var(--font-display); font-weight: 800; font-style: italic; text-transform: uppercase; letter-spacing: .04em; font-size: 17px; }
+.sp-presentado-texto span { font-style: normal; font-weight: 600; font-size: 12px; letter-spacing: .14em; color: var(--muted); margin-left: 6px; }
+.sp-presentado .sponsor-item { display: block; background: #fff; border-radius: var(--radius-sm); padding: 4px 10px; }
+.sp-presentado .sponsor-sin-fondo { background: transparent; padding: 0; }
+.sp-presentado img { height: 30px; max-width: 150px; object-fit: contain; display: block; }
+
+/* Sponsor Principal: banner grande (Inicio y página del torneo) */
+.sp-banner-slot { margin: 0 0 40px; }
+#dtSponsorPrincipal { margin: 0 0 16px; }
+.sp-banner {
+  display: grid; grid-template-columns: 1fr; justify-items: center; gap: 10px; text-align: center;
+  padding: 22px 18px; border-radius: var(--radius-lg); text-decoration: none; color: var(--text);
+  background: radial-gradient(90% 120% at 50% 0%, rgba(var(--accent-rgb),.12), transparent 60%), var(--card);
+  border: 1px solid rgba(var(--accent-rgb),.35);
+}
+a.sp-banner:hover, a.sp-banner:focus-visible { border-color: var(--accent); }
+.sp-banner-label { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-bright); }
+.sp-banner-logo { background: #fff; border-radius: var(--radius); padding: 12px 22px; }
+.sp-banner-logo img { height: 72px; max-width: min(320px, 70vw); object-fit: contain; display: block; }
+.sp-banner-nombre { font-family: var(--font-display); font-size: 22px; font-style: italic; text-transform: uppercase; }
+@media (min-width: 700px) {
+  .sp-banner { grid-template-columns: auto 1fr; grid-template-areas: "logo label" "logo nombre"; justify-items: start; text-align: left; column-gap: 28px; padding: 26px 32px; }
+  .sp-banner-logo { grid-area: logo; }
+  .sp-banner-label { grid-area: label; align-self: end; }
+  .sp-banner-nombre { grid-area: nombre; align-self: start; font-size: 30px; }
+  .sp-banner-logo img { height: 90px; }
+}
+
+/* Sponsor Frente: logo más grande en el listado de partners */
+.sponsor-strip .sponsor-frente img { height: 56px; max-width: 190px; }

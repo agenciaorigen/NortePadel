@@ -159,6 +159,7 @@ async function despacharRuta() {
     if (raiz === "torneo" && a) { await abrirTorneo(a, sub); return; }
     if (raiz === "perfil-jugador" && a) { await abrirPerfilJugador(a); return; }
     if (raiz === "evento" && a) { await abrirEvento(a); return; }
+    if (raiz === "sponsors") { cambiarVista("sponsors"); return; }
     cambiarVista("inicio");
   } finally {
     syncingDesdeHash = false;
@@ -3825,6 +3826,7 @@ const SECCIONES_CONFIG_GENERAL = {
   categorias: { id: "admCfgCategorias", label: "Categorías", grupo: "club" },
   etiquetas: { id: "admCfgEtiquetas", label: "Etiquetas", grupo: "club" },
   eventos: { id: "admCfgEventos", label: "Eventos", grupo: "contenido" },
+  consultasSponsors: { id: "admCfgSponsorConsultas", label: "Consultas de sponsors", grupo: "contenido" },
   noticias: { id: "admCfgNoticias", label: "Noticias", grupo: "contenido" },
   auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes", grupo: "contenido" },
   jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes", grupo: "contenido" },
@@ -3862,6 +3864,7 @@ function mostrarSeccionConfigGeneral(clave) {
   Object.entries(SECCIONES_CONFIG_GENERAL).forEach(([key, s]) => {
     document.getElementById(s.id).style.display = key === clave ? "block" : "none";
   });
+  if (clave === "consultasSponsors") cargarConsultasSponsors();
   sincronizarAdmSidebar();
 }
 
@@ -3930,6 +3933,9 @@ async function cargarPanelAdmin() {
     if (sinPago) pendientes.push([`${sinPago} pareja${sinPago === 1 ? "" : "s"} con pago pendiente`, `${t.nombre} · Inscripciones`, "inscripciones"]);
     if (sueltos) pendientes.push([`${sueltos} jugador${sueltos === 1 ? "" : "es"} sin pareja`, `${t.nombre} · Inscripciones`, "inscripciones"]);
   }
+  const { count: consultas } = await sb.from("sponsor_consultas").select("id", { count: "exact", head: true }).eq("leida", false);
+  if (areaAdmin !== "panel") return;
+  if (consultas) pendientes.push([`${plural(consultas, "consulta")} de sponsors sin leer`, "Contenido · Consultas de sponsors", "consultasSponsors"]);
   const solicitudes = cacheJugadoresAdmin.filter((j) => j.categoria_pendiente).length;
   if (solicitudes) pendientes.push([`${solicitudes} solicitud${solicitudes === 1 ? "" : "es"} de categoría`, "Club · Solicitudes", "solicitudes"]);
 
@@ -3943,7 +3949,7 @@ document.getElementById("admPanel").addEventListener("click", (e) => {
   if (!accion) return;
   const torneoId = document.getElementById("admPanelTorneo").dataset.torneo;
   if (accion === "nuevo") { mostrarSeccionTorneoSelector(); document.getElementById("btnMostrarCrearTorneo").click(); return; }
-  if (accion === "solicitudes") { mostrarSeccionConfigGeneral("solicitudes"); return; }
+  if (accion === "solicitudes" || accion === "consultasSponsors") { mostrarSeccionConfigGeneral(accion); return; }
   if (!torneoId) return;
   seccionGestionActiva = accion === "inscripciones" ? "inscripciones" : "resumen";
   cargarGestionTorneo(torneoId);
@@ -6414,7 +6420,7 @@ function renderSponsorItem(s, caption, admin) {
   // si el logo no carga, se muestra el nombre del auspiciante en su lugar (ver data-si-falla)
   const contenido = `<img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" />` +
     (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
-  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "");
+  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "") + (s.nivel === "frente" ? " sponsor-frente" : "");
   const item = hrefSeguro(s.link_url)
     ? `<a href="${hrefSeguro(s.link_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
     : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
@@ -6424,8 +6430,51 @@ function renderSponsorItem(s, caption, admin) {
   return `<div class="sponsor-admin-item">${item}<button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">Borrar</button></div>`;
 }
 
+// Niveles de patrocinio (página Sponsors): cada uno se muestra en otro lugar
+// del sitio (ver renderUbicacionesSponsors). La posición es la de la remera.
+const NIVELES_SPONSOR = { general: "Patrocinador General", principal: "Sponsor Principal", frente: "Sponsor Frente", espalda: "Sponsor Espalda" };
+const POSICIONES_NIVEL = { principal: [2], frente: [1, 3, 4], espalda: [5, 6, 7, 8, 9, 10, 11, 12] };
+const ORDEN_NIVEL = { general: 0, principal: 1, frente: 2, espalda: 3 };
+document.getElementById("spNivelAdmin").addEventListener("change", (e) => {
+  const pos = POSICIONES_NIVEL[e.target.value] || [];
+  const sel = document.getElementById("spPosicionAdmin");
+  sel.innerHTML = pos.length ? pos.map((n) => `<option value="${n}">Posición ${n}</option>`).join("") : '<option value="">No aplica</option>';
+  sel.disabled = pos.length < 2;
+});
+function bannerPrincipalHtml(s) {
+  const interior = `<span class="sp-banner-label">Sponsor principal de la fecha</span>
+    <span class="sp-banner-logo"><img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" /></span>
+    <strong class="sp-banner-nombre">${escapeHtml(s.nombre)}</strong>`;
+  return hrefSeguro(s.link_url)
+    ? `<a class="sp-banner" href="${hrefSeguro(s.link_url)}" target="_blank" rel="noopener noreferrer">${interior}</a>`
+    : `<div class="sp-banner">${interior}</div>`;
+}
+function mostrarEn(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = html || "";
+  el.hidden = !html;
+}
+// General: franja "presentado por" arriba de todas las secciones.
+// Principal: banner grande en Inicio. Frente y Espalda (y los auspiciantes sin
+// nivel): listado de partners, Frente primero y más grande.
+function renderUbicacionesSponsors(vigentes) {
+  const general = vigentes.find((s) => s.nivel === "general");
+  mostrarEn("spPresentado", general ? `<span class="sp-presentado-texto">El Norte Pádel <span>presentado por</span></span>${renderSponsorItem(general)}` : "");
+  const principal = vigentes.find((s) => s.nivel === "principal");
+  mostrarEn("inicioSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
+}
+
 async function cargarSponsors() {
-  const { data } = await sb.from("sponsors").select("*").eq("activo", true).order("orden");
+  const { data: todos } = await sb.from("sponsors").select("*").eq("activo", true).order("orden");
+  // un sponsor de una fecha puntual se muestra en todo el sitio mientras esa
+  // fecha no terminó; los que no tienen torneo, siempre
+  const idsTorneo = [...new Set((todos || []).map((s) => s.torneo_id).filter(Boolean))];
+  const { data: torneosSp } = idsTorneo.length ? await sb.from("torneos").select("id, estado").in("id", idsTorneo) : { data: [] };
+  const vivos = new Set((torneosSp || []).filter((t) => t.estado !== "finalizado" && t.estado !== "cancelado").map((t) => t.id));
+  const data = (todos || []).filter((s) => !s.torneo_id || vivos.has(s.torneo_id))
+    .sort((a, b) => (ORDEN_NIVEL[a.nivel] ?? 9) - (ORDEN_NIVEL[b.nivel] ?? 9));
+  renderUbicacionesSponsors(data);
   const admin = document.getElementById("listaSponsors");
   const inlineCard = document.getElementById("sponsorsInlineCard");
   const inline = document.getElementById("sponsorsInline");
@@ -6433,8 +6482,11 @@ async function cargarSponsors() {
   const marqueeTrack = document.getElementById("sponsorMarqueeTrack");
 
   if (admin) {
-    admin.innerHTML = (data && data.length > 0)
-      ? data.map((s) => renderSponsorItem(s, s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "General", true)).join("")
+    admin.innerHTML = todos?.length
+      ? todos.map((s) => renderSponsorItem(s, [
+          s.nivel ? NIVELES_SPONSOR[s.nivel] + (s.posicion ? ` · N° ${s.posicion}` : "") : "",
+          s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "Todo el año"
+        ].filter(Boolean).join(" · "), true)).join("")
       : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
     admin.querySelectorAll(".btnQuitarSponsor").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -6453,7 +6505,9 @@ async function cargarSponsors() {
     });
   }
 
-  const generales = (data || []).filter((s) => !s.torneo_id);
+  // listado de partners: Frente, Espalda y auspiciantes sin nivel (estos
+  // últimos solo si no son de un torneo puntual, como siempre)
+  const generales = data.filter((s) => s.nivel ? (s.nivel === "frente" || s.nivel === "espalda") : !s.torneo_id);
   if (generales.length > 0) {
     if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
     if (inlineCard) inlineCard.style.display = "block";
@@ -6600,6 +6654,9 @@ async function cargarSponsorsTorneo() {
     cont.innerHTML = "";
     cont.style.display = "none";
   }
+  // Sponsor Principal en la página del torneo: el de esa fecha primero
+  const principal = (data || []).filter((s) => s.nivel === "principal").sort((a, b) => (b.torneo_id ? 1 : 0) - (a.torneo_id ? 1 : 0))[0];
+  mostrarEn("dtSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
 }
 
 document.getElementById("btnSubirSponsor").addEventListener("click", async () => {
@@ -6618,7 +6675,9 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   const { data: pub } = sb.storage.from("sponsors").getPublicUrl(path);
   const linkUrl = document.getElementById("spLink").value.trim() || null;
   const torneoId = document.getElementById("spTorneo").value || null;
-  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId });
+  const nivel = document.getElementById("spNivelAdmin").value || null;
+  const posicion = nivel && nivel !== "general" ? Number(document.getElementById("spPosicionAdmin").value) : null;
+  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId, nivel, posicion });
   if (error) { toast("Error: " + error.message); return; }
 
   toast("Auspiciante agregado");
@@ -6626,6 +6685,8 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   document.getElementById("spLink").value = "";
   document.getElementById("spArchivo").value = "";
   document.getElementById("spTorneo").value = "";
+  document.getElementById("spNivelAdmin").value = "";
+  document.getElementById("spNivelAdmin").dispatchEvent(new Event("change"));
   cargarSponsors();
   } finally {
     btn.disabled = false;
@@ -6942,6 +7003,81 @@ document.getElementById("listaEventosAdmin").addEventListener("click", async (e)
     btn.disabled = false;
     btn.textContent = textoOriginal;
   }
+});
+
+// ============================================================
+// SPONSORS: "Me interesa" de cada nivel preelige el nivel en el formulario;
+// el formulario guarda en sponsor_consultas (el público solo puede insertar,
+// leerlas es solo del admin) y se ven en Gestión › Contenido.
+// ============================================================
+document.querySelectorAll("[data-sp-nivel]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.getElementById("sfNivel").value = btn.dataset.sfNivel;
+    document.getElementById("spSumate").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("sfNombre").focus({ preventScroll: true });
+  });
+});
+const contactoValido = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || v.replace(/\D/g, "").length >= 8;
+document.getElementById("formSponsor").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("btnEnviarSponsor");
+  const estado = document.getElementById("spEstado");
+  const contacto = document.getElementById("sfContacto");
+  contacto.setCustomValidity(contactoValido(contacto.value.trim()) ? "" : "Poné un teléfono (con característica) o un email válido");
+  if (!e.target.reportValidity() || btn.disabled) return;
+  btn.disabled = true;
+  estado.textContent = "Enviando...";
+  try {
+    // si el campo trampa viene completo es un bot: se le responde igual, sin guardar
+    if (!document.getElementById("sfSitio").value) {
+      const { error } = await sb.from("sponsor_consultas").insert({
+        nombre: document.getElementById("sfNombre").value.trim(),
+        marca: document.getElementById("sfMarca").value.trim(),
+        contacto: contacto.value.trim(),
+        nivel: document.getElementById("sfNivel").value,
+        comentario: document.getElementById("sfComentario").value.trim() || null
+      });
+      if (error) { estado.textContent = "No se pudo enviar. Probá de nuevo o escribinos por WhatsApp."; return; }
+    }
+    e.target.reset();
+    estado.textContent = "¡Gracias! Recibimos tu consulta y te vamos a contactar pronto.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+document.getElementById("sfContacto").addEventListener("input", (e) => e.target.setCustomValidity(""));
+
+async function cargarConsultasSponsors() {
+  const cont = document.getElementById("listaSponsorConsultas");
+  const { data, error } = await sb.from("sponsor_consultas").select("*").order("created_at", { ascending: false });
+  if (error) { cont.innerHTML = `<p class="empty">No se pudieron cargar las consultas.</p>`; return; }
+  cont.innerHTML = data.length ? data.map((c) => {
+    const digitos = c.contacto.replace(/\D/g, "");
+    const esMail = c.contacto.includes("@");
+    const link = esMail
+      ? `<a href="mailto:${encodeURIComponent(c.contacto)}">${escapeHtml(c.contacto)}</a>`
+      : `<a href="https://wa.me/${digitos.startsWith("54") ? digitos : "549" + digitos}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.contacto)}</a>`;
+    return `<div class="match-card sp-consulta${c.leida ? "" : " sp-consulta-nueva"}">
+      <p><strong>${escapeHtml(c.marca)}</strong> · ${escapeHtml(c.nombre)} ${c.leida ? "" : '<span class="badge solid">Nueva</span>'}</p>
+      <p class="match-meta">${escapeHtml(c.nivel)} · ${new Date(c.created_at).toLocaleDateString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${link}</p>
+      ${c.comentario ? `<p class="sp-consulta-comentario">${escapeHtml(c.comentario)}</p>` : ""}
+      <div class="match-actions">
+        ${c.leida ? "" : `<button type="button" class="secondary small" data-consulta-leida="${c.id}">Marcar como leída</button>`}
+        <button type="button" class="secondary small danger" data-consulta-borrar="${c.id}">Borrar</button>
+      </div>
+    </div>`;
+  }).join("") : '<p class="empty">Todavía no llegó ninguna consulta.</p>';
+}
+document.getElementById("listaSponsorConsultas").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-consulta-leida], [data-consulta-borrar]");
+  if (!btn || btn.disabled) return;
+  if (btn.dataset.consultaBorrar && !confirm("¿Borrar esta consulta?")) return;
+  btn.disabled = true;
+  const { error } = btn.dataset.consultaLeida
+    ? await sb.from("sponsor_consultas").update({ leida: true }).eq("id", btn.dataset.consultaLeida)
+    : await sb.from("sponsor_consultas").delete().eq("id", btn.dataset.consultaBorrar);
+  if (error) { toast("Error: " + error.message); btn.disabled = false; return; }
+  cargarConsultasSponsors();
 });
 
 // ============================================================
