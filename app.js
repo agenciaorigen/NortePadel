@@ -6427,7 +6427,9 @@ function renderSponsorItem(s, caption, admin) {
   // En admin el logo va aparte del botón de borrar (nunca adentro del <a>,
   // que ya es clickeable y abre el link del auspiciante).
   if (!admin) return item;
-  return `<div class="sponsor-admin-item">${item}<button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">Borrar</button></div>`;
+  return `<div class="sponsor-admin-item">${item}
+    <label class="sponsor-hasta">Hasta <input type="date" data-sp-hasta="${s.id}" value="${s.hasta || ""}" aria-label="Vigente hasta: ${escapeHtml(s.nombre)}" /></label>
+    <button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">Borrar</button></div>`;
 }
 
 // Niveles de patrocinio (página Sponsors): cada uno se muestra en otro lugar
@@ -6496,6 +6498,16 @@ function renderSponsorsPagina(vigentes) {
   txt.textContent = `✓ Ocupadas en esta fecha: ${ocupadas.map((p) => p === "general" ? "Patrocinador General" : p).join(", ")}.`;
 }
 
+// "Vigente hasta" (acuerdos de varias fechas): después de ese día ya no se muestra
+const sponsorVigenteHoy = (s) => !s.hasta || s.hasta >= new Date().toLocaleDateString("sv");
+document.getElementById("listaSponsors").addEventListener("change", async (e) => {
+  const id = e.target.dataset.spHasta;
+  if (!id) return;
+  const { error } = await sb.from("sponsors").update({ hasta: e.target.value || null }).eq("id", id);
+  toast(error ? "Error: " + error.message : e.target.value ? "Vencimiento guardado" : "Sin vencimiento");
+  if (!error) cargarSponsors();
+});
+
 async function cargarSponsors() {
   const { data: todos } = await sb.from("sponsors").select("*").eq("activo", true).order("orden");
   // un sponsor de una fecha puntual se muestra en todo el sitio mientras esa
@@ -6503,7 +6515,7 @@ async function cargarSponsors() {
   const idsTorneo = [...new Set((todos || []).map((s) => s.torneo_id).filter(Boolean))];
   const { data: torneosSp } = idsTorneo.length ? await sb.from("torneos").select("id, estado").in("id", idsTorneo) : { data: [] };
   const vivos = new Set((torneosSp || []).filter((t) => t.estado !== "finalizado" && t.estado !== "cancelado").map((t) => t.id));
-  const data = (todos || []).filter((s) => !s.torneo_id || vivos.has(s.torneo_id))
+  const data = (todos || []).filter((s) => (!s.torneo_id || vivos.has(s.torneo_id)) && sponsorVigenteHoy(s))
     .sort((a, b) => (ORDEN_NIVEL[a.nivel] ?? 9) - (ORDEN_NIVEL[b.nivel] ?? 9));
   renderUbicacionesSponsors(data);
   renderSponsorsPagina(data);
@@ -6517,7 +6529,8 @@ async function cargarSponsors() {
     admin.innerHTML = todos?.length
       ? todos.map((s) => renderSponsorItem(s, [
           s.nivel ? NIVELES_SPONSOR[s.nivel] + (s.posicion ? ` · N° ${s.posicion}` : "") : "",
-          s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : "Todo el año"
+          s.torneo_id ? (cacheTorneos.find((t) => t.id === s.torneo_id)?.nombre || "torneo") : s.hasta ? "Varias fechas" : "Todo el año",
+          sponsorVigenteHoy(s) ? "" : "vencido"
         ].filter(Boolean).join(" · "), true)).join("")
       : '<p class="empty">Todavía no cargaste auspiciantes.</p>';
     admin.querySelectorAll(".btnQuitarSponsor").forEach((btn) => {
@@ -6679,15 +6692,16 @@ async function cargarSponsorsTorneo() {
   if (!cont || !torneoActualId) return;
   const { data } = await sb.from("sponsors").select("*").eq("activo", true)
     .or(`torneo_id.eq.${torneoActualId},torneo_id.is.null`).order("orden");
-  if (data && data.length > 0) {
-    cont.innerHTML = data.map((s) => renderSponsorItem(s)).join("");
+  const vigentes = (data || []).filter(sponsorVigenteHoy);
+  if (vigentes.length > 0) {
+    cont.innerHTML = vigentes.map((s) => renderSponsorItem(s)).join("");
     cont.style.display = "flex";
   } else {
     cont.innerHTML = "";
     cont.style.display = "none";
   }
   // Sponsor Principal en la página del torneo: el de esa fecha primero
-  const principal = (data || []).filter((s) => s.nivel === "principal").sort((a, b) => (b.torneo_id ? 1 : 0) - (a.torneo_id ? 1 : 0))[0];
+  const principal = vigentes.filter((s) => s.nivel === "principal").sort((a, b) => (b.torneo_id ? 1 : 0) - (a.torneo_id ? 1 : 0))[0];
   mostrarEn("dtSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
 }
 
@@ -6709,7 +6723,8 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   const torneoId = document.getElementById("spTorneo").value || null;
   const nivel = document.getElementById("spNivelAdmin").value || null;
   const posicion = nivel && nivel !== "general" ? Number(document.getElementById("spPosicionAdmin").value) : null;
-  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId, nivel, posicion });
+  const hasta = document.getElementById("spHasta").value || null;
+  const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId, nivel, posicion, hasta });
   if (error) { toast("Error: " + error.message); return; }
 
   toast("Auspiciante agregado");
@@ -6718,6 +6733,7 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   document.getElementById("spArchivo").value = "";
   document.getElementById("spTorneo").value = "";
   document.getElementById("spNivelAdmin").value = "";
+  document.getElementById("spHasta").value = "";
   document.getElementById("spNivelAdmin").dispatchEvent(new Event("change"));
   cargarSponsors();
   } finally {
