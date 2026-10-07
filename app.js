@@ -111,6 +111,23 @@ function cambiarVista(nombre, ruta) {
     adminFocoTorneoActivo = false;
   }
   if (!syncingDesdeHash) navegarA(ruta || (nombre === "inicio" ? "/" : "/" + nombre));
+  contarVisita(nombre);
+}
+
+// Contador de visitas: cuenta una sesión por navegador y cada sección una vez
+// por sesión. Solo guarda cantidades por día; nada de quién entró.
+const SECCIONES_VISITA = new Set(["inicio", "torneos", "ranking", "en-vivo", "sponsors", "evento", "perfil-jugador", "perfil"]);
+function contarVisita(vista) {
+  if (isAdmin) return;
+  const seccion = VISTAS_DE_TORNEO.has(vista) ? "torneo" : SECCIONES_VISITA.has(vista) ? vista : null;
+  if (!seccion) return;
+  try {
+    const vistas = JSON.parse(sessionStorage.getItem("np_visitas") || "[]");
+    const nuevas = [vistas.length ? null : "sesion", vistas.includes(seccion) ? null : seccion].filter(Boolean);
+    if (!nuevas.length) return;
+    sessionStorage.setItem("np_visitas", JSON.stringify([...vistas, ...nuevas]));
+    nuevas.forEach((sec) => sb.rpc("registrar_visita", { p_seccion: sec }).then(() => {}));
+  } catch (e) { /* sin sessionStorage (modo privado estricto): no se cuenta */ }
 }
 
 // Prende/apaga TODA la configuración general del club de una sola vez —
@@ -595,7 +612,7 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   editandoPerfil = false;
   document.getElementById("jFoto").value = "";
   toast(datos.categoria_pendiente ? "¡Perfil guardado! Tu categoría queda pendiente de aprobación" : "¡Perfil guardado!");
-  pedirPermisoNotificaciones();
+  suscribirAvisos(true).catch(() => {}).then(renderAvisos);
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
@@ -664,6 +681,8 @@ async function manejarCambioSesion(session) {
   renderVistaPerfil();
   suscribirseANotificacionesRealtime();
   actualizarContadorNotificaciones();
+  // si este celular ya dio permiso, se re-registra solo (sin preguntar)
+  if (miJugador) suscribirAvisos(false).catch(() => {}).then(renderAvisos);
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
   calcularTorneoDestacado();
   cargarHeroPosicion();
@@ -884,6 +903,63 @@ function cargarImagenParaCanvas(url) {
   });
 }
 
+// Sponsors en las placas del ranking (lo que promete la propuesta): arriba
+// "presentado por" el General, abajo el Principal y los Frente. Cada logo se
+// prueba antes: si su servidor no permite leerlo desde el canvas, se saltea
+// en vez de arruinar la descarga.
+function imagenUsableEnCanvas(img) {
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 1;
+    const x = c.getContext("2d");
+    x.drawImage(img, 0, 0, 1, 1);
+    x.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (e) { return false; }
+}
+async function logosPlaca() {
+  const elegir = (n) => sponsorsVigentes.filter((s) => s.nivel === n);
+  const cargar = async (lista) => (await Promise.all(lista.map((s) => cargarImagenParaCanvas(urlSegura(s.logo_url))))).filter((img) => img && imagenUsableEnCanvas(img));
+  const [general, principal, frente] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente"))]);
+  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])] };
+}
+const ALTO_BANDA_SPONSORS = 230;
+function dibujarLogoEnCaja(ctx, img, x, y, alto) {
+  const ancho = Math.min(alto * 3.2, (img.width / img.height) * alto);
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(x, y, ancho + 32, alto + 24, 14) : ctx.rect(x, y, ancho + 32, alto + 24);
+  ctx.fill();
+  ctx.drawImage(img, x + 16, y + 12, ancho, alto);
+  return ancho + 32;
+}
+function dibujarSponsorsPlaca(ctx, W, H, logos) {
+  const y0 = H - 100 - ALTO_BANDA_SPONSORS;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8D969C";
+  ctx.font = "700 26px 'Barlow Condensed'";
+  if (logos.general) {
+    ctx.fillText("P R E S E N T A D O   P O R", W / 2, y0 + 20);
+    const ancho = Math.min(80 * 3.2, (logos.general.width / logos.general.height) * 80) + 32;
+    dibujarLogoEnCaja(ctx, logos.general, (W - ancho) / 2, y0 + 34, 80);
+  }
+  if (logos.fila.length) {
+    const yFila = y0 + (logos.general ? 152 : 40);
+    const anchos = logos.fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
+    const total = anchos.reduce((a, b) => a + b, 0) + 18 * (anchos.length - 1);
+    const escala = Math.min(1, (W - 120) / total); // si no entran, se achican todos parejo
+    let x = (W - total * escala) / 2;
+    ctx.save();
+    ctx.translate(x, yFila); ctx.scale(escala, escala);
+    let cx = 0;
+    logos.fila.forEach(([img, alto], i) => {
+      dibujarLogoEnCaja(ctx, img, cx, 76 - alto, alto); // alineados por abajo
+      cx += anchos[i] + 18;
+    });
+    ctx.restore();
+  }
+}
+
 async function exportarRankingTop20() {
   if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para exportar"); return; }
   await cargarFuentesExport();
@@ -893,12 +969,13 @@ async function exportarRankingTop20() {
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
-  const fondo = await cargarImagenParaCanvas("ranking-bg-top20.jpg");
+  const [fondo, logos] = await Promise.all([cargarImagenParaCanvas("ranking-bg-top20.jpg"), logosPlaca()]);
+  const conSponsors = !!(logos.general || logos.fila.length);
   fondoImagenExport(ctx, W, H, fondo);
   encabezadoImagenExport(ctx, W, categoria, "TOP 20 · RANKING");
 
   const inicioLista = 360;
-  const altoFila = (H - inicioLista - 120) / 20;
+  const altoFila = (H - inicioLista - (conSponsors ? 120 + ALTO_BANDA_SPONSORS : 120)) / 20;
   const colorPosicion = (pos) => pos === 1 ? "#ffd700" : pos === 2 ? "#c9d3e0" : pos === 3 ? "#ff9d5c" : "#F3F5F4";
   top.forEach((j, idx) => {
     const y = inicioLista + idx * altoFila;
@@ -920,11 +997,12 @@ async function exportarRankingTop20() {
     ctx.fillText(String(j.puntos_ranking), W - 90, y + altoFila / 2 + 12);
   });
 
+  if (conSponsors) dibujarSponsorsPlaca(ctx, W, H, logos);
   piePaginaImagenExport(ctx, W, H);
   descargarCanvas(canvas, `ranking-${categoria.replace(/\s+/g, "-").toLowerCase()}-top20.png`);
 }
 
-function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) {
+function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H, logos) {
   ctx.clearRect(0, 0, W, H);
   fondoImagenExport(ctx, W, H, fotoFondo);
   encabezadoImagenExport(ctx, W, categoria, "CAMPEÓN DE LA CATEGORÍA");
@@ -965,6 +1043,7 @@ function dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fotoFondo, W, H) 
   ctx.font = "700 32px 'Barlow Condensed'";
   ctx.fillText("PUNTOS", cx, cy + radio + 290);
 
+  if (logos && (logos.general || logos.fila.length)) dibujarSponsorsPlaca(ctx, W, H, logos);
   piePaginaImagenExport(ctx, W, H);
 }
 
@@ -977,11 +1056,12 @@ async function exportarRankingCampeon() {
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
-  const [foto, fondo] = await Promise.all([
+  const [foto, fondo, logos] = await Promise.all([
     cargarImagenParaCanvas(campeon.foto_url),
-    cargarImagenParaCanvas("ranking-bg-campeon.jpg")
+    cargarImagenParaCanvas("ranking-bg-campeon.jpg"),
+    logosPlaca()
   ]);
-  dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fondo, W, H);
+  dibujarCampeonEnCanvas(ctx, campeon, categoria, foto, fondo, W, H, logos);
   const nombreArchivo = `campeon-${categoria.replace(/\s+/g, "-").toLowerCase()}.png`;
   const ok = descargarCanvas(canvas, nombreArchivo);
   if (!ok && foto) {
@@ -989,14 +1069,337 @@ async function exportarRankingCampeon() {
     // se reintenta directamente sin foto de jugador en vez de dejar al usuario
     // sin nada (el fondo de cancha, al ser un archivo propio del sitio, no
     // tiene este problema).
-    dibujarCampeonEnCanvas(ctx, campeon, categoria, null, fondo, W, H);
+    dibujarCampeonEnCanvas(ctx, campeon, categoria, null, fondo, W, H, logos);
     descargarCanvas(canvas, nombreArchivo);
     toast("Se exportó sin la foto (no se pudo leer por permisos de imagen)");
   }
 }
 
 document.getElementById("btnExportarTop20")?.addEventListener("click", exportarRankingTop20);
+document.getElementById("btnCompartirRanking").addEventListener("click", conBotonOcupado(exportarRankingCompleto));
 document.getElementById("btnExportarCampeon")?.addEventListener("click", exportarRankingCampeon);
+
+
+// ============================================================
+// COMPARTIR: en el celular abre el menú de compartir (Instagram, WhatsApp...)
+// con la imagen; en la compu, o si no se puede, la descarga.
+// ============================================================
+function conBotonOcupado(fn) {
+  return async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try { await fn(); } finally { btn.disabled = false; }
+  };
+}
+function compartirCanvas(canvas, nombreArchivo, titulo) {
+  if (!matchMedia("(pointer: coarse)").matches || !navigator.canShare) return descargarCanvas(canvas, nombreArchivo);
+  try {
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const archivo = new File([blob], nombreArchivo, { type: "image/png" });
+      if (!navigator.canShare({ files: [archivo] })) { descargarCanvas(canvas, nombreArchivo); return; }
+      try { await navigator.share({ files: [archivo], title: titulo }); }
+      catch (err) { if (err.name !== "AbortError") descargarCanvas(canvas, nombreArchivo); }
+    }, "image/png");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Ranking completo de la categoría, con foto de fondo arriba que se funde a
+// oscuro (la imagen crece hacia abajo según la cantidad de jugadores)
+async function exportarRankingCompleto() {
+  if (!ultimoRankingExport || ultimoRankingExport.lista.length === 0) { toast("No hay ranking cargado para compartir"); return; }
+  await cargarFuentesExport();
+  const { categoria, lista } = ultimoRankingExport;
+  const [fondo, logos] = await Promise.all([cargarImagenParaCanvas("foto-ranking.jpg"), logosPlaca()]);
+  const conSponsors = !!(logos.general || logos.fila.length);
+  const W = 1080, altoFila = 64, inicioLista = 380;
+  const H = Math.max(1920, inicioLista + lista.length * altoFila + 140 + (conSponsors ? ALTO_BANDA_SPONSORS : 0));
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#07090B";
+  ctx.fillRect(0, 0, W, H);
+  if (fondo) {
+    const altoFoto = Math.min(H, 1500);
+    dibujarImagenCover(ctx, fondo, 0, 0, W, altoFoto);
+    const fundido = ctx.createLinearGradient(0, 0, 0, altoFoto);
+    fundido.addColorStop(0, "rgba(7,9,11,.82)");
+    fundido.addColorStop(0.35, "rgba(7,9,11,.6)");
+    fundido.addColorStop(1, "rgba(7,9,11,1)");
+    ctx.fillStyle = fundido;
+    ctx.fillRect(0, 0, W, altoFoto);
+  }
+  encabezadoImagenExport(ctx, W, categoria, "RANKING COMPLETO");
+  const colorPosicion = (pos) => pos === 1 ? "#ffd700" : pos === 2 ? "#c9d3e0" : pos === 3 ? "#ff9d5c" : "#F3F5F4";
+  lista.forEach((j, i) => {
+    const y = inicioLista + i * altoFila;
+    if (i % 2 === 0) { ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fillRect(60, y, W - 120, altoFila - 6); }
+    if (i === 20) { ctx.fillStyle = "#B9FF3D"; ctx.fillRect(60, y - 4, W - 120, 2); } // corte del Master (top 20)
+    const base = y + altoFila / 2 + 10;
+    ctx.textAlign = "left";
+    ctx.fillStyle = colorPosicion(i + 1);
+    ctx.font = "italic 800 36px 'Barlow Condensed'";
+    ctx.fillText(String(i + 1).padStart(2, "0"), 90, base);
+    ctx.fillStyle = "#F3F5F4";
+    ctx.font = "700 30px Manrope";
+    ctx.fillText(`${j.nombre} ${j.apellido}`, 175, base);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#B9FF3D";
+    ctx.font = "800 36px 'Barlow Condensed'";
+    ctx.fillText(String(j.puntos_ranking), W - 90, base);
+  });
+  if (conSponsors) dibujarSponsorsPlaca(ctx, W, H, logos);
+  piePaginaImagenExport(ctx, W, H);
+  compartirCanvas(canvas, `ranking-${categoria.replace(/\s+/g, "-").toLowerCase()}.png`, `Ranking ${categoria} · Norte Padel`);
+}
+
+// ============================================================
+// PERFIL COMPLETO: posición, efectividad, evolución de puntos, recorrido por
+// torneo, últimos partidos y compañeros (todo con SVG nativo, sin librerías)
+// ============================================================
+let perfilJugadorActual = null;
+const ETAPAS_RECORRIDO = ["", "Zona", "16avos", "Octavos", "Cuartos", "Semi", "Final", "Campeón"];
+const fechaCorta = (f) => new Date(String(f).length <= 10 ? f + "T12:00:00" : f).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+function mostrarCard(id, html) {
+  document.getElementById(id.replace("Card", "")).innerHTML = html;
+  document.getElementById(id).hidden = !html;
+}
+function graficoEvolucion(historial) {
+  if (historial.length < 2) return `<p class="match-meta">Desde ahora guardamos los puntos después de cada fecha: el gráfico se va armando solo.</p>`;
+  const W = 600, H = 200, m = { t: 24, r: 16, b: 28, l: 44 };
+  const vals = historial.map((h) => Number(h.puntos));
+  const min = Math.min(...vals), max = Math.max(...vals), rango = max - min || 1;
+  const x = (i) => m.l + (i * (W - m.l - m.r)) / (historial.length - 1);
+  const y = (v) => m.t + (1 - (v - min) / rango) * (H - m.t - m.b);
+  const pts = historial.map((h, i) => `${x(i)},${y(Number(h.puntos))}`).join(" ");
+  const ult = historial.length - 1;
+  return `<svg class="pj-grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Puntos: de ${vals[0]} el ${fechaCorta(historial[0].dia)} a ${vals[ult]} el ${fechaCorta(historial[ult].dia)}">
+    <line class="eje" x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" />
+    <text class="eje-txt" x="${m.l - 8}" y="${y(max) + 4}" text-anchor="end">${max}</text>
+    <text class="eje-txt" x="${m.l - 8}" y="${y(min) + 4}" text-anchor="end">${min}</text>
+    <text class="eje-txt" x="${m.l}" y="${H - 8}">${fechaCorta(historial[0].dia)}</text>
+    <text class="eje-txt" x="${W - m.r}" y="${H - 8}" text-anchor="end">${fechaCorta(historial[ult].dia)}</text>
+    <polygon class="area" points="${m.l},${H - m.b} ${pts} ${x(ult)},${H - m.b}" />
+    <polyline class="linea" points="${pts}" />
+    ${historial.map((h, i) => `<circle class="punto${i === ult ? " ultimo" : ""}" cx="${x(i)}" cy="${y(Number(h.puntos))}" r="${i === ult ? 6 : 4}"><title>${fechaCorta(h.dia)}: ${h.puntos} pts</title></circle>`).join("")}
+    <text class="valor" x="${x(ult)}" y="${y(vals[ult]) - 12}" text-anchor="end">${vals[ult]} pts</text>
+  </svg>`;
+}
+function graficoRecorrido(torneos) {
+  if (!torneos.length) return "";
+  const lista = [...torneos].reverse(); // del más viejo al más nuevo
+  const W = 600, H = 220, m = { t: 26, b: 40 }, ancho = W / lista.length, barra = Math.min(46, ancho * 0.6);
+  return `<svg class="pj-grafico" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hasta dónde llegó en cada torneo">
+    <line class="eje" x1="0" x2="${W}" y1="${H - m.b}" y2="${H - m.b}" />
+    ${lista.map((t, i) => {
+      const alto = (t.nivel / 7) * (H - m.t - m.b), cx = ancho * i + ancho / 2;
+      return `<g><title>${escapeHtml(t.nombre)} (${escapeHtml(t.categoria || "")}): ${ETAPAS_RECORRIDO[t.nivel]} · ${t.ganados}G ${t.jugados - t.ganados}P</title>
+        <rect class="barra${t.nivel === 7 ? " campeon" : ""}" x="${cx - barra / 2}" y="${H - m.b - alto}" width="${barra}" height="${alto}" rx="4" />
+        <text class="valor" x="${cx}" y="${H - m.b - alto - 8}" text-anchor="middle">${ETAPAS_RECORRIDO[t.nivel]}</text>
+        <text class="eje-txt" x="${cx}" y="${H - m.b + 18}" text-anchor="middle">${escapeHtml(String(t.nombre).replace(/fecha puntuable/i, "F").slice(0, 10))}</text>
+      </g>`;
+    }).join("")}
+  </svg>`;
+}
+function renderPerfilCompleto(j, extra) {
+  document.getElementById("pjPosicion").textContent = extra.posicion && extra.total_categoria
+    ? `#${extra.posicion} de ${extra.total_categoria} en ${j.categoria}` : "";
+  const ef = j.partidos_jugados > 0 ? Math.round((j.partidos_ganados / j.partidos_jugados) * 100) : null;
+  document.getElementById("pjMeter").innerHTML = ef === null ? "" : `
+    <div class="pj-meter-barra" role="img" aria-label="Efectividad ${ef}%: ${j.partidos_ganados} ganados de ${j.partidos_jugados}"><span style="width:${ef}%"></span></div>
+    <p class="match-meta">${j.partidos_ganados} ganados · ${j.partidos_jugados - j.partidos_ganados} perdidos</p>`;
+  mostrarCard("pjEvolucionCard", (extra.historial || []).length ? graficoEvolucion(extra.historial) : "");
+  mostrarCard("pjRecorridoCard", graficoRecorrido(extra.torneos || []));
+  const partidos = extra.partidos || [];
+  document.getElementById("pjRacha").innerHTML = partidos.slice(0, 10).reverse()
+    .map((p) => `<span class="pj-chip ${p.gano ? "g" : "p"}" title="${p.gano ? "Ganó" : "Perdió"}">${p.gano ? "G" : "P"}</span>`).join("");
+  mostrarCard("pjUltimosCard", partidos.map((p) => {
+    const sets = (p.sets || []).map((st) => p.lado === 1 ? `${st.p1}-${st.p2}` : `${st.p2}-${st.p1}`).join(" ");
+    return `<div class="pj-partido">
+      <span class="pj-chip ${p.gano ? "g" : "p"}">${p.gano ? "G" : "P"}</span>
+      <div><strong>${escapeHtml(p.torneo)}</strong> · ${escapeHtml(p.ronda || "")} <span class="match-meta">${fechaCorta(p.cuando)}</span>
+      <div class="match-meta">con ${escapeHtml(p.companero || "?")} vs ${escapeHtml(p.rivales || "?")}</div></div>
+      <span class="pj-sets">${sets}</span>
+    </div>`;
+  }).join(""));
+  mostrarCard("pjCompanerosCard", (extra.companeros || []).map((c) => `<div class="pj-companero">
+    <strong>${escapeHtml(c.nombre)}</strong>
+    <span class="match-meta">${plural(c.jugados, "partido")} · ${c.ganados} ganado${c.ganados === 1 ? "" : "s"} (${Math.round((c.ganados / c.jugados) * 100)}%)</span>
+  </div>`).join(""));
+}
+
+document.getElementById("btnCompartirPerfil").addEventListener("click", async () => {
+  if (!perfilJugadorActual) return;
+  const { j } = perfilJugadorActual;
+  const url = `${location.origin}${location.pathname}#/perfil-jugador/${j.id}`;
+  const datos = { title: `${j.nombre} ${j.apellido} · Norte Padel`, text: `Mirá el perfil de ${j.nombre} ${j.apellido} en el circuito Norte Padel`, url };
+  try {
+    if (navigator.share) { await navigator.share(datos); return; }
+    await navigator.clipboard.writeText(url);
+    toast("Link del perfil copiado");
+  } catch (e) {
+    if (e.name !== "AbortError") toast("No se pudo compartir: copiá el link de la barra del navegador");
+  }
+});
+
+// Tarjeta de perfil para historias (1080x1920)
+function dibujarFotoCircular(ctx, foto, iniciales, cx, cy, radio) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+  ctx.clip();
+  if (foto) {
+    const lado = Math.min(foto.width, foto.height);
+    ctx.drawImage(foto, (foto.width - lado) / 2, (foto.height - lado) / 2, lado, lado, cx - radio, cy - radio, radio * 2, radio * 2);
+  } else {
+    ctx.fillStyle = "#161A1E";
+    ctx.fillRect(cx - radio, cy - radio, radio * 2, radio * 2);
+    ctx.fillStyle = "#B9FF3D";
+    ctx.textAlign = "center";
+    ctx.font = `italic 800 ${Math.round(radio * 0.7)}px 'Barlow Condensed'`;
+    ctx.fillText(iniciales, cx, cy + radio * 0.22);
+  }
+  ctx.restore();
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "#B9FF3D";
+  ctx.beginPath();
+  ctx.arc(cx, cy, radio, 0, Math.PI * 2);
+  ctx.stroke();
+}
+async function exportarTarjetaPerfil() {
+  if (!perfilJugadorActual) return;
+  const { j, extra, titulos } = perfilJugadorActual;
+  await cargarFuentesExport();
+  const W = 1080, H = 1920;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const [foto, fondo, logos] = await Promise.all([cargarImagenParaCanvas(urlSegura(j.foto_url)), cargarImagenParaCanvas("ranking-bg-campeon.jpg"), logosPlaca()]);
+  const dibujar = (conFoto) => {
+    ctx.clearRect(0, 0, W, H);
+    fondoImagenExport(ctx, W, H, fondo);
+    encabezadoImagenExport(ctx, W, j.categoria, "PERFIL DE JUGADOR");
+    dibujarFotoCircular(ctx, conFoto ? foto : null, `${j.nombre[0] || ""}${j.apellido[0] || ""}`, W / 2, 600, 230);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#F3F5F4";
+    ctx.font = "italic 800 92px 'Barlow Condensed'";
+    ctx.fillText(`${j.nombre} ${j.apellido}`.toUpperCase(), W / 2, 950);
+    if (extra.posicion) {
+      ctx.fillStyle = "#B9FF3D";
+      ctx.font = "700 40px 'Barlow Condensed'";
+      ctx.fillText(`#${extra.posicion} DE ${extra.total_categoria} EN ${String(j.categoria).toUpperCase()}`, W / 2, 1010);
+    }
+    const ef = j.partidos_jugados > 0 ? Math.round((j.partidos_ganados / j.partidos_jugados) * 100) + "%" : "—";
+    const datos = [[String(j.puntos_ranking), "PUNTOS"], [ef, "EFECTIVIDAD"], [String(j.partidos_jugados), "PARTIDOS"], [String(titulos), titulos === 1 ? "TÍTULO" : "TÍTULOS"]];
+    datos.forEach(([valor, etiqueta], i) => {
+      const cx = 150 + (i % 2) * 520 + 130, cy = 1110 + Math.floor(i / 2) * 200;
+      ctx.fillStyle = "rgba(255,255,255,.07)";
+      ctx.fillRect(cx - 230, cy, 460, 170);
+      ctx.fillStyle = "#B9FF3D";
+      ctx.font = "italic 800 92px 'Barlow Condensed'";
+      ctx.fillText(valor, cx, cy + 100);
+      ctx.fillStyle = "#8D969C";
+      ctx.font = "700 30px 'Barlow Condensed'";
+      ctx.fillText(etiqueta, cx, cy + 145);
+    });
+    if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#8D969C";
+    ctx.font = "600 24px Manrope";
+    ctx.fillText("elnortepadel.com", W / 2, H - 50);
+  };
+  const nombre = `perfil-${j.nombre}-${j.apellido}`.toLowerCase().replace(/\s+/g, "-") + ".png";
+  dibujar(true);
+  if (!compartirCanvas(canvas, nombre, `${j.nombre} ${j.apellido} · Norte Padel`) && foto) {
+    dibujar(false); // la foto no se pudo leer (permisos de imagen): sale con iniciales
+    compartirCanvas(canvas, nombre, `${j.nombre} ${j.apellido} · Norte Padel`);
+  }
+}
+document.getElementById("btnTarjetaPerfil").addEventListener("click", conBotonOcupado(exportarTarjetaPerfil));
+
+// ============================================================
+// AVISOS EN EL CELULAR (push): una hora antes de cada partido y cuando cambia
+// un horario. Los manda la función "enviar-push" de Supabase; acá solo se
+// registra este celular. En iPhone hace falta tener la app agregada a la
+// pantalla de inicio.
+// ============================================================
+const VAPID_PUBLICA = "BFMznZ4-fmteUiCyhlHs_8baA_mM__VGrVdKyT1kDhMxhXzf5x05peaN9wsj_E5g0CEKzzVZw1ojzyjBhOlu3_k";
+const bytesDeBase64Url = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (t.length % 4)) % 4)), (c) => c.charCodeAt(0));
+const pushDisponible = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+async function suscribirAvisos(pedirPermiso) {
+  if (!miJugador || !pushDisponible()) return;
+  if (pedirPermiso && Notification.permission === "default") await Notification.requestPermission();
+  if (Notification.permission !== "granted") return;
+  const reg = await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription())
+    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytesDeBase64Url(VAPID_PUBLICA) });
+  // si este celular ya estaba registrado, la base lo rechaza por repetido: está bien
+  await sb.from("push_subscriptions").insert({ jugador_id: miJugador.id, subscription: sub.toJSON() });
+}
+async function renderAvisos() {
+  const estado = document.getElementById("avisosEstado");
+  const btn = document.getElementById("btnActivarAvisos");
+  const esIphone = /iphone|ipad/i.test(navigator.userAgent);
+  const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  btn.hidden = true;
+  if (!pushDisponible()) {
+    estado.textContent = esIphone && !instalada
+      ? "En iPhone, primero agregá la app a la pantalla de inicio (botón Compartir → «Agregar a inicio»), abrila desde ahí y volvé a esta pantalla."
+      : "Este navegador no permite avisos. Probá desde Chrome en Android o con la app agregada a la pantalla de inicio.";
+    return;
+  }
+  if (Notification.permission === "denied") {
+    estado.textContent = "Bloqueaste los avisos para este sitio. Para activarlos, permitilos desde la configuración del navegador.";
+    return;
+  }
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  if (Notification.permission === "granted" && sub) {
+    estado.textContent = "✓ Avisos activados en este celular: te avisamos una hora antes de cada partido y si te cambian el horario.";
+    return;
+  }
+  estado.textContent = "Te avisamos una hora antes de cada partido y si te cambian el horario.";
+  btn.hidden = false;
+}
+document.getElementById("btnActivarAvisos").addEventListener("click", conBotonOcupado(async () => {
+  try { await suscribirAvisos(true); } catch (e) { toast("No se pudieron activar los avisos en este celular"); }
+  renderAvisos();
+}));
+
+// ============================================================
+// VISITAS (Gestión › Panel): sesiones por día y secciones más vistas
+// ============================================================
+const NOMBRE_SECCION = { inicio: "Inicio", torneos: "Torneos", torneo: "Páginas de torneos", ranking: "Ranking", "en-vivo": "En vivo", sponsors: "Sponsors", evento: "Eventos", "perfil-jugador": "Perfiles de jugadores", perfil: "Mi perfil" };
+async function cargarVisitasAdmin() {
+  const cont = document.getElementById("admVisitas");
+  const dias = Array.from({ length: 30 }, (_, i) => new Date(Date.now() - (29 - i) * 864e5).toLocaleDateString("sv"));
+  const { data, error } = await sb.from("visitas").select("dia, seccion, visitas").gte("dia", dias[0]);
+  if (error) { cont.innerHTML = '<p class="match-meta">Todavía no hay datos de visitas.</p>'; return; }
+  const porDia = Object.fromEntries(dias.map((d) => [d, 0]));
+  const porSeccion = {};
+  data.forEach((v) => {
+    if (v.seccion === "sesion") { if (v.dia in porDia) porDia[v.dia] += v.visitas; }
+    else porSeccion[v.seccion] = (porSeccion[v.seccion] || 0) + v.visitas;
+  });
+  const total = Object.values(porDia).reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...Object.values(porDia));
+  const W = 600, H = 140, ancho = W / dias.length;
+  cont.innerHTML = `
+    <p class="adm-visitas-total"><strong>${total.toLocaleString("es-AR")}</strong> visitas en 30 días · hoy ${porDia[dias[29]]}</p>
+    <svg class="pj-grafico" viewBox="0 0 ${W} ${H + 20}" role="img" aria-label="Visitas por día en los últimos 30 días, máximo ${max}">
+      <line class="eje" x1="0" x2="${W}" y1="${H}" y2="${H}" />
+      ${dias.map((d, i) => { const alto = (porDia[d] / max) * (H - 10); return `<rect class="barra" x="${i * ancho + 2}" y="${H - alto}" width="${ancho - 4}" height="${alto}" rx="2"><title>${fechaCorta(d)}: ${porDia[d]} visitas</title></rect>`; }).join("")}
+      <text class="eje-txt" x="0" y="${H + 16}">${fechaCorta(dias[0])}</text>
+      <text class="eje-txt" x="${W}" y="${H + 16}" text-anchor="end">Hoy</text>
+    </svg>
+    <ul class="adm-visitas-secciones">${Object.entries(porSeccion).sort((a, b) => b[1] - a[1])
+      .map(([sec, n]) => `<li><span>${NOMBRE_SECCION[sec] || sec}</span><strong>${n.toLocaleString("es-AR")}</strong></li>`).join("")}</ul>
+    <p class="match-meta">Una visita = una persona que abre el sitio (se cuenta una vez por sesión). Las tuyas como admin no cuentan.</p>`;
+}
 
 // ============================================================
 // PERFIL PÚBLICO DE JUGADOR (foto grande, stats, torneos ganados)
@@ -1009,11 +1412,12 @@ async function abrirPerfilJugador(jugadorId) {
   }
   cambiarVista("perfil-jugador", "/perfil-jugador/" + jugadorId);
 
-  const [{ data: jugadores }, { data: torneosGanados }, { data: finalesPerdidas }, { data: estadisticasRows }] = await Promise.all([
+  const [{ data: jugadores }, { data: torneosGanados }, { data: finalesPerdidas }, { data: estadisticasRows }, { data: perfilExtra }] = await Promise.all([
     sb.rpc("jugadores_publicos"),
     sb.rpc("torneos_ganados_publico", { p_jugador_id: jugadorId }),
     sb.rpc("finales_perdidas_publico", { p_jugador_id: jugadorId }),
-    sb.rpc("estadisticas_jugador", { p_jugador_id: jugadorId })
+    sb.rpc("estadisticas_jugador", { p_jugador_id: jugadorId }),
+    sb.rpc("perfil_jugador_publico", { p_jugador_id: jugadorId })
   ]);
   const j = (jugadores || []).find((x) => x.id === jugadorId);
   if (!j) { toast("No se encontró el jugador"); cambiarVista(vistaAntesDePerfilJugador); return; }
@@ -1035,6 +1439,8 @@ async function abrirPerfilJugador(jugadorId) {
     : "sin partidos";
   document.getElementById("pjPrimerUltimoTorneo").textContent =
     est.primer_torneo ? `Primer torneo: ${est.primer_torneo} · Último: ${est.ultimo_torneo}` : "";
+  perfilJugadorActual = { j, est, extra: perfilExtra || {}, titulos: (torneosGanados || []).length };
+  renderPerfilCompleto(j, perfilExtra || {});
 
   const cont = document.getElementById("pjTorneosGanados");
   cont.innerHTML = (torneosGanados || []).length > 0
@@ -3933,6 +4339,7 @@ async function cargarPanelAdmin() {
     if (sinPago) pendientes.push([`${sinPago} pareja${sinPago === 1 ? "" : "s"} con pago pendiente`, `${t.nombre} · Inscripciones`, "inscripciones"]);
     if (sueltos) pendientes.push([`${sueltos} jugador${sueltos === 1 ? "" : "es"} sin pareja`, `${t.nombre} · Inscripciones`, "inscripciones"]);
   }
+  cargarVisitasAdmin();
   const { count: consultas } = await sb.from("sponsor_consultas").select("id", { count: "exact", head: true }).eq("leida", false);
   if (areaAdmin !== "panel") return;
   if (consultas) pendientes.push([`${plural(consultas, "consulta")} de sponsors sin leer`, "Contenido · Consultas de sponsors", "consultasSponsors"]);
@@ -6420,7 +6827,7 @@ function renderSponsorItem(s, caption, admin) {
   // si el logo no carga, se muestra el nombre del auspiciante en su lugar (ver data-si-falla)
   const contenido = `<img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" />` +
     (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
-  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "") + (s.nivel === "frente" ? " sponsor-frente" : "");
+  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "") + (s.nivel === "frente" ? " sponsor-frente" : s.nivel === "principal" ? " sponsor-principal" : "");
   const item = hrefSeguro(s.link_url)
     ? `<a href="${hrefSeguro(s.link_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
     : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
@@ -6460,7 +6867,13 @@ function mostrarEn(id, html) {
 // General: franja "presentado por" arriba de todas las secciones.
 // Principal: banner grande en Inicio. Frente, Manga y Espalda (y los
 // auspiciantes sin nivel): listado de partners, Frente primero y más grande.
+let sponsorsVigentes = []; // los de la fecha en curso (para las placas del ranking)
 function renderUbicacionesSponsors(vigentes) {
+  sponsorsVigentes = vigentes;
+  // En vivo: la transmisión acompañada por el Principal y los Frente
+  const transmision = vigentes.filter((s) => s.nivel === "principal" || s.nivel === "frente");
+  mostrarEn("enVivoSponsors", transmision.length
+    ? `<p class="sponsor-label">Transmisión acompañada por</p><div class="sponsor-strip">${transmision.map((s) => renderSponsorItem(s)).join("")}</div>` : "");
   const general = vigentes.find((s) => s.nivel === "general");
   mostrarEn("spPresentado", general ? `<span class="sp-presentado-texto">El Norte Pádel <span>presentado por</span></span>${renderSponsorItem(general)}` : "");
   const principal = vigentes.find((s) => s.nivel === "principal");
@@ -7442,6 +7855,39 @@ if ("serviceWorker" in navigator) {
   // el número de versión de más arriba (CACHE) siempre se nota apenas se sube.
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {}));
 }
+
+// "Descargar app": en Android/Chrome usa el aviso de instalación del propio
+// navegador; en iPhone (que no lo tiene) muestra los pasos para agregarla.
+let pedidoInstalacion = null;
+const appInstalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function actualizarBotonInstalar() {
+  document.getElementById("btnInstalarApp").hidden = appInstalada() || !(pedidoInstalacion || esIOS || matchMedia("(pointer: coarse)").matches);
+}
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); pedidoInstalacion = e; actualizarBotonInstalar(); });
+window.addEventListener("appinstalled", () => { pedidoInstalacion = null; actualizarBotonInstalar(); toast("¡Listo! Norte Padel ya está en tu pantalla de inicio"); });
+document.getElementById("btnInstalarApp").addEventListener("click", async () => {
+  if (pedidoInstalacion) {
+    pedidoInstalacion.prompt();
+    await pedidoInstalacion.userChoice;
+    pedidoInstalacion = null;
+    actualizarBotonInstalar();
+    return;
+  }
+  document.getElementById("instalarPasos").innerHTML = esIOS
+    ? `<li>Abrí elnortepadel.com en <strong>Safari</strong>.</li>
+       <li>Tocá el botón <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba).</li>
+       <li>Elegí <strong>"Agregar a inicio"</strong> y confirmá.</li>
+       <li>Abrí Norte Padel desde el ícono nuevo.</li>`
+    : `<li>Abrí el menú del navegador (los <strong>tres puntitos</strong>).</li>
+       <li>Elegí <strong>"Instalar app"</strong> o <strong>"Agregar a la pantalla de inicio"</strong>.</li>
+       <li>Abrí Norte Padel desde el ícono nuevo.</li>`;
+  document.getElementById("instalarOverlay").style.display = "flex";
+  document.getElementById("btnCerrarInstalar").focus();
+});
+document.getElementById("btnCerrarInstalar").addEventListener("click", () => { document.getElementById("instalarOverlay").style.display = "none"; });
+document.getElementById("instalarOverlay").addEventListener("click", (e) => { if (e.target.id === "instalarOverlay") e.target.style.display = "none"; });
+actualizarBotonInstalar();
 
 // ============================================================
 // INIT

@@ -42,6 +42,17 @@
   </div>
 </div>
 
+<div id="instalarOverlay" class="overlay-bloqueante" style="display:none" role="dialog" aria-modal="true" aria-labelledby="instalarTitulo">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 style="margin:0" id="instalarTitulo">Norte Padel en tu celular</h2>
+      <button type="button" class="secondary small" id="btnCerrarInstalar">Cerrar</button>
+    </div>
+    <p class="match-meta" style="margin:10px 0 4px">Queda como una app más, con su ícono, y te llegan los avisos de tus partidos.</p>
+    <ol class="instalar-pasos" id="instalarPasos"></ol>
+  </div>
+</div>
+
 <div id="notifOverlay" class="overlay-bloqueante" style="display:none">
   <div class="card" style="max-height:80vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -79,6 +90,11 @@
 <header class="topbar">
   <div class="logo-ring"><img src="icon-192.png" alt="Norte Padel" /></div>
   <h1>NORTE <span>PADEL</span></h1>
+  <!-- "Descargar app": solo aparece si la app todavía no está instalada en este celular -->
+  <button type="button" id="btnInstalarApp" class="btn-instalar-app" aria-label="Descargar la app" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+    <span class="txt-largo">Descargar app</span><span class="txt-corto" aria-hidden="true">App</span>
+  </button>
   <button id="btnNotif" title="Notificaciones" aria-label="Notificaciones">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
     <span id="notifCount"></span>
@@ -452,6 +468,9 @@
     <div class="card card-ranking">
       <div class="pill-row tabs-linea" id="generoRankingPills"></div>
       <div class="pill-row" id="categoriaPills"></div>
+      <div class="pill-row" style="margin-bottom:6px">
+        <button type="button" class="secondary small" id="btnCompartirRanking">Compartir ranking completo (imagen)</button>
+      </div>
       <div class="pill-row admin-only" style="margin-bottom:10px">
         <button type="button" class="secondary small" id="btnExportarTop20">Exportar Top 20 (imagen)</button>
         <button type="button" class="secondary small" id="btnExportarCampeon">Exportar Campeón (imagen)</button>
@@ -478,6 +497,7 @@
       <div class="video-embed-16-9" id="enVivoVideoWrap" style="display:none"></div>
       <p class="empty" id="enVivoSinVideo" style="display:none">No hay transmisión en este momento.</p>
     </div>
+    <div class="sp-envivo" id="enVivoSponsors" hidden></div>
     <div class="seccion" id="enVivoPartidosWrap" style="display:none">
       <div id="enVivoJugandoWrap" style="display:none">
         <h3><span class="live-dot"></span>Jugándose ahora</h3>
@@ -667,6 +687,7 @@
         <div>
           <h2 id="pjNombre"></h2>
           <span class="badge" id="pjCategoria"></span>
+          <p class="pj-posicion" id="pjPosicion"></p>
           <div class="pj-trofeos" id="pjTrofeos" style="display:none"></div>
         </div>
       </div>
@@ -676,6 +697,10 @@
         <div><strong id="pjGanados"></strong><span>Ganados</span></div>
         <div><strong id="pjEfectividad"></strong><span>Efectividad</span></div>
       </div>
+      <div class="pj-acciones">
+        <button type="button" class="primary" id="btnCompartirPerfil">Compartir perfil</button>
+        <button type="button" class="secondary" id="btnTarjetaPerfil">Descargar tarjeta</button>
+      </div>
     </div>
     <div class="card">
       <h3>Rendimiento</h3>
@@ -684,7 +709,25 @@
         <div><strong id="pjTotalTorneos"></strong><span>Torneos jugados</span></div>
         <div><strong id="pj6m"></strong><span>Últimos 6 meses</span></div>
       </div>
+      <div class="pj-meter" id="pjMeter"></div>
       <p class="match-meta" id="pjPrimerUltimoTorneo" style="margin-top:10px"></p>
+    </div>
+    <div class="card" id="pjEvolucionCard" hidden>
+      <h3>Evolución de puntos</h3>
+      <div id="pjEvolucion"></div>
+    </div>
+    <div class="card" id="pjRecorridoCard" hidden>
+      <h3>Recorrido por torneo</h3>
+      <div id="pjRecorrido"></div>
+    </div>
+    <div class="card" id="pjUltimosCard" hidden>
+      <h3>Últimos partidos</h3>
+      <div class="pj-racha" id="pjRacha"></div>
+      <div id="pjUltimos"></div>
+    </div>
+    <div class="card" id="pjCompanerosCard" hidden>
+      <h3>Compañeros frecuentes</h3>
+      <div id="pjCompaneros"></div>
     </div>
     <div class="card">
       <h3>Torneos ganados</h3>
@@ -786,6 +829,12 @@
         <div class="inicio-partidos-grid" id="inicioMisPartidosGrid"></div>
       </div>
 
+      <div class="card" id="avisosCard">
+        <h3>Avisos en el celular</h3>
+        <p class="match-meta" id="avisosEstado">Te avisamos una hora antes de cada partido y si te cambian el horario.</p>
+        <button type="button" class="primary" id="btnActivarAvisos">Activar avisos en este celular</button>
+      </div>
+
       <div class="card perfil-cuenta">
         <h3>Cuenta</h3>
         <div class="perfil-cuenta-acciones">
@@ -858,6 +907,10 @@
       <div class="card" id="admPanelPendientesCard">
         <h3>Para resolver</h3>
         <div id="admPanelPendientes"><p class="match-meta">Cargando…</p></div>
+      </div>
+      <div class="card" id="admVisitasCard">
+        <h3>Visitas a la web · últimos 30 días</h3>
+        <div id="admVisitas"><p class="match-meta">Cargando…</p></div>
       </div>
       <div class="adm-panel-accesos">
         <button type="button" class="adm-acceso" data-area="torneos"><strong>Torneos</strong><span>Crear, inscripciones, partidos</span></button>

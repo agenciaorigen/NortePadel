@@ -2120,3 +2120,62 @@ a.sp-banner:hover, a.sp-banner:focus-visible { border-color: var(--accent); }
   box-shadow: 0 0 0 3px rgba(7,9,11,.55);
 }
 .sp-ocupadas { margin: 8px 0 0; font-size: 13.5px; color: var(--accent-bright); }
+
+/* En vivo: sponsors de la transmisión, debajo del video */
+.sp-envivo { margin: 0 0 28px; }
+.sp-envivo .sponsor-strip { justify-content: center; flex-wrap: wrap; overflow: visible; gap: 14px; }
+.sp-envivo .sponsor-frente img { height: 48px; }
+.sp-envivo .sponsor-principal img { height: 68px; max-width: 240px; }
+/* Patrocinador General más grande en Inicio (en el resto queda la franja fina) */
+.app-body:has(#view-inicio.active) .sp-presentado { padding: 18px 20px; gap: 10px 22px; border-color: rgba(var(--accent-rgb),.4); }
+.app-body:has(#view-inicio.active) .sp-presentado-texto { font-size: 24px; }
+.app-body:has(#view-inicio.active) .sp-presentado img { height: 56px; max-width: 240px; }
+@media (min-width: 960px) {
+  .app-body:has(#view-inicio.active) .sp-presentado-texto { font-size: 30px; }
+  .app-body:has(#view-inicio.active) .sp-presentado img { height: 72px; max-width: 300px; }
+}
+
+/* ============================================================
+   PERFIL COMPLETO: posición, acciones, gráficos (SVG) y últimos partidos
+   ============================================================ */
+.pj-posicion { margin: 6px 0 0; font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: .04em; color: var(--accent-bright); }
+.pj-posicion:empty { display: none; }
+.pj-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.pj-acciones button { width: auto; margin: 0; flex: 1 1 160px; }
+.pj-meter { margin-top: 14px; }
+.pj-meter-barra { height: 10px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.pj-meter-barra span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.pj-meter .match-meta { margin: 6px 0 0; }
+.pj-grafico { width: 100%; height: auto; display: block; overflow: visible; }
+.pj-grafico .eje { stroke: var(--border); stroke-width: 1; }
+.pj-grafico .eje-txt { fill: var(--muted); font-size: 12px; font-family: var(--font-body); }
+.pj-grafico .valor { fill: var(--text); font-size: 13px; font-weight: 700; font-family: var(--font-display); letter-spacing: .03em; }
+.pj-grafico .linea { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.pj-grafico .area { fill: rgba(var(--accent-rgb), .12); }
+.pj-grafico .punto { fill: var(--card); stroke: var(--accent); stroke-width: 2; }
+.pj-grafico .punto.ultimo { fill: var(--accent); }
+.pj-grafico .barra { fill: rgba(var(--accent-rgb), .55); }
+.pj-grafico .barra.campeon, .pj-grafico g:hover .barra, .pj-grafico rect.barra:hover { fill: var(--accent); }
+.pj-racha { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pj-racha:empty { display: none; }
+.pj-chip { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; font-family: var(--font-display); font-weight: 800; font-size: 14px; flex: none; }
+.pj-chip.g { background: var(--accent); color: var(--accent-ink); }
+.pj-chip.p { background: rgba(255,255,255,.08); color: var(--muted); border: 1px solid var(--border); }
+.pj-partido { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.pj-partido .match-meta { margin: 2px 0 0; }
+.pj-sets { font-family: var(--font-display); font-weight: 700; font-size: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pj-companero { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--border); }
+.pj-companero:first-child, .pj-partido:first-child { border-top: none; }
+
+/* Gestión › Panel: visitas */
+.adm-visitas-total { margin: 0 0 10px; color: var(--muted); }
+.adm-visitas-total strong { font-family: var(--font-display); font-size: 34px; color: var(--accent-bright); margin-right: 4px; }
+.adm-visitas-secciones { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 4px; }
+.adm-visitas-secciones li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+
+/* "Descargar app" en el encabezado */
+header.topbar button.btn-instalar-app { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
+header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); }
+.btn-instalar-app .txt-corto { display: none; }
+@media (max-width: 480px) { .btn-instalar-app .txt-largo { display: none; } .btn-instalar-app .txt-corto { display: inline; } }
+.instalar-pasos { margin: 12px 0 0; padding-left: 22px; display: grid; gap: 10px; line-height: 1.45; }

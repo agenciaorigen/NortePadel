@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v146";
+const CACHE = "norte-padel-v149";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -60,7 +60,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "Norte Padel", {
       body: data.body,
       icon: "icon-192.png",
-      badge: "icon-192.png"
+      badge: "icon-192.png",
+      data: { url: data.url || "./" }
     })
   );
 });
@@ -68,9 +69,11 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(
+    // abre (o lleva) la app a la pantalla del aviso, ej. el torneo del partido
     self.clients.matchAll({ type: "window" }).then((clients) => {
-      if (clients.length > 0) return clients[0].focus();
-      return self.clients.openWindow("./index.html");
+      const url = new URL((event.notification.data && event.notification.data.url) || "./", self.registration.scope).href;
+      if (clients.length > 0) return clients[0].navigate(url).then((c) => (c || clients[0]).focus());
+      return self.clients.openWindow(url);
     })
   );
 });
