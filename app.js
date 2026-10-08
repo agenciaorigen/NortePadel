@@ -5937,12 +5937,18 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     // uno) el nombre solo no alcanza para distinguirlas -- se antepone el
     // predio, mismo formato "Predio · Cancha" que ya se usa en el selector
     // de "Cambiar cancha" de la vista Lista.
-    html += `<div></div>` + canchas.map((c) => {
+    // cabecera fija arriba (y la columna de horas fija a la izquierda) al
+    // scrollear, con un color por predio para no perderse entre canchas
+    const predios = [...new Set(canchas.map((c) => c.complejo_id))];
+    html += `<div class="calendario-grid-esquina"></div>` + canchas.map((c) => {
       const complejo = cacheComplejos.find((x) => x.id === c.complejo_id);
-      return `<div class="calendario-grid-cabecera">${complejo ? `<span class="calendario-grid-predio">${complejo.nombre}</span>` : ""}${c.nombre}</div>`;
+      return `<div class="calendario-grid-cabecera predio-${predios.indexOf(c.complejo_id) % 4}">${complejo ? `<span class="calendario-grid-predio">${escapeHtml(complejo.nombre)}</span>` : ""}${escapeHtml(c.nombre)}</div>`;
     }).join("");
     filasVisibles.forEach((fila) => {
-      const fecha = new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+      // en la planilla el día ya se elige arriba: alcanza con la hora
+      const fecha = editable
+        ? new Date(fila.horarioISO).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })
+        : new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       html += `<div class="calendario-hora">${fecha}</div>`;
       fila.celdas.forEach((celda) => {
         if (celda.estado === "ocupado") html += tarjetaHtml(celda.partido);
@@ -6905,6 +6911,8 @@ function toDatetimeLocalValue(horarioISO) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// "Zona 8" / "Octavos · O3" en vez de solo el nombre de la ronda
+const etiquetaRonda = (p) => !p.slot_cuadro ? p.ronda : p.ronda === "Zona" ? `Zona ${p.slot_cuadro.slice(1)}` : `${p.ronda} · ${p.slot_cuadro}`;
 function renderPartidosLista(containerId, partidos, canchasTorneo, editable, parejasTorneo = []) {
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
@@ -6926,7 +6934,7 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
     div.innerHTML = `
       ${matchVsRowHtml(p, ganador)}
-      <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${p.ronda}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
+      <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${etiquetaRonda(p)}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
       ${editable && p.estado === "jugado" && !esByeSinJugar ? `
       <div class="match-actions">

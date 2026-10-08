@@ -2251,3 +2251,14 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
   .cuadro-cruce .cuadro-vs { display: none; }
   .cuadro-cruce select[data-l="1"] { grid-column: 2; }
 }
+
+/* Planilla: cabecera (predio + cancha) fija arriba y horas fijas a la izquierda al scrollear */
+.calendario-grid-scroll { overflow: auto; max-height: 78vh; overscroll-behavior: contain; }
+.calendario-grid-cabecera { position: sticky; top: 0; z-index: 3; border-top: 3px solid var(--predio, var(--border)); box-shadow: 0 4px 10px rgba(0,0,0,.45); }
+.calendario-grid-cabecera .calendario-grid-predio { font-size: 10px; color: var(--predio, var(--muted)); font-weight: 800; }
+.calendario-grid-cabecera.predio-0 { --predio: var(--accent-bright); }
+.calendario-grid-cabecera.predio-1 { --predio: var(--accent-2); }
+.calendario-grid-cabecera.predio-2 { --predio: #6FB7FF; }
+.calendario-grid-cabecera.predio-3 { --predio: var(--accent-3); }
+.calendario-grid-esquina { position: sticky; top: 0; left: 0; z-index: 4; background: var(--card); }
+.calendario-grid .calendario-hora { position: sticky; left: 0; z-index: 2; background: var(--card); display: flex; align-items: center; }

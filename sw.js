@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v158";
+const CACHE = "norte-padel-v160";
 const APP_SHELL = [
   "./",
   "./index.html",
