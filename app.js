@@ -7433,12 +7433,17 @@ const SILUETA_REMERA = "M31 4 L41 1 Q50 9 59 1 L69 4 L96 19 L88 37 L76 31 L76 10
 function remeraHtml(posiciones, sponsors, { editable = false, seleccion = null, color = "negra", nuevo = null } = {}) {
   const porPos = {};
   sponsors.forEach((sp) => { if (sp.posicion && !porPos[sp.posicion]) porPos[sp.posicion] = sp; });
+  // las dos mangas son del mismo sponsor: el logo de una se repite en la otra
+  const mangas = posiciones.filter((p) => p.nivel === "manga").map((p) => p.id);
+  const deManga = porPos[mangas.find((id) => porPos[id])];
+  if (deManga) mangas.forEach((id) => { porPos[id] = porPos[id] || deManga; });
+  if (nuevo && mangas.includes(nuevo.posicion)) nuevo = { ...nuevo, mangas };
   return ["frente", "espalda"].map((lado) => `
     <figure class="remera-lado remera-${color}">
       <div class="remera-lienzo" data-lado="${lado}">
         <svg viewBox="0 0 100 110" aria-hidden="true"><path d="${SILUETA_REMERA}" />${lado === "espalda" ? '<text x="50" y="23" text-anchor="middle" class="remera-club">EL NORTE PÁDEL</text>' : ""}</svg>
         ${posiciones.filter((p) => p.lado === lado).map((p) => {
-          const sp = porPos[p.id], esNuevo = nuevo && nuevo.posicion === p.id;
+          const sp = porPos[p.id], esNuevo = nuevo && (nuevo.posicion === p.id || nuevo.mangas?.includes(p.id));
           const logo = esNuevo ? nuevo.url : urlSegura(sp?.logo_url);
           const titulo = nombrePosicion(p) + (sp ? ` · ${sp.nombre}` : " · libre");
           return `<div class="remera-pos${logo ? " con-logo" : ""}${seleccion === p.id ? " seleccionada" : ""}${esNuevo ? " nueva" : ""}" data-pos="${p.id}"
@@ -7501,7 +7506,7 @@ function renderSponsorsPagina(vigentes) {
   const lugaresDe = (n) => posiciones.filter((p) => p.nivel === n);
   document.querySelectorAll("[data-cupo]").forEach((el) => {
     const n = el.dataset.cupo;
-    const cupo = lugaresDe(n).length || (n === "general" ? 1 : 0);
+    const cupo = n === "manga" ? 1 : lugaresDe(n).length || (n === "general" ? 1 : 0); // las dos mangas son un solo sponsor
     const libres = cupo - vigentes.filter((s) => s.nivel === n).length;
     el.textContent = libres <= 0 ? "completo en esta fecha" : cupo === 1 ? "disponible" : libres === 1 ? "1 lugar disponible" : `${libres} lugares disponibles`;
   });
@@ -7514,7 +7519,7 @@ function renderSponsorsPagina(vigentes) {
     const lugares = lugaresDe(n);
     return lugares.length ? `<li><b>${lugares.map((p) => p.id).join(" · ")}</b> ${nombre}</li>` : "";
   }).join("");
-  const ocupadas = vigentes.filter((s) => s.posicion && posiciones.some((p) => p.id === s.posicion)).map((s) => s.posicion);
+  const ocupadas = [...document.querySelectorAll("#spRemera .con-logo")].map((el) => Number(el.dataset.pos)); // incluye la manga repetida
   const txt = document.getElementById("spOcupadas");
   txt.hidden = !ocupadas.length;
   txt.textContent = `Ocupados en esta fecha (con logo): ${ocupadas.sort((a, b) => a - b).join(", ")}.`;
@@ -7538,6 +7543,8 @@ function renderRemeraMuestra() {
     const en = sponsorsAdminVigentes.filter((sp) => sp.posicion === p.id);
     if (en.length > 1) avisos.push(`El lugar ${p.id} tiene ${en.length} sponsors (${en.map((sp) => sp.nombre).join(", ")}): en la remera se ve solo el primero.`);
   });
+  const enMangas = sponsorsAdminVigentes.filter((sp) => posiciones.some((p) => p.id === sp.posicion && p.nivel === "manga"));
+  if (enMangas.length > 1) avisos.push(`Las dos mangas son de un solo sponsor y hay ${enMangas.length} (${enMangas.map((sp) => sp.nombre).join(", ")}): en la remera se ve solo uno.`);
   document.getElementById("remeraSinUbicar").textContent = avisos.join(" ");
   const p = posiciones.find((x) => x.id === remeraSeleccion);
   document.getElementById("remeraEditor").innerHTML = p ? `
