@@ -6470,6 +6470,116 @@ document.getElementById("partidosBusqueda").addEventListener("input", (e) => {
   renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion);
 });
 
+// ---------- Horarios para Instagram: una historia (1080x1920) por categoría ----------
+// Partidos con horario, agrupados por día; si no entran en una imagen sigue en
+// otra ("1/2", "2/2"). Respeta el filtro de categoría de arriba.
+function textoAjustado(ctx, texto, maxAncho, fuente, tamano, minimo = 20) {
+  let t = tamano;
+  do { ctx.font = fuente.replace("{t}", t); } while (ctx.measureText(texto).width > maxAncho && --t > minimo);
+}
+function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categoria, items, pagina, paginas) {
+  fondoImagenExport(ctx, W, H, fondo);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#B9FF3D";
+  ctx.font = "700 32px 'Barlow Condensed'";
+  ctx.fillText(`NORTE PADEL · ${torneoNombre.toUpperCase()}`, W / 2, 120);
+  ctx.fillStyle = "#F3F5F4";
+  textoAjustado(ctx, categoria.toUpperCase(), W - 120, "italic 800 {t}px 'Barlow Condensed'", 120, 60);
+  ctx.fillText(categoria.toUpperCase(), W / 2, 230);
+  ctx.fillStyle = "#8D969C";
+  ctx.font = "700 30px Manrope";
+  ctx.fillText(`Horarios y sedes${paginas > 1 ? ` · ${pagina}/${paginas}` : ""}`, W / 2, 285);
+  items.forEach((it) => {
+    if (it.dia) {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#B9FF3D";
+      ctx.font = "800 34px 'Barlow Condensed'";
+      ctx.fillText(it.dia.toUpperCase(), 70, it.y + 38);
+      ctx.fillRect(70, it.y + 50, W - 140, 2);
+      return;
+    }
+    const p = it.partido, x = 60, y = it.y, ancho = W - 120, alto = it.alto;
+    const nombre = (n) => (n || "?").replace(/A confirmar \([^)]*\)/g, "A confirmar"); // jugadores provisorios
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, ancho, alto, 18) : ctx.rect(x, y, ancho, alto);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#B9FF3D";
+    ctx.font = "italic 800 60px 'Barlow Condensed'";
+    ctx.fillText(new Date(p.horario).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }), x + 100, y + alto / 2 + 8);
+    ctx.fillStyle = "#8D969C";
+    ctx.font = "700 22px 'Barlow Condensed'";
+    ctx.fillText((p.slot_cuadro ? p.slot_cuadro.replace(/^Z/, "ZONA ") : p.ronda || "").toUpperCase(), x + 100, y + alto / 2 + 38);
+    ctx.fillStyle = "rgba(255,255,255,.15)";
+    ctx.fillRect(x + 200, y + 18, 2, alto - 36);
+    const xt = x + 228, maxT = ancho - 250;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#F3F5F4";
+    textoAjustado(ctx, nombre(p.pareja1_nombre), maxT, "700 {t}px Manrope", 30);
+    ctx.fillText(nombre(p.pareja1_nombre), xt, y + 44);
+    const vs = "vs  ";
+    ctx.fillStyle = "#B9FF3D";
+    ctx.font = "italic 800 28px 'Barlow Condensed'";
+    ctx.fillText(vs, xt, y + 86);
+    const anchoVs = ctx.measureText(vs).width;
+    ctx.fillStyle = "#F3F5F4";
+    textoAjustado(ctx, nombre(p.pareja2_nombre), maxT - anchoVs, "700 {t}px Manrope", 30);
+    ctx.fillText(nombre(p.pareja2_nombre), xt + anchoVs, y + 86);
+    ctx.fillStyle = "#AEB6BB";
+    ctx.font = "700 23px Manrope";
+    ctx.fillText([p.complejo_nombre, p.cancha_nombre].filter(Boolean).join(" · ") || "Sede a confirmar", xt, y + 120);
+  });
+  if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8D969C";
+  ctx.font = "700 22px Manrope";
+  ctx.fillText("Horarios sujetos a cambios · seguilos en vivo en la web", W / 2, H - 50);
+}
+async function exportarHorariosInstagram() {
+  const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro));
+  if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
+  await cargarFuentesExport();
+  const [fotoDamas, fotoCaballeros, logos] = await Promise.all([cargarImagenParaCanvas("foto-torneos.jpg"), cargarImagenParaCanvas("foto-cancha.jpg"), logosPlaca()]);
+  const W = 1080, H = 1920, altoCard = 156, altoDia = 70, inicio = 330;
+  const limite = H - 90 - (logos.general || logos.fila.length ? ALTO_BANDA_SPONSORS + 30 : 0);
+  const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
+  const categorias = [...new Set(conHorario.map((p) => p.categoria))].sort((a, b) => orden(a) - orden(b));
+  const torneoNombre = torneoGestionData?.nombre || "Torneo";
+  const imagenes = [];
+  for (const categoria of categorias) {
+    const partidos = conHorario.filter((p) => p.categoria === categoria).sort((a, b) => new Date(a.horario) - new Date(b.horario));
+    // reparte en páginas: cada día abre con su título (y se repite si sigue en la página siguiente)
+    const paginas = [[]];
+    let y = inicio, diaActual = null;
+    partidos.forEach((p) => {
+      const dia = new Date(p.horario).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+      if (y + (dia !== diaActual ? altoDia : 0) + altoCard > limite) { paginas.push([]); y = inicio; diaActual = null; }
+      if (dia !== diaActual) { paginas[paginas.length - 1].push({ dia, y }); y += altoDia; diaActual = dia; }
+      paginas[paginas.length - 1].push({ partido: p, y, alto: altoCard - 16 });
+      y += altoCard;
+    });
+    paginas.forEach((items, i) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = W; canvas.height = H;
+      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, generoDeCategoria(categoria) === "Damas" ? fotoDamas : fotoCaballeros, logos, torneoNombre, categoria, items, i + 1, paginas.length);
+      imagenes.push({ canvas, nombre: `horarios-${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
+    });
+  }
+  // en el celular: un solo menú de compartir con todas las imágenes; en la compu, se descargan
+  if (matchMedia("(pointer: coarse)").matches && navigator.canShare) {
+    const archivos = (await Promise.all(imagenes.map(({ canvas, nombre }) => new Promise((ok) =>
+      canvas.toBlob((blob) => ok(blob && new File([blob], nombre, { type: "image/png" })), "image/png"))))).filter(Boolean);
+    if (archivos.length && navigator.canShare({ files: archivos })) {
+      try { await navigator.share({ files: archivos, title: `Horarios · ${torneoNombre}` }); return; }
+      catch (err) { if (err.name === "AbortError") return; }
+    }
+  }
+  imagenes.forEach(({ canvas, nombre }) => descargarCanvas(canvas, nombre));
+  toast(imagenes.length === 1 ? "Imagen descargada" : `${imagenes.length} imágenes descargadas`);
+}
+document.getElementById("btnExportarHorarios").addEventListener("click", conBotonOcupado(exportarHorariosInstagram));
+
 // resultado por sets como grilla de casillas (una fila por pareja, una casilla por
 // set) en vez de un "6-3, 6-4" suelto — la fila ganadora se resalta, igual que en
 // la vista Llave, así se ve consistente en todos lados donde aparece un resultado
