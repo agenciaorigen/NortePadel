@@ -2273,3 +2273,30 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .planilla-seleccion .secondary { background: rgba(0,0,0,.12); color: var(--accent-ink); border-color: rgba(0,0,0,.25); }
 .planilla-moviendo .calendario-vacia { cursor: pointer; }
 .planilla-moviendo .calendario-vacia:hover, .planilla-moviendo .calendario-vacia:focus-visible { background: rgba(var(--accent-rgb), .22); outline: 2px dashed var(--accent-bright); outline-offset: -2px; }
+
+/* Remera (página Sponsors y remera de muestra en Gestión): dibujo con los lugares encima */
+.remera-par { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 760px; margin: 0 auto; }
+.remera-lado { margin: 0; text-align: center; }
+.remera-lado figcaption { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 6px; }
+.remera-lienzo { position: relative; aspect-ratio: 100 / 110; touch-action: none; }
+.remera-lienzo svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.remera-negra .remera-lienzo path { fill: #17191c; stroke: #3a3f44; stroke-width: .6; }
+.remera-blanca .remera-lienzo path { fill: #f4f5f2; stroke: #c9ccc6; stroke-width: .6; }
+.remera-club { font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: 7px; fill: var(--accent-bright); }
+.remera-blanca .remera-club { fill: #1f6f2b; }
+.remera-pos { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 5 / 3; display: grid; place-items: center; border: 1.5px dashed rgba(var(--accent-rgb), .7); border-radius: 6px; background: rgba(var(--accent-rgb), .08); }
+.remera-pos.con-logo { border-color: transparent; background: none; }
+.remera-pos img { width: 100%; height: 100%; object-fit: contain; }
+.remera-num { font-family: var(--font-display); font-weight: 800; color: var(--accent-bright); font-size: clamp(11px, 2.4vw, 18px); }
+.remera-blanca .remera-num { color: #1f6f2b; }
+#remeraMuestra .remera-pos { cursor: grab; }
+#remeraMuestra .remera-pos.con-logo { border-color: rgba(255,255,255,.18); }
+#remeraMuestra .remera-pos:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.remera-pos.seleccionada { border: 2px solid var(--accent-bright) !important; box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .25); }
+.remera-pos.nueva { border: 2px solid var(--accent-bright) !important; background: rgba(var(--accent-rgb), .15); }
+.remera-editor-campos { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.remera-editor-campos label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.remera-editor-campos strong { width: 100%; color: var(--text); }
+#remeraSinUbicar:empty { display: none; }
+#remeraSinUbicar { color: var(--state-warn); }
+@media (max-width: 520px) { .remera-par { gap: 8px; } }

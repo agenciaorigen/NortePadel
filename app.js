@@ -2721,6 +2721,7 @@ async function cargarConfig() {
   if (inputWspFotos) inputWspFotos.value = configApp.whatsapp_fotos || "";
   if (inputIg) inputIg.value = configApp.instagram_url || "";
   if (inputYt) inputYt.value = configApp.youtube_en_vivo || "";
+  if (sponsorsVigentes.length || document.getElementById("spRemera")) { renderSponsorsPagina(sponsorsVigentes); renderRemeraMuestra(); }
 }
 
 document.getElementById("btnGuardarConfig").addEventListener("click", async () => {
@@ -7382,6 +7383,7 @@ function renderSponsorItem(s, caption, admin) {
   // que ya es clickeable y abre el link del auspiciante).
   if (!admin) return item;
   return `<div class="sponsor-admin-item">${item}
+    <label class="sponsor-hasta">Remera <select data-sp-pos="${s.id}" aria-label="Lugar en la remera: ${escapeHtml(s.nombre)}">${opcionesPosicion(s.posicion)}</select></label>
     <label class="sponsor-hasta">Hasta <input type="date" data-sp-hasta="${s.id}" value="${s.hasta || ""}" aria-label="Vigente hasta: ${escapeHtml(s.nombre)}" /></label>
     <button type="button" class="secondary small btnQuitarSponsor" data-id="${s.id}" aria-label="Borrar auspiciante ${escapeHtml(s.nombre)}">Borrar</button></div>`;
 }
@@ -7389,14 +7391,54 @@ function renderSponsorItem(s, caption, admin) {
 // Niveles de patrocinio (página Sponsors): cada uno se muestra en otro lugar
 // del sitio (ver renderUbicacionesSponsors). La posición es la de la remera.
 const NIVELES_SPONSOR = { general: "Patrocinador General", principal: "Sponsor Principal", frente: "Sponsor Frente", manga: "Sponsor Manga", espalda: "Sponsor Espalda" };
-const POSICIONES_NIVEL = { principal: [2], frente: [1, 3, 4], manga: [13, 14], espalda: [5, 6, 7, 8, 9, 10, 11, 12] };
 const ORDEN_NIVEL = { general: 0, principal: 1, frente: 2, manga: 3, espalda: 4 };
-document.getElementById("spNivelAdmin").addEventListener("change", (e) => {
-  const pos = POSICIONES_NIVEL[e.target.value] || [];
-  const sel = document.getElementById("spPosicionAdmin");
-  sel.innerHTML = pos.length ? pos.map((n) => `<option value="${n}">Posición ${n}</option>`).join("") : '<option value="">No aplica</option>';
-  sel.disabled = pos.length < 2;
-});
+
+// ---------- Remera: lugares para sponsors (se editan en Gestión → Auspiciantes) ----------
+// Cada lugar: número, lado (frente/espalda), nombre, nivel que se le vende y
+// posición/tamaño en % sobre el dibujo de la remera. Se guarda en
+// config.remera_posiciones; si no hay nada guardado, va el diseño actual.
+const REMERA_POR_DEFECTO = [
+  { id: 1, lado: "frente", nombre: "Pecho izquierdo", nivel: "frente", x: 33, y: 30, ancho: 15 },
+  { id: 2, lado: "frente", nombre: "Pecho derecho", nivel: "frente", x: 67, y: 30, ancho: 15 },
+  { id: 3, lado: "frente", nombre: "Centro", nivel: "principal", x: 50, y: 52, ancho: 32 },
+  { id: 4, lado: "frente", nombre: "Abajo izquierda", nivel: "frente", x: 37, y: 77, ancho: 15 },
+  { id: 5, lado: "frente", nombre: "Abajo derecha", nivel: "frente", x: 63, y: 77, ancho: 15 },
+  { id: 6, lado: "frente", nombre: "Manga izquierda", nivel: "manga", x: 14, y: 23, ancho: 9 },
+  { id: 7, lado: "frente", nombre: "Manga derecha", nivel: "manga", x: 86, y: 23, ancho: 9 },
+  { id: 8, lado: "espalda", nombre: "Centro de la espalda", nivel: "general", x: 50, y: 52, ancho: 32 },
+  { id: 9, lado: "espalda", nombre: "Abajo de la espalda", nivel: "espalda", x: 50, y: 78, ancho: 26 }
+];
+let remeraEditada = null; // copia en edición (Gestión), null = la guardada
+function posicionesRemera() {
+  if (remeraEditada) return remeraEditada;
+  try { const p = JSON.parse(configApp.remera_posiciones || ""); if (Array.isArray(p) && p.length) return p; } catch (e) { /* diseño por defecto */ }
+  return REMERA_POR_DEFECTO;
+}
+const nombrePosicion = (p) => `N° ${p.id} · ${p.nombre} (${p.lado === "frente" ? "adelante" : "atrás"})`;
+const SILUETA_REMERA = "M31 4 L41 1 Q50 9 59 1 L69 4 L96 19 L88 37 L76 31 L76 107 L24 107 L24 31 L12 37 L4 19 Z";
+// sponsors: los que ya tienen lugar; nuevo: {posicion, url} = logo que se está cargando
+function remeraHtml(posiciones, sponsors, { editable = false, seleccion = null, color = "negra", nuevo = null } = {}) {
+  const porPos = {};
+  sponsors.forEach((sp) => { if (sp.posicion && !porPos[sp.posicion]) porPos[sp.posicion] = sp; });
+  return ["frente", "espalda"].map((lado) => `
+    <figure class="remera-lado remera-${color}">
+      <div class="remera-lienzo" data-lado="${lado}">
+        <svg viewBox="0 0 100 110" aria-hidden="true"><path d="${SILUETA_REMERA}" />${lado === "espalda" ? '<text x="50" y="23" text-anchor="middle" class="remera-club">EL NORTE PÁDEL</text>' : ""}</svg>
+        ${posiciones.filter((p) => p.lado === lado).map((p) => {
+          const sp = porPos[p.id], esNuevo = nuevo && nuevo.posicion === p.id;
+          const logo = esNuevo ? nuevo.url : urlSegura(sp?.logo_url);
+          const titulo = nombrePosicion(p) + (sp ? ` · ${sp.nombre}` : " · libre");
+          return `<div class="remera-pos${logo ? " con-logo" : ""}${seleccion === p.id ? " seleccionada" : ""}${esNuevo ? " nueva" : ""}" data-pos="${p.id}"
+            style="left:${p.x}%;top:${p.y}%;width:${p.ancho}%" title="${escapeHtml(titulo)}"${editable ? ` tabindex="0" role="button" aria-label="${escapeHtml(titulo)}"` : ""}>
+            ${logo ? `<img src="${logo}" alt="${escapeHtml(esNuevo ? "Logo nuevo" : sp.nombre)}" />` : `<span class="remera-num">${p.id}</span>`}
+          </div>`;
+        }).join("")}
+      </div>
+      <figcaption>${lado === "frente" ? "Adelante" : "Atrás"}</figcaption>
+    </figure>`).join("");
+}
+const opcionesPosicion = (elegida) => '<option value="">Sin lugar en la remera</option>' + posicionesRemera()
+  .map((p) => `<option value="${p.id}" ${p.id === Number(elegida) ? "selected" : ""}>${escapeHtml(nombrePosicion(p))}</option>`).join("");
 function bannerPrincipalHtml(s) {
   const interior = `<span class="sp-banner-label">Sponsor principal de la fecha</span>
     <span class="sp-banner-logo"><img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" /></span>
@@ -7429,38 +7471,163 @@ function renderUbicacionesSponsors(vigentes) {
 
 // Página Sponsors: "Nos acompañan" (los vigentes, con la jerarquía de su
 // nivel), lugares libres por nivel y posiciones ocupadas marcadas en la remera.
-const CUPOS_NIVEL = { general: 1, principal: 1, frente: 3, manga: 2, espalda: 8 };
-// dónde va la marca de "ocupado" de cada posición (arriba a la derecha del
-// número) en remera-sponsors.jpg, en % del ancho y alto
-const POS_REMERA = {
-  general: [86, 40.1], 1: [20.3, 25.5], 2: [30, 48], 3: [21.5, 75], 4: [35.4, 75], 13: [7.5, 31], 14: [48.2, 31],
-  5: [66.8, 41], 6: [74.2, 41], 7: [81.6, 41], 8: [89, 41], 9: [66.8, 62], 10: [75, 62], 11: [82.4, 62], 12: [89.8, 62]
-};
 function renderSponsorsPagina(vigentes) {
   const grupos = ["general", "principal", "frente", "manga", "espalda", ""].map((n) => vigentes.filter((s) => (s.nivel || "") === n));
   document.getElementById("spAcompananLista").innerHTML = grupos.map((g, i) => g.length
     ? `<div class="sponsor-strip sp-acomp-${i}">${g.map((s) => renderSponsorItem(s)).join("")}</div>` : "").join("");
   document.getElementById("spAcompanan").hidden = !vigentes.length;
+  // lugares de cada nivel según la remera (el General, si no tiene lugar propio, igual es uno solo)
+  const posiciones = posicionesRemera();
+  const lugaresDe = (n) => posiciones.filter((p) => p.nivel === n);
   document.querySelectorAll("[data-cupo]").forEach((el) => {
     const n = el.dataset.cupo;
-    const libres = CUPOS_NIVEL[n] - vigentes.filter((s) => s.nivel === n).length;
-    el.textContent = libres <= 0 ? "completo en esta fecha" : CUPOS_NIVEL[n] === 1 ? "disponible" : libres === 1 ? "1 lugar disponible" : `${libres} lugares disponibles`;
+    const cupo = lugaresDe(n).length || (n === "general" ? 1 : 0);
+    const libres = cupo - vigentes.filter((s) => s.nivel === n).length;
+    el.textContent = libres <= 0 ? "completo en esta fecha" : cupo === 1 ? "disponible" : libres === 1 ? "1 lugar disponible" : `${libres} lugares disponibles`;
   });
-  const ocupadas = vigentes.filter((s) => s.nivel === "general" || s.posicion).map((s) => s.nivel === "general" ? "general" : s.posicion);
-  const figura = document.getElementById("spRemera");
-  figura.querySelectorAll(".sp-ocupado").forEach((el) => el.remove());
-  ocupadas.filter((p) => POS_REMERA[p]).forEach((p) => {
-    const [x, y] = POS_REMERA[p];
-    figura.insertAdjacentHTML("beforeend", `<span class="sp-ocupado" style="left:${x}%;top:${y}%" aria-hidden="true">✓</span>`);
+  document.querySelectorAll("[data-pos-nivel]").forEach((el) => {
+    const lugares = lugaresDe(el.dataset.posNivel);
+    el.textContent = lugares.length ? `${lugares.length === 1 ? "Lugar" : "Lugares"} ${lugares.map((p) => p.id).join(", ")} · ${[...new Set(lugares.map((p) => p.nombre.toLowerCase()))].join(", ")}` : "En la web y las redes";
   });
+  document.getElementById("spRemera").innerHTML = remeraHtml(posiciones, vigentes);
+  document.getElementById("spLeyenda").innerHTML = Object.entries(NIVELES_SPONSOR).map(([n, nombre]) => {
+    const lugares = lugaresDe(n);
+    return lugares.length ? `<li><b>${lugares.map((p) => p.id).join(" · ")}</b> ${nombre}</li>` : "";
+  }).join("");
+  const ocupadas = vigentes.filter((s) => s.posicion && posiciones.some((p) => p.id === s.posicion)).map((s) => s.posicion);
   const txt = document.getElementById("spOcupadas");
   txt.hidden = !ocupadas.length;
-  txt.textContent = `✓ Ocupadas en esta fecha: ${ocupadas.map((p) => p === "general" ? "Patrocinador General" : p).join(", ")}.`;
+  txt.textContent = `Ocupados en esta fecha (con logo): ${ocupadas.sort((a, b) => a - b).join(", ")}.`;
 }
+
+// ---------- Gestión: remera de muestra + editor de lugares ----------
+let sponsorsAdminVigentes = [];
+let remeraSeleccion = null;
+let remeraColor = "negra";
+let logoNuevoUrl = null;
+function renderRemeraMuestra() {
+  const cont = document.getElementById("remeraMuestra");
+  if (!cont) return;
+  const posiciones = posicionesRemera();
+  const nuevaPos = Number(document.getElementById("spPosicionAdmin").value);
+  cont.innerHTML = remeraHtml(posiciones, sponsorsAdminVigentes, { editable: true, seleccion: remeraSeleccion, color: remeraColor, nuevo: logoNuevoUrl && nuevaPos ? { posicion: nuevaPos, url: logoNuevoUrl } : null });
+  // avisos: sponsors con un lugar que ya no existe, o dos en el mismo lugar
+  const avisos = [];
+  sponsorsAdminVigentes.filter((sp) => sp.posicion && !posiciones.some((p) => p.id === sp.posicion)).forEach((sp) => avisos.push(`${sp.nombre} está en el lugar ${sp.posicion}, que ya no existe: elegile uno nuevo en su ficha.`));
+  posiciones.forEach((p) => {
+    const en = sponsorsAdminVigentes.filter((sp) => sp.posicion === p.id);
+    if (en.length > 1) avisos.push(`El lugar ${p.id} tiene ${en.length} sponsors (${en.map((sp) => sp.nombre).join(", ")}): en la remera se ve solo el primero.`);
+  });
+  document.getElementById("remeraSinUbicar").textContent = avisos.join(" ");
+  const p = posiciones.find((x) => x.id === remeraSeleccion);
+  document.getElementById("remeraEditor").innerHTML = p ? `
+    <div class="remera-editor-campos">
+      <strong>Lugar N° ${p.id} (${p.lado === "frente" ? "adelante" : "atrás"})</strong>
+      <label>Nombre <input type="text" data-remera-campo="nombre" value="${escapeHtml(p.nombre)}" maxlength="40" /></label>
+      <label>Nivel que se vende <select data-remera-campo="nivel">${Object.entries(NIVELES_SPONSOR).map(([k, v]) => `<option value="${k}" ${k === p.nivel ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label>Tamaño <input type="range" min="6" max="45" data-remera-campo="ancho" value="${p.ancho}" /></label>
+      <button type="button" class="secondary small danger" id="btnQuitarLugarRemera">Quitar este lugar</button>
+    </div>` : "";
+}
+function editarRemera(cambio) {
+  remeraEditada = posicionesRemera().map((p) => ({ ...p }));
+  cambio(remeraEditada);
+  document.getElementById("btnGuardarRemera").textContent = "Guardar posiciones (sin guardar)";
+  renderRemeraMuestra();
+}
+const remeraMuestra = document.getElementById("remeraMuestra");
+// tocar = elegir; arrastrar = mover (con mouse o dedo)
+remeraMuestra.addEventListener("pointerdown", (e) => {
+  const caja = e.target.closest(".remera-pos");
+  if (!caja) return;
+  e.preventDefault();
+  const id = Number(caja.dataset.pos), lienzo = caja.parentElement, r = lienzo.getBoundingClientRect();
+  let movio = false;
+  caja.setPointerCapture(e.pointerId);
+  const mover = (ev) => {
+    const x = Math.round(Math.min(100, Math.max(0, ((ev.clientX - r.left) / r.width) * 100)));
+    const y = Math.round(Math.min(100, Math.max(0, ((ev.clientY - r.top) / r.height) * 100)));
+    if (!movio && Math.abs(ev.clientX - e.clientX) + Math.abs(ev.clientY - e.clientY) < 4) return;
+    movio = true;
+    caja.style.left = x + "%"; caja.style.top = y + "%";
+    caja.dataset.x = x; caja.dataset.y = y;
+  };
+  caja.addEventListener("pointermove", mover);
+  caja.addEventListener("pointerup", () => {
+    caja.removeEventListener("pointermove", mover);
+    remeraSeleccion = id;
+    if (movio) editarRemera((lista) => Object.assign(lista.find((p) => p.id === id), { x: Number(caja.dataset.x), y: Number(caja.dataset.y) }));
+    else renderRemeraMuestra();
+    document.querySelector(`#remeraMuestra .remera-pos[data-pos="${id}"]`)?.focus();
+  }, { once: true });
+});
+remeraMuestra.addEventListener("keydown", (e) => {
+  const caja = e.target.closest(".remera-pos");
+  const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!caja || !delta) return;
+  e.preventDefault();
+  const id = Number(caja.dataset.pos);
+  remeraSeleccion = id;
+  editarRemera((lista) => { const p = lista.find((x) => x.id === id); p.x = Math.min(100, Math.max(0, p.x + delta[0])); p.y = Math.min(100, Math.max(0, p.y + delta[1])); });
+  document.querySelector(`#remeraMuestra .remera-pos[data-pos="${id}"]`)?.focus();
+});
+document.getElementById("remeraEditor").addEventListener("change", (e) => {
+  const campo = e.target.dataset.remeraCampo;
+  if (!campo) return;
+  editarRemera((lista) => { const p = lista.find((x) => x.id === remeraSeleccion); p[campo] = campo === "ancho" ? Number(e.target.value) : e.target.value.trim() || p[campo]; });
+});
+document.getElementById("remeraEditor").addEventListener("click", (e) => {
+  if (e.target.id !== "btnQuitarLugarRemera") return;
+  const id = remeraSeleccion;
+  remeraSeleccion = null;
+  editarRemera((lista) => lista.splice(lista.findIndex((x) => x.id === id), 1));
+});
+document.querySelectorAll("[data-remera-agregar]").forEach((btn) => btn.addEventListener("click", () => {
+  const id = Math.max(0, ...posicionesRemera().map((p) => p.id)) + 1;
+  remeraSeleccion = id;
+  editarRemera((lista) => lista.push({ id, lado: btn.dataset.remeraAgregar, nombre: "Nuevo lugar", nivel: btn.dataset.remeraAgregar === "frente" ? "frente" : "espalda", x: 50, y: 60, ancho: 15 }));
+}));
+document.querySelectorAll("[data-remera-color]").forEach((btn) => btn.addEventListener("click", () => {
+  remeraColor = btn.dataset.remeraColor;
+  document.querySelectorAll("[data-remera-color]").forEach((b) => { b.classList.toggle("active", b === btn); b.setAttribute("aria-pressed", b === btn); });
+  renderRemeraMuestra();
+}));
+document.getElementById("btnRemeraOriginal").addEventListener("click", () => { remeraSeleccion = null; editarRemera((lista) => lista.splice(0, lista.length, ...REMERA_POR_DEFECTO.map((p) => ({ ...p })))); });
+document.getElementById("btnGuardarRemera").addEventListener("click", conBotonOcupado(async () => {
+  const valor = JSON.stringify(posicionesRemera());
+  const { error } = await sb.from("config").upsert({ clave: "remera_posiciones", valor }, { onConflict: "clave" });
+  if (error) { toast("Error: " + error.message); return; }
+  configApp.remera_posiciones = valor;
+  remeraEditada = null;
+  document.getElementById("btnGuardarRemera").textContent = "Guardar posiciones";
+  toast("Posiciones de la remera guardadas");
+  cargarSponsors();
+}));
+// formulario de alta: lugar en la remera (pone solo el nivel) y vista previa del logo
+document.getElementById("spPosicionAdmin").addEventListener("change", (e) => {
+  const p = posicionesRemera().find((x) => x.id === Number(e.target.value));
+  if (p) document.getElementById("spNivelAdmin").value = p.nivel;
+  renderRemeraMuestra();
+});
+document.getElementById("spArchivo").addEventListener("change", (e) => {
+  if (logoNuevoUrl) URL.revokeObjectURL(logoNuevoUrl);
+  const archivo = e.target.files[0];
+  logoNuevoUrl = archivo && archivo.type.startsWith("image/") ? URL.createObjectURL(archivo) : null;
+  renderRemeraMuestra();
+});
 
 // "Vigente hasta" (acuerdos de varias fechas): después de ese día ya no se muestra
 const sponsorVigenteHoy = (s) => !s.hasta || s.hasta >= new Date().toLocaleDateString("sv");
 document.getElementById("listaSponsors").addEventListener("change", async (e) => {
+  const idPos = e.target.dataset.spPos;
+  if (idPos) {
+    const lugar = posicionesRemera().find((p) => p.id === Number(e.target.value));
+    const cambios = { posicion: lugar ? lugar.id : null, ...(lugar ? { nivel: lugar.nivel } : {}) };
+    const { error } = await sb.from("sponsors").update(cambios).eq("id", idPos);
+    toast(error ? "Error: " + error.message : lugar ? `Ahora va en ${nombrePosicion(lugar)}` : "Sin lugar en la remera");
+    if (!error) cargarSponsors();
+    return;
+  }
   const id = e.target.dataset.spHasta;
   if (!id) return;
   const { error } = await sb.from("sponsors").update({ hasta: e.target.value || null }).eq("id", id);
@@ -7479,6 +7646,10 @@ async function cargarSponsors() {
     .sort((a, b) => (ORDEN_NIVEL[a.nivel] ?? 9) - (ORDEN_NIVEL[b.nivel] ?? 9));
   renderUbicacionesSponsors(data);
   renderSponsorsPagina(data);
+  sponsorsAdminVigentes = (todos || []).filter(sponsorVigenteHoy);
+  const selPos = document.getElementById("spPosicionAdmin");
+  if (selPos) { const v = selPos.value; selPos.innerHTML = opcionesPosicion(v); }
+  renderRemeraMuestra();
   const admin = document.getElementById("listaSponsors");
   const inlineCard = document.getElementById("sponsorsInlineCard");
   const inline = document.getElementById("sponsorsInline");
@@ -7682,7 +7853,7 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   const linkUrl = document.getElementById("spLink").value.trim() || null;
   const torneoId = document.getElementById("spTorneo").value || null;
   const nivel = document.getElementById("spNivelAdmin").value || null;
-  const posicion = nivel && nivel !== "general" ? Number(document.getElementById("spPosicionAdmin").value) : null;
+  const posicion = Number(document.getElementById("spPosicionAdmin").value) || null;
   const hasta = document.getElementById("spHasta").value || null;
   const { error } = await sb.from("sponsors").insert({ nombre, logo_url: pub.publicUrl, link_url: linkUrl, torneo_id: torneoId, nivel, posicion, hasta });
   if (error) { toast("Error: " + error.message); return; }
@@ -7694,7 +7865,8 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   document.getElementById("spTorneo").value = "";
   document.getElementById("spNivelAdmin").value = "";
   document.getElementById("spHasta").value = "";
-  document.getElementById("spNivelAdmin").dispatchEvent(new Event("change"));
+  document.getElementById("spPosicionAdmin").value = "";
+  if (logoNuevoUrl) { URL.revokeObjectURL(logoNuevoUrl); logoNuevoUrl = null; }
   cargarSponsors();
   } finally {
     btn.disabled = false;
