@@ -2435,3 +2435,6 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
   .ev-marcadores, .ev-resultados { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .ev-estado.on { animation: none; } .ev-marcador, .ev-atajos button { transition: none; } }
+
+/* Lista de partidos (Gestión): zona y categoría como título de cada tarjeta */
+.match-titulo { margin: 0 0 10px; font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; color: var(--accent-bright); }

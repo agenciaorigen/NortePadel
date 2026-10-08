@@ -295,7 +295,6 @@ document.addEventListener("error", (e) => {
 // usuarios creados por el club: "lucas.marini" = "lucas.marini@elnortepadel.com"
 const DOMINIO_USUARIOS = "@elnortepadel.com";
 const emailDeUsuario = (texto) => { const t = String(texto || "").trim().toLowerCase(); return t && !t.includes("@") ? t + DOMINIO_USUARIOS : t; };
-const usuarioCorto = (email) => String(email || "").replace(DOMINIO_USUARIOS, "");
 // crea la cuenta (si no tiene) o le pone una clave nueva, y muestra los datos para pasárselos
 async function darAccesoJugador(j) {
   const nuevaClave = claveProvisoria();
@@ -306,7 +305,9 @@ async function darAccesoJugador(j) {
     toast("Error: " + detalle);
     return false;
   }
-  const texto = `Hola ${j.nombre}! ${data.creada ? "Ya tenés tu usuario" : "Te dejo una clave nueva"} para la app de Norte Padel (elnortepadel.com, botón Ingresar).\nUsuario: ${usuarioCorto(data.usuario)}\nClave: ${nuevaClave}\nAl entrar te va a pedir que la cambies.`;
+  // que al entrar le pida cambiar la clave provisoria (no depende de la versión de la función de Supabase)
+  await sb.from("jugadores").update({ debe_cambiar_clave: true }).eq("id", j.id);
+  const texto = `Hola ${j.nombre}! ${data.creada ? "Ya tenés tu usuario" : "Te dejo una clave nueva"} para la app de Norte Padel (elnortepadel.com, botón Ingresar).\nUsuario: ${data.usuario}\nClave: ${nuevaClave}\nAl entrar te va a pedir que la cambies.`;
   const tel = String(j.telefono || "").replace(/\D/g, "");
   if (tel.length >= 8 && confirm(`${texto}\n\n¿Se lo mandás por WhatsApp a ${j.telefono}?`)) {
     window.open(`https://wa.me/${tel.length === 10 ? "549" + tel : tel}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
@@ -656,6 +657,15 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
   }
 });
 
+// cambio de clave cuando el jugador quiere (mismo cuadro que el obligatorio, pero con "Cancelar")
+document.getElementById("btnCambiarClave").addEventListener("click", () => {
+  document.getElementById("btnCancelarClaveNueva").hidden = false;
+  document.getElementById("cambiarClaveOverlay").style.display = "flex";
+  document.getElementById("nuevaClave1").focus();
+});
+document.getElementById("btnCancelarClaveNueva").addEventListener("click", () => {
+  document.getElementById("cambiarClaveOverlay").style.display = "none";
+});
 document.getElementById("btnGuardarClaveNueva").addEventListener("click", async () => {
   const btn = document.getElementById("btnGuardarClaveNueva");
   if (btn.disabled) return;
@@ -672,8 +682,10 @@ document.getElementById("btnGuardarClaveNueva").addEventListener("click", async 
   const { error } = await sb.auth.updateUser({ password: c1 });
   if (error) { err.textContent = error.message; return; }
 
-  await sb.from("jugadores").update({ debe_cambiar_clave: false }).eq("id", miJugador.id);
-  miJugador.debe_cambiar_clave = false;
+  if (miJugador) {
+    await sb.from("jugadores").update({ debe_cambiar_clave: false }).eq("id", miJugador.id);
+    miJugador.debe_cambiar_clave = false;
+  }
   document.getElementById("nuevaClave1").value = "";
   document.getElementById("nuevaClave2").value = "";
   document.getElementById("cambiarClaveOverlay").style.display = "none";
@@ -698,6 +710,7 @@ async function manejarCambioSesion(session) {
   }
 
   document.getElementById("cambiarClaveOverlay").style.display = miJugador?.debe_cambiar_clave ? "flex" : "none";
+  document.getElementById("btnCancelarClaveNueva").hidden = true; // la clave provisoria hay que cambiarla sí o sí
 
   // body.is-admin (más abajo en style.css) es lo único que decide si #btnAdminPanel
   // se muestra — igual en mobile y en desktop (ver comentario junto a #btnAdminPanel
@@ -7171,9 +7184,12 @@ function renderPartidosLista(containerId, partidos, canchasTorneo, editable, par
     div.className = "match-card" + (p.estado === "jugado" ? " match-card-jugado" : "") + (!editable ? " clickeable" : "");
     if (!editable) div.dataset.abrirPartido = p.id;
     const horario = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "sin horario";
+    // título bien visible: zona/fase + categoría (en la Lista hay muchas tarjetas iguales)
+    const titulo = [p.ronda && p.ronda !== "Fase de grupos" ? etiquetaRonda(p) : p.grupo ? `Grupo ${p.grupo}` : "", p.categoria].filter(Boolean).join(" · ");
     div.innerHTML = `
+      ${titulo ? `<p class="match-titulo">${escapeHtml(titulo)}</p>` : ""}
       ${matchVsRowHtml(p, ganador)}
-      <div class="match-meta">${iconoPin()} ${p.cancha_nombre || "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${etiquetaRonda(p)}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
+      <div class="match-meta">${iconoPin()} ${p.cancha_nombre ? `${escapeHtml(p.complejo_nombre ? p.complejo_nombre + " · " : "")}${escapeHtml(p.cancha_nombre)}` : "sin cancha"} · ${iconoReloj()} ${horario} · <span class="badge">${p.estado}</span>${p.ronda && p.ronda !== "Fase de grupos" ? ` <span class="badge orange">${etiquetaRonda(p)}</span>` : (p.grupo ? ` <span class="badge orange">Grupo ${p.grupo}</span>` : "")}${!partidosCategoriaFiltro && p.categoria ? ` <span class="badge">${p.categoria}</span>` : ""}</div>
       ${p.estado === "jugado" ? setsGridHtml(p.sets, ganador) : ""}
       ${editable && p.estado === "jugado" && !esByeSinJugar ? `
       <div class="match-actions">
