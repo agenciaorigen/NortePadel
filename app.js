@@ -25,6 +25,7 @@ let cacheEtiquetas = []; // etiquetas_jugador — uso interno del admin, con col
 let cacheRankingCategoriaAdmin = {}; // jugador_id -> [{categoria, puntos_ranking, partidos_jugados, partidos_ganados}], para el bloque "categorías de ranking" del admin
 let cacheTorneos = [];
 let torneoDestacadoId = null; // el torneo en curso o el próximo; a donde lleva la banda "Inscribite ya" de Inicio
+let torneoEnCursoData = null; // la fila de ese torneo (nombre, duración de los partidos)
 let torneoEnCursoId = null; // solo si HOY cae dentro de sus fechas (a diferencia de torneoDestacadoId, no cae al próximo) -- ver cargarEnVivo()
 let ultimosPartidos = [];
 // true si alguna categoría del torneo abierto ya tiene calendario (cancha+horario
@@ -1816,38 +1817,124 @@ function extraerIdYoutube(url) {
   return m ? m[1] : "";
 }
 
-// "En vivo": video (cargado a mano en Config, ver btnGuardarConfig) + partidos del
-// torneo que cae dentro de HOY (no el "destacado" de cargarUltimosProximos, que
-// también apunta al próximo torneo aunque todavía no haya arrancado). Reutiliza
-// partidos_publicos() y la misma tarjeta de siempre (llavePartidoCardHtml).
+// "En vivo": separado por lo que viene a buscar cada uno -- mirar la
+// transmisión (video cargado a mano en Config), ver qué se juega ahora, cuándo
+// siguen los partidos y cómo salieron. Solo el torneo que cae HOY
+// (torneoEnCursoId), con los mismos datos de partidos_publicos().
+const lugarPartido = (p) => p.cancha_nombre ? `${p.complejo_nombre ? p.complejo_nombre + " · " : ""}${p.cancha_nombre}` : (p.complejo_nombre || "Cancha a definir");
+const horaPartido = (iso) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+const lapizResultadoHtml = (p) => isAdmin && p.estado !== "jugado"
+  ? `<button type="button" class="btnTogglePartidoAdmin" data-p="${p.id}" title="Cargar resultado" aria-label="Cargar resultado">${iconoLapiz()}</button>` : "";
+function marcadorEnVivoHtml(p, vivo) {
+  const ganador = p.ganador_pareja_id && p.ganador_pareja_id === p.pareja1_id ? 1 : p.ganador_pareja_id && p.ganador_pareja_id === p.pareja2_id ? 2 : null;
+  const sets = p.sets || [];
+  const fila = (lado) => `<div class="ev-fila ${ganador === lado ? "ganador" : ""}">
+      <span class="ev-pareja">${escapeHtml(lado === 1 ? p.pareja1_nombre : p.pareja2_nombre)}</span>
+      <span class="ev-sets">${sets.length ? sets.map((st) => `<b>${Number(lado === 1 ? st.p1 : st.p2)}</b>`).join("") : "<b>–</b>"}</span>
+    </div>`;
+  const etiqueta = [p.categoria, p.slot_cuadro || p.ronda, vivo && p.horario ? `desde las ${horaPartido(p.horario)}` : ""].filter(Boolean).join(" · ");
+  return `<article class="ev-marcador ${vivo ? "vivo" : ""}" data-ev-partido tabindex="0" role="button" aria-label="Ver la fecha: ${escapeHtml(p.pareja1_nombre)} contra ${escapeHtml(p.pareja2_nombre)}">
+    <header class="ev-marcador-top">
+      <span class="ev-cancha">${p.cancha_nombre && p.complejo_nombre ? `<small>${escapeHtml(p.complejo_nombre)}</small>` : ""}${escapeHtml(p.cancha_nombre || lugarPartido(p))}</span>
+      ${vivo ? '<span class="badge live"><span class="live-dot"></span>En vivo</span>' : p.horario ? `<span class="ev-hora">${horaPartido(p.horario)}</span>` : ""}
+      ${lapizResultadoHtml(p)}
+    </header>
+    <p class="ev-etiqueta">${escapeHtml(etiqueta)}</p>
+    ${fila(1)}${fila(2)}
+    ${isAdmin && p.estado !== "jugado" ? cargaResultadoPanelHtml(p, true) : ""}
+  </article>`;
+}
+function proximosEnVivoHtml(proximos) {
+  const turnos = [];
+  proximos.forEach((p) => {
+    const ultimo = turnos[turnos.length - 1];
+    if (ultimo && ultimo.horario === p.horario) ultimo.partidos.push(p);
+    else turnos.push({ horario: p.horario, partidos: [p] });
+  });
+  return turnos.map((t) => `<div class="ev-turno">
+      <div class="ev-turno-hora"><b>${horaPartido(t.horario)}</b><span>${new Date(t.horario).toLocaleDateString("es-AR", { weekday: "short", day: "2-digit", month: "2-digit" })}</span></div>
+      <div class="ev-turno-partidos">${t.partidos.map((p) => `
+        <div class="ev-prox" data-ev-partido tabindex="0" role="button" aria-label="Ver la fecha: ${escapeHtml(p.pareja1_nombre)} contra ${escapeHtml(p.pareja2_nombre)}">
+          <span class="ev-prox-cancha">${iconoPin()} ${escapeHtml(lugarPartido(p))}</span>
+          <span class="ev-prox-cat">${escapeHtml([p.categoria, p.slot_cuadro || p.ronda].filter(Boolean).join(" · "))}</span>
+          <span class="ev-prox-vs">${escapeHtml(p.pareja1_nombre)} <em>vs</em> ${escapeHtml(p.pareja2_nombre)}</span>
+          ${lapizResultadoHtml(p)}
+          ${isAdmin ? cargaResultadoPanelHtml(p, true) : ""}
+        </div>`).join("")}</div>
+    </div>`).join("");
+}
 async function cargarEnVivo() {
   const videoId = extraerIdYoutube(configApp.youtube_en_vivo);
   const wrapVideo = document.getElementById("enVivoVideoWrap");
   const sinVideo = document.getElementById("enVivoSinVideo");
   if (videoId) {
-    wrapVideo.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}" title="Transmisión en vivo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+    if (!wrapVideo.innerHTML.includes(videoId)) // no reinicia el video en cada actualización
+      wrapVideo.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}" title="Transmisión en vivo" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
     wrapVideo.style.display = "block";
     sinVideo.style.display = "none";
   } else {
     wrapVideo.innerHTML = "";
     wrapVideo.style.display = "none";
-    sinVideo.style.display = "block";
+    sinVideo.style.display = "";
   }
 
   await calcularTorneoDestacado(); // idempotente -- asegura torneoEnCursoId sin depender del orden de carga en init()
+  const vista = document.getElementById("view-en-vivo");
   const wrapPartidos = document.getElementById("enVivoPartidosWrap");
-  if (!torneoEnCursoId) { wrapPartidos.style.display = "none"; return; }
-  const partidos = await partidosPublicados(torneoEnCursoId);
-  const ahora = new Date();
-  const jugandoAhora = partidos.filter((p) => p.estado === "en_juego");
-  const proximos = partidos.filter((p) => p.horario && p.estado === "programado" && new Date(p.horario) >= ahora)
-    .sort((a, b) => new Date(a.horario) - new Date(b.horario)).slice(0, 6);
+  const partidos = torneoEnCursoId ? await partidosPublicados(torneoEnCursoId) : [];
+  const ahora = Date.now();
+  const duracion = (torneoEnCursoData?.duracion_minutos || 90) * 60000;
+  const t = (p) => new Date(p.horario).getTime();
+  // en cancha: los marcados "en juego" y los programados cuyo turno está corriendo
+  const enCancha = partidos.filter((p) => p.estado === "en_juego" || (p.estado === "programado" && p.horario && t(p) <= ahora && ahora < t(p) + duracion))
+    .sort((a, b) => lugarPartido(a).localeCompare(lugarPartido(b), "es", { numeric: true }));
+  const proximos = partidos.filter((p) => p.estado === "programado" && p.horario && t(p) > ahora).sort((a, b) => t(a) - t(b)).slice(0, 12);
+  const resultados = partidos.filter((p) => p.estado === "jugado").sort((a, b) => (b.horario ? t(b) : 0) - (a.horario ? t(a) : 0)).slice(0, 9);
 
-  if (jugandoAhora.length === 0 && proximos.length === 0) { wrapPartidos.style.display = "none"; return; }
-  wrapPartidos.style.display = "block";
-  renderInicioPartidosGrid("enVivoJugandoWrap", "enVivoJugandoGrid", jugandoAhora, () => abrirTorneo(torneoEnCursoId, ""));
-  renderInicioPartidosGrid("enVivoProximosWrap", "enVivoProximosGrid", proximos, () => abrirTorneo(torneoEnCursoId, ""));
+  document.getElementById("evTorneo").textContent = torneoEnCursoData?.nombre || "Circuito Norte Padel";
+  const estado = document.getElementById("evEstado");
+  estado.textContent = videoId ? "Al aire" : enCancha.length ? "Partidos en juego" : "Fuera del aire";
+  estado.classList.toggle("on", Boolean(videoId || enCancha.length));
+  vista.classList.toggle("ev-activo", Boolean(videoId || enCancha.length));
+  document.getElementById("evNumCancha").textContent = enCancha.length;
+  document.getElementById("evNumProximos").textContent = proximos.length;
+  document.getElementById("evNumResultados").textContent = partidos.filter((p) => p.estado === "jugado").length;
+  const prox = document.getElementById("evTvProximo");
+  prox.hidden = !proximos.length;
+  if (proximos.length) prox.textContent = `Próximo turno: ${horaPartido(proximos[0].horario)} · ${new Date(proximos[0].horario).toLocaleDateString("es-AR", { weekday: "long" })}`;
+
+  document.getElementById("evSinFecha").hidden = Boolean(torneoEnCursoId);
+  // sin transmisión, lo primero es ver qué se juega: la pantalla del video baja abajo de "En cancha"
+  const tv = document.getElementById("evTv");
+  if (!videoId && torneoEnCursoId) document.getElementById("evCancha").after(tv);
+  else wrapPartidos.before(tv);
+  wrapPartidos.style.display = torneoEnCursoId ? "block" : "none";
+  if (!torneoEnCursoId) return;
+  const llenar = (id, html, vacioId) => {
+    document.getElementById(id).innerHTML = html;
+    document.getElementById(vacioId).hidden = Boolean(html);
+  };
+  llenar("evCanchaGrid", enCancha.map((p) => marcadorEnVivoHtml(p, true)).join(""), "evCanchaVacio");
+  llenar("evProximosLista", proximosEnVivoHtml(proximos), "evProximosVacio");
+  llenar("evResultadosGrid", resultados.map((p) => marcadorEnVivoHtml(p, false)).join(""), "evResultadosVacio");
+  // tocar un partido lleva a la fecha completa (el lápiz y el panel de carga no, ver wireCargaResultado)
+  wrapPartidos.querySelectorAll("[data-ev-partido]").forEach((el) => {
+    el.onclick = () => abrirTorneo(torneoEnCursoId, "");
+    el.onkeydown = (e) => { if (e.target === el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrirTorneo(torneoEnCursoId, ""); } };
+  });
+  wireCargaResultado(wrapPartidos);
 }
+document.querySelectorAll("[data-ev-ir]").forEach((btn) => btn.addEventListener("click", () => {
+  const quieto = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(btn.dataset.evIr)?.scrollIntoView({ behavior: quieto ? "auto" : "smooth", block: "start" });
+}));
+document.getElementById("evVerTodo").addEventListener("click", () => { if (torneoEnCursoId) abrirTorneo(torneoEnCursoId, ""); });
+// mientras se mira En vivo, se actualiza sola cada minuto (quién está en cancha cambia con la hora)
+setInterval(() => {
+  if (!document.getElementById("view-en-vivo").classList.contains("active")) return;
+  if (document.querySelector('#enVivoPartidosWrap .match-admin-panel:not([style*="none"])')) return; // no pisar un resultado a medio cargar
+  cargarEnVivo();
+}, 60000);
 
 async function cargarHeroPosicion() {
   const card = document.getElementById("heroPosicionCard");
@@ -1971,6 +2058,7 @@ async function calcularTorneoDestacado() {
   const proximo = (torneos || []).filter((t) => t.fecha_inicio > hoy).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
   torneoDestacadoId = (enCurso || proximo)?.id || null;
   torneoEnCursoId = enCurso?.id || null;
+  torneoEnCursoData = enCurso || null;
 }
 
 document.getElementById("btnDestacarJugador").addEventListener("click", async () => {
@@ -6252,6 +6340,7 @@ function wireCargaResultado(cont) {
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
       cargarRanking();
+      if (document.getElementById("view-en-vivo").classList.contains("active")) cargarEnVivo();
       if (btn.dataset.ronda === "Final") {
         // el campeón de esta categoría se define acá mismo -- no debería hacer
         // falta volver a apretar "Generar siguiente fase" para que el torneo
@@ -8599,7 +8688,7 @@ const canalEnVivo = sb.channel("norte-padel-en-vivo");
 canalEnVivo
   .on("broadcast", { event: "actualizado" }, () => {
     cargarRanking();
-    calcularTorneoDestacado();
+    cargarEnVivo(); // ya llama a calcularTorneoDestacado
     if (torneoActualId) refrescarDetalleTorneo();
   })
   .subscribe();

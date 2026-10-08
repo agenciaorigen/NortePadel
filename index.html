@@ -502,25 +502,56 @@
        Reutiliza calcularTorneoDestacado()/partidos_publicos() y la misma tarjeta
        de partido de siempre (llavePartidoCardHtml) -- ver cargarEnVivo() en app.js. -->
   <section id="view-en-vivo" class="view">
-    <div class="pagina-head">
-      <p class="perfil-eyebrow">Circuito Norte Padel</p>
-      <h2><span class="live-dot" aria-hidden="true"></span>En vivo</h2>
-    </div>
-    <div class="card">
-      <div class="video-embed-16-9" id="enVivoVideoWrap" style="display:none"></div>
-      <p class="empty" id="enVivoSinVideo" style="display:none">No hay transmisión en este momento.</p>
-    </div>
-    <div class="sp-envivo" id="enVivoSponsors" hidden></div>
-    <div class="seccion" id="enVivoPartidosWrap" style="display:none">
-      <div id="enVivoJugandoWrap" style="display:none">
-        <h3><span class="live-dot"></span>Jugándose ahora</h3>
-        <div class="inicio-partidos-grid" id="enVivoJugandoGrid"></div>
+    <div class="ev-head">
+      <div>
+        <p class="perfil-eyebrow" id="evTorneo">Circuito Norte Padel</p>
+        <h2 class="ev-titulo"><span class="live-dot" aria-hidden="true"></span>En vivo</h2>
       </div>
-      <div id="enVivoProximosWrap" style="display:none">
-        <h3>Próximos partidos</h3>
-        <div class="inicio-partidos-grid" id="enVivoProximosGrid"></div>
-      </div>
+      <span class="ev-estado" id="evEstado">Fuera del aire</span>
     </div>
+
+    <!-- a qué viene cada uno: mirar, ver qué se juega, cuándo juego, cómo salió -->
+    <nav class="ev-atajos" aria-label="Secciones de En vivo">
+      <button type="button" data-ev-ir="evTv"><span class="ev-atajo-num" aria-hidden="true">▶</span>Transmisión</button>
+      <button type="button" data-ev-ir="evCancha"><span class="ev-atajo-num" id="evNumCancha">0</span>En cancha</button>
+      <button type="button" data-ev-ir="evProximos"><span class="ev-atajo-num" id="evNumProximos">0</span>Próximos</button>
+      <button type="button" data-ev-ir="evResultados"><span class="ev-atajo-num" id="evNumResultados">0</span>Resultados</button>
+    </nav>
+
+    <section class="ev-bloque" id="evTv" aria-labelledby="evTvTitulo">
+      <h3 class="ev-bloque-titulo" id="evTvTitulo">Transmisión</h3>
+      <div class="ev-tv">
+        <div class="video-embed-16-9" id="enVivoVideoWrap" style="display:none"></div>
+        <div class="ev-tv-off" id="enVivoSinVideo" style="display:none">
+          <p class="ev-tv-off-kicker">Fuera del aire</p>
+          <p class="ev-tv-off-texto">Cuando arranque la transmisión la vas a ver acá. Mientras, seguí la fecha abajo: los resultados se actualizan solos.</p>
+          <p class="ev-tv-off-prox" id="evTvProximo" hidden></p>
+        </div>
+      </div>
+      <div class="sp-envivo" id="enVivoSponsors" hidden></div>
+    </section>
+
+    <div id="enVivoPartidosWrap" style="display:none">
+      <section class="ev-bloque" id="evCancha" aria-labelledby="evCanchaTitulo">
+        <h3 class="ev-bloque-titulo" id="evCanchaTitulo"><span class="live-dot" aria-hidden="true"></span>En cancha ahora</h3>
+        <div class="ev-marcadores" id="evCanchaGrid"></div>
+        <p class="ev-vacio" id="evCanchaVacio" hidden>Ahora no hay partidos en cancha.</p>
+      </section>
+      <section class="ev-bloque" id="evProximos" aria-labelledby="evProximosTitulo">
+        <h3 class="ev-bloque-titulo" id="evProximosTitulo">Próximos partidos</h3>
+        <div id="evProximosLista"></div>
+        <p class="ev-vacio" id="evProximosVacio" hidden>No quedan partidos programados.</p>
+      </section>
+      <section class="ev-bloque" id="evResultados" aria-labelledby="evResultadosTitulo">
+        <div class="ev-bloque-head">
+          <h3 class="ev-bloque-titulo" id="evResultadosTitulo">Últimos resultados</h3>
+          <button type="button" class="link-mas" id="evVerTodo">Ver toda la fecha <span aria-hidden="true">→</span></button>
+        </div>
+        <div class="ev-resultados" id="evResultadosGrid"></div>
+        <p class="ev-vacio" id="evResultadosVacio" hidden>Todavía no hay resultados cargados.</p>
+      </section>
+    </div>
+    <p class="ev-sin-fecha" id="evSinFecha" hidden>Hoy no hay una fecha en juego. Cuando arranque la próxima, acá vas a ver los partidos en cancha, los que siguen y los resultados.</p>
   </section>
 
   <!-- EVENTO: galería completa de un evento especial -->
