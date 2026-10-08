@@ -2310,6 +2310,7 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 #dtSponsors .sponsor-principal img, #dtSponsors .sponsor-general img { height: 84px; max-width: 280px; }
 .sp-franja { margin: 0 0 40px; text-align: center; }
 .sp-franja .sponsor-frente img { height: 88px; max-width: 300px; }
+.sp-franja .sponsor-general img { height: 96px; max-width: 320px; }
 @media (max-width: 600px) {
   .sp-franja .sponsor-frente img, .bloque-partners .sponsor-frente img { height: 64px; max-width: 70vw; }
 }

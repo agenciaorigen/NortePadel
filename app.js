@@ -7498,9 +7498,10 @@ function renderUbicacionesSponsors(vigentes) {
   mostrarEn("spPresentado", general ? `<span class="sp-presentado-texto">El Norte Pádel <span>presentado por</span></span>${renderSponsorItem(general)}` : "");
   const principal = vigentes.find((s) => s.nivel === "principal");
   mostrarEn("inicioSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
-  // Frente: franja grande a mitad de Inicio; Frente y Manga: debajo del Ranking
+  // Inicio: franja con todos los de la fecha; Frente y Manga: debajo del Ranking
   const de = (...niveles) => vigentes.filter((s) => niveles.includes(s.nivel));
-  mostrarEn("inicioSponsorsFrente", franjaSponsors(de("frente"), "Sponsors de la fecha"));
+  // todos los de la fecha (menos el Principal, que ya tiene su banner justo arriba), ordenados por nivel
+  mostrarEn("inicioSponsorsFrente", franjaSponsors(vigentes.filter((s) => s.nivel !== "principal"), "Sponsors de la fecha"));
   mostrarEn("rankingSponsors", franjaSponsors(de("frente", "manga"), "Acompañan el ranking"));
 }
 // renglón de logos con título; vacío si no hay nadie (mostrarEn lo oculta)
