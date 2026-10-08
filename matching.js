@@ -472,7 +472,7 @@ function resolverRondaCuadro(matchesPlantilla, prefijo, mapaSlots) {
 // definido en su propio script antes de que esta función se ejecute.
 async function propagarCuadro(categoria, torneoId) {
   const { data: partidos } = await sb.from("partidos")
-    .select("id, slot_cuadro, pareja1_id, pareja2_id, ganador_pareja_id, estado, sets")
+    .select("id, slot_cuadro, pareja1_id, pareja2_id, ganador_pareja_id, estado, sets, pareja1_nombre_manual, pareja2_nombre_manual")
     .eq("torneo_id", torneoId).eq("categoria", categoria).not("slot_cuadro", "is", null);
   if (!partidos || partidos.length === 0) return { avisos: [] };
 
@@ -482,6 +482,20 @@ async function propagarCuadro(categoria, torneoId) {
 
   const porSlot = {};
   partidos.forEach((p) => { porSlot[p.slot_cuadro] = p; });
+
+  // el cuadro entero existe desde el principio: los cruces que falten se crean
+  // con "Ganador Z3"/"Perdedor Z5" de nombre, y se van llenando solos con cada resultado
+  const faltan = proyeccionCuadroCompleto(nZonas, plantilla).filter((f) => !porSlot[f.slot]).map((f) => ({
+    torneo_id: torneoId, categoria, ronda: RONDA_DISPLAY_CUADRO[f.ronda] || f.ronda, slot_cuadro: f.slot,
+    pareja1_id: null, pareja2_id: null, estado: "programado",
+    pareja1_nombre_manual: refLabelCuadro(f.refA), pareja2_nombre_manual: refLabelCuadro(f.refB)
+  }));
+  if (faltan.length) {
+    const { data: creados, error } = await sb.from("partidos").insert(faltan)
+      .select("id, slot_cuadro, pareja1_id, pareja2_id, ganador_pareja_id, estado, sets, pareja1_nombre_manual, pareja2_nombre_manual");
+    if (error) return { avisos: [`${categoria}: no se pudieron crear los cruces del cuadro — ${error.message}`] };
+    (creados || []).forEach((p) => { porSlot[p.slot_cuadro] = p; });
+  }
   // ganador/perdedor real de una fila, tal cual está guardada hoy en la base
   // (nunca lo que "debería" ser según la plantilla) — es la fuente de verdad
   // para las rondas siguientes, incluso cuando se decidió dejar un cruce sin
@@ -496,36 +510,42 @@ async function propagarCuadro(categoria, torneoId) {
   const avisos = [];
   for (const nombreRonda of Object.keys(plantilla)) {
     const prefijo = nombreRonda[0];
-    const resueltos = resolverRondaCuadro(plantilla[nombreRonda], prefijo, mapaSlots);
-    if (!resueltos) break; // esta ronda (y las siguientes) todavía no se puede evaluar
-
-    for (const r of resueltos) {
-      const fila = porSlot[r.slot];
-      if (!fila) continue; // esta ronda todavía no se armó — le toca a "Generar siguiente fase"
+    for (const [i, [refA, refB]] of plantilla[nombreRonda].entries()) {
+      const slot = prefijo + (i + 1);
+      const fila = porSlot[slot];
+      if (!fila) continue;
+      // cada lado por separado: el que ya se sabe entra, el otro sigue "Ganador Z…"
+      const home = resolverRefCuadro(refA, mapaSlots);
+      const away = resolverRefCuadro(refB, mapaSlots);
+      const definido = home !== undefined && away !== undefined;
+      const walkover = definido && Boolean(home) !== Boolean(away); // el rival vino de un bye
+      const r = walkover
+        ? { pareja1_id: home || away, pareja2_id: null }
+        : { pareja1_id: home || null, pareja2_id: away || null };
+      const manual1 = r.pareja1_id ? null : refLabelCuadro(refA);
+      const manual2 = r.pareja2_id || walkover ? null : refLabelCuadro(refB);
 
       const tieneResultadoPropio = !!fila.pareja2_id && Array.isArray(fila.sets) && fila.sets.length > 0;
       const cambioRival = fila.pareja1_id !== r.pareja1_id || fila.pareja2_id !== r.pareja2_id;
+      const cambioTexto = (fila.pareja1_nombre_manual || null) !== manual1 || (fila.pareja2_nombre_manual || null) !== manual2;
 
       if (cambioRival && tieneResultadoPropio) {
-        avisos.push(`${categoria} ${r.slot}: ya tiene un resultado cargado pero su rival cambió — revisalo a mano`);
-      } else if (cambioRival) {
+        avisos.push(`${categoria} ${slot}: ya tiene un resultado cargado pero su rival cambió — revisalo a mano`);
+      } else if (cambioRival || (cambioTexto && !tieneResultadoPropio)) {
         const patch = {
           pareja1_id: r.pareja1_id, pareja2_id: r.pareja2_id,
-          estado: r.walkover ? "jugado" : "programado",
-          ganador_pareja_id: r.walkover ? r.pareja1_id : null,
+          estado: walkover ? "jugado" : "programado",
+          ganador_pareja_id: walkover ? r.pareja1_id : null,
           sets: null, updated_at: new Date().toISOString(),
-          // limpia el texto viejo de la carga manual del cuadro (p.ej. "Perdedor
-          // Z1"): si no se vacía acá, partidos_publicos() lo sigue mostrando como
-          // resguardo aunque pareja1_id/pareja2_id ya estén bien resueltos
-          pareja1_nombre_manual: null, pareja2_nombre_manual: null
+          pareja1_nombre_manual: manual1, pareja2_nombre_manual: manual2
         };
         const { error } = await sb.from("partidos").update(patch).eq("id", fila.id);
-        if (error) { avisos.push(`${categoria} ${r.slot}: error al actualizar — ${error.message}`); continue; }
+        if (error) { avisos.push(`${categoria} ${slot}: error al actualizar — ${error.message}`); continue; }
         Object.assign(fila, patch); // para que las rondas siguientes de este mismo pase ya vean el cambio
       }
 
       const g = gananciaDe(fila);
-      if (g) mapaSlots[r.slot] = g;
+      if (g) mapaSlots[slot] = g;
     }
   }
   return { avisos };

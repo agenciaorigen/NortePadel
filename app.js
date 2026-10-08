@@ -4847,6 +4847,12 @@ async function cargarGestionTorneo(id) {
     return `${c.nombre} (${complejo ? complejo.nombre : "?"})`;
   });
 
+  // cuadro de zonas: que existan todos los cruces (octavos, cuartos...) aunque todavía no se jueguen
+  const { data: zonasCuadro } = await sb.from("partidos").select("categoria").eq("torneo_id", id).eq("ronda", "Zona").not("slot_cuadro", "is", null);
+  for (const cat of new Set((zonasCuadro || []).map((z) => z.categoria))) {
+    const { avisos } = await propagarCuadro(cat, id);
+    avisos.forEach((x) => toast(x));
+  }
   const [{ data: insc }, { data: parejas }, { data: partidos }] = await Promise.all([
     sb.rpc("inscriptos_publicos", { p_torneo_id: id }),
     sb.rpc("parejas_publicas", { p_torneo_id: id }),
