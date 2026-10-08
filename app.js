@@ -320,6 +320,7 @@ function llenarSelect(select, items, labelFn, valueFn) {
 // ============================================================
 function traducirErrorAuth(error) {
   const msg = error?.message || "";
+  if (msg.includes("Email not confirmed")) return "Tu cuenta todavía no está activada: pedile al club que te blanquee la clave y ya vas a poder entrar.";
   if (msg.includes("Invalid login credentials")) return "Usuario o contraseña incorrectos. Si nunca entraste o no te funciona la clave, pedile una nueva al club con el botón de abajo.";
   if (msg.includes("User already registered")) return "Ya existe una cuenta con ese email. Probá iniciar sesión.";
   if (msg.includes("Password should be")) return "La contraseña es muy corta (mínimo 8 caracteres).";
@@ -337,10 +338,12 @@ document.getElementById("btnPedirClave").addEventListener("click", () => {
 });
 
 document.getElementById("btnLogin").addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value.trim();
+  const email = document.getElementById("authEmail").value.trim().toLowerCase();
   const password = document.getElementById("authPassword").value;
   if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  let { error } = await sb.auth.signInWithPassword({ email, password });
+  // una clave copiada desde WhatsApp suele traer un espacio de más al principio o al final
+  if (error && password.trim() !== password) ({ error } = await sb.auth.signInWithPassword({ email, password: password.trim() }));
   if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
   toast("¡Bienvenido de nuevo!");
 });
@@ -2955,7 +2958,9 @@ function renderListaJugadoresAdmin() {
       if (nuevaClave.length < 8) { toast("La clave debe tener al menos 8 caracteres"); return; }
       const { data, error } = await sb.functions.invoke("admin-reset-password", { body: { email: j.email, nuevaClave } });
       if (error || data?.error) { toast("Error: " + (data?.error || error.message)); return; }
-      toast(`Clave de ${j.nombre} ${j.apellido} blanqueada — se la pide cambiar al entrar`);
+      // el usuario REAL de la cuenta (puede no coincidir con el email de la ficha): es el que tiene que escribir para entrar
+      const usuario = data?.usuario || j.email;
+      prompt(`Listo. Pasale estos datos a ${j.nombre} ${j.apellido} (al entrar le va a pedir que cambie la clave):`, `Usuario: ${usuario}  Clave: ${nuevaClave}`);
     });
     div.querySelector(".btnEliminarJugador").addEventListener("click", async function () {
       if (this.disabled) return;
