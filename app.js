@@ -292,6 +292,29 @@ document.addEventListener("error", (e) => {
 }, true);
 // clave provisoria al azar (para "Blanquear clave"): 10 caracteres sin los que
 // se confunden a la vista (0/O, 1/l/I)
+// usuarios creados por el club: "lucas.marini" = "lucas.marini@elnortepadel.com"
+const DOMINIO_USUARIOS = "@elnortepadel.com";
+const emailDeUsuario = (texto) => { const t = String(texto || "").trim().toLowerCase(); return t && !t.includes("@") ? t + DOMINIO_USUARIOS : t; };
+const usuarioCorto = (email) => String(email || "").replace(DOMINIO_USUARIOS, "");
+// crea la cuenta (si no tiene) o le pone una clave nueva, y muestra los datos para pasárselos
+async function darAccesoJugador(j) {
+  const nuevaClave = claveProvisoria();
+  const { data, error } = await sb.functions.invoke("admin-reset-password", { body: { jugadorId: j.id, nuevaClave } });
+  if (error || data?.error) {
+    let detalle = data?.error || error.message;
+    try { detalle = (await error.context.json()).error || detalle; } catch (e) { /* sin detalle del servidor */ }
+    toast("Error: " + detalle);
+    return false;
+  }
+  const texto = `Hola ${j.nombre}! ${data.creada ? "Ya tenés tu usuario" : "Te dejo una clave nueva"} para la app de Norte Padel (elnortepadel.com, botón Ingresar).\nUsuario: ${usuarioCorto(data.usuario)}\nClave: ${nuevaClave}\nAl entrar te va a pedir que la cambies.`;
+  const tel = String(j.telefono || "").replace(/\D/g, "");
+  if (tel.length >= 8 && confirm(`${texto}\n\n¿Se lo mandás por WhatsApp a ${j.telefono}?`)) {
+    window.open(`https://wa.me/${tel.length === 10 ? "549" + tel : tel}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
+  } else {
+    prompt(`Pasale estos datos a ${j.nombre} ${j.apellido}:`, texto.replace(/\n/g, "  "));
+  }
+  return true;
+}
 function claveProvisoria() {
   const letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   return Array.from(crypto.getRandomValues(new Uint32Array(10)), (n) => letras[n % letras.length]).join("");
@@ -339,9 +362,9 @@ document.getElementById("btnPedirClave").addEventListener("click", () => {
 });
 
 document.getElementById("btnLogin").addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value.trim().toLowerCase();
+  const email = emailDeUsuario(document.getElementById("authEmail").value);
   const password = document.getElementById("authPassword").value;
-  if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
+  if (!email || !password) { document.getElementById("authError").textContent = "Completá usuario y contraseña"; return; }
   let { error } = await sb.auth.signInWithPassword({ email, password });
   // una clave copiada desde WhatsApp suele traer un espacio de más al principio o al final
   if (error && password.trim() !== password) ({ error } = await sb.auth.signInWithPassword({ email, password: password.trim() }));
@@ -349,18 +372,14 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
   toast("¡Bienvenido de nuevo!");
 });
 
-document.getElementById("btnSignup").addEventListener("click", async () => {
-  const email = document.getElementById("authEmail").value.trim();
-  const password = document.getElementById("authPassword").value;
-  if (!email || !password) { document.getElementById("authError").textContent = "Completá email y contraseña"; return; }
-  if (password.length < 8) { document.getElementById("authError").textContent = "La contraseña tiene que tener al menos 8 caracteres."; return; }
-  if (!document.getElementById("chkAceptoTerminos").checked) {
-    document.getElementById("authError").textContent = "Para crear la cuenta tenés que aceptar la Política de privacidad y los Términos.";
-    return;
-  }
-  const { error } = await sb.auth.signUp({ email, password });
-  if (error) { document.getElementById("authError").textContent = traducirErrorAuth(error); return; }
-  toast("Cuenta creada. Ahora completá tu perfil de jugador");
+// Los jugadores nuevos no se registran solos (el mail de confirmación no
+// siempre llega): le piden el usuario al club por WhatsApp y el admin lo crea
+// en Gestión › Jugadores › "+ Jugador nuevo".
+document.getElementById("btnPedirUsuario").addEventListener("click", () => {
+  const numero = String(configApp.whatsapp_numero || "").replace(/\D/g, "");
+  if (!numero) { toast("El club todavía no cargó su WhatsApp: pedí tu usuario en persona."); return; }
+  const mensaje = "Hola! Soy jugador nuevo y quiero mi usuario para la app de Norte Padel.\nNombre y apellido: \nCategoría: ";
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener,noreferrer");
 });
 
 document.getElementById("btnLogout").addEventListener("click", async () => {
@@ -2861,6 +2880,37 @@ async function cargarJugadoresAdmin() {
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
 
+document.getElementById("btnMostrarNuevoJugador")?.addEventListener("click", async () => {
+  const form = document.getElementById("nuevoJugadorForm");
+  form.hidden = !form.hidden;
+  if (form.hidden) return;
+  if (cacheCategorias.length === 0) await cargarCategorias();
+  const sel = document.getElementById("njCategoria");
+  if (!sel.options.length) sel.innerHTML = '<option value="">Categoría</option>' + cacheCategorias.map((c) => `<option>${escapeHtml(c.nombre)}</option>`).join("");
+  document.getElementById("njNombre").focus();
+});
+document.getElementById("nuevoJugadorForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("btnCrearJugador");
+  if (btn.disabled) return;
+  const v = (id) => document.getElementById(id).value.trim();
+  const nombre = v("njNombre"), apellido = v("njApellido"), categoria = v("njCategoria");
+  const email = v("njEmail").toLowerCase() || null, telefono = v("njTelefono") || null;
+  const norm = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const parecido = cacheJugadoresAdmin.find((j) => norm(`${j.nombre} ${j.apellido}`) === norm(`${nombre} ${apellido}`));
+  if (parecido && !confirm(`Ya hay un ${parecido.nombre} ${parecido.apellido} (${parecido.categoria})${parecido.auth_user_id ? " con usuario" : ""}. Si es la misma persona, buscalo y usá "${parecido.auth_user_id ? "Blanquear clave" : "Crear usuario"}". ¿Crear otro igual?`)) return;
+  btn.disabled = true;
+  try {
+    const { data: j, error } = await sb.from("jugadores").insert({ nombre, apellido, categoria, email, telefono }).select().single();
+    if (error) { toast(error.code === "23505" ? "Ese email ya es de otro jugador: buscalo en la lista" : "Error: " + error.message); return; }
+    toast(`${nombre} ${apellido} creado`);
+    e.target.reset();
+    await darAccesoJugador(j);
+    cargarJugadoresAdmin();
+  } finally {
+    btn.disabled = false;
+  }
+});
 document.getElementById("btnMostrarBuscarJugador")?.addEventListener("click", () => {
   const wrap = document.getElementById("buscarJugadorWrap");
   wrap.style.display = "block";
@@ -2994,7 +3044,7 @@ function renderListaJugadoresAdmin() {
       <div class="row" style="margin-top:8px;gap:8px">
         <button type="button" class="secondary small btnGuardarJugador">Guardar</button>
         <button type="button" class="secondary small btnAscenderJugador">Ascender</button>
-        <button type="button" class="secondary small btnBlanquearClave">Blanquear clave</button>
+        <button type="button" class="secondary small btnBlanquearClave">${j.auth_user_id ? "Blanquear clave" : "Crear usuario"}</button>
         <button type="button" class="secondary small danger btnEliminarJugador">Eliminar perfil</button>
       </div>
     `);
@@ -3061,16 +3111,15 @@ function renderListaJugadoresAdmin() {
     // "anon" de siempre -- hace falta la Edge Function admin-reset-password
     // (server-side, con la service_role key que Supabase le inyecta sola, nunca
     // pegada acá) que valida que quien llama es admin y recién ahí resetea.
-    div.querySelector(".btnBlanquearClave").addEventListener("click", async () => {
-      if (!j.email) { toast("Este jugador no tiene usuario/email cargado"); return; }
-      const nuevaClave = prompt(`Nueva clave provisoria para ${j.nombre} ${j.apellido} (usuario: ${j.email}). Pasásela por privado; al entrar le va a pedir que la cambie:`, claveProvisoria());
-      if (!nuevaClave) return;
-      if (nuevaClave.length < 8) { toast("La clave debe tener al menos 8 caracteres"); return; }
-      const { data, error } = await sb.functions.invoke("admin-reset-password", { body: { email: j.email, nuevaClave } });
-      if (error || data?.error) { toast("Error: " + (data?.error || error.message)); return; }
-      // el usuario REAL de la cuenta (puede no coincidir con el email de la ficha): es el que tiene que escribir para entrar
-      const usuario = data?.usuario || j.email;
-      prompt(`Listo. Pasale estos datos a ${j.nombre} ${j.apellido} (al entrar le va a pedir que cambie la clave):`, `Usuario: ${usuario}  Clave: ${nuevaClave}`);
+    // Sin cuenta todavía ("Crear usuario"): la crea ya activada, sin mandar ningún mail.
+    div.querySelector(".btnBlanquearClave").addEventListener("click", async function () {
+      if (this.disabled) return;
+      if (!confirm(j.auth_user_id
+        ? `¿Generar una clave nueva para ${j.nombre} ${j.apellido}? La clave vieja deja de funcionar.`
+        : `¿Crear el usuario de ${j.nombre} ${j.apellido} para que pueda entrar a la app?`)) return;
+      this.disabled = true;
+      try { if (await darAccesoJugador(j) && !j.auth_user_id) cargarJugadoresAdmin(); }
+      finally { this.disabled = false; }
     });
     div.querySelector(".btnEliminarJugador").addEventListener("click", async function () {
       if (this.disabled) return;

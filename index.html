@@ -780,18 +780,15 @@
     <div class="card card-glow" id="authCard">
       <h2 id="authTitulo">Ingresar</h2>
       <p class="match-meta perfil-auth-sub">Tus partidos, tu posición en el ranking y tus datos de jugador, en un solo lugar.</p>
-      <label for="authEmail">Email</label>
-      <input id="authEmail" type="email" autocomplete="email" />
+      <label for="authEmail">Usuario o email</label>
+      <input id="authEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ej: lucas.marini" />
       <label for="authPassword">Contraseña</label>
       <input id="authPassword" type="password" autocomplete="current-password" />
       <button class="primary" id="btnLogin">Ingresar</button>
-      <label class="check-legal" for="chkAceptoTerminos">
-        <input type="checkbox" id="chkAceptoTerminos" />
-        <span>Para crear una cuenta nueva: leí y acepto la <a href="privacidad.html" target="_blank" rel="noopener">Política de privacidad y los Términos de uso</a>.</span>
-      </label>
-      <button class="secondary" id="btnSignup" style="margin-top:10px;width:100%">Crear cuenta nueva</button>
       <p class="match-meta" id="authError"></p>
-      <button type="button" class="link-btn auth-ayuda" id="btnPedirClave">¿No podés entrar o es tu primera vez? Pedile una clave nueva al club</button>
+      <button type="button" class="secondary" id="btnPedirUsuario" style="margin-top:10px;width:100%">Soy jugador nuevo: pedile tu usuario al club</button>
+      <button type="button" class="link-btn auth-ayuda" id="btnPedirClave">¿Te olvidaste la clave o no podés entrar? Pedile una nueva al club</button>
+      <p class="check-legal" style="display:block">Al ingresar aceptás la <a href="privacidad.html" target="_blank" rel="noopener">Política de privacidad y los Términos de uso</a>.</p>
     </div>
 
     <div class="card" id="completarPerfilCard" style="display:none">
@@ -1491,8 +1488,24 @@
     <div class="card card-accent" id="admCfgJugadores">
       <div class="torneo-card-header">
         <h2>Jugadores registrados</h2>
-        <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>
+        <span class="row" style="gap:8px">
+          <button type="button" class="secondary small" id="btnMostrarNuevoJugador">+ Jugador nuevo</button>
+          <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>
+        </span>
       </div>
+      <form id="nuevoJugadorForm" hidden style="margin-top:10px">
+        <p class="match-meta" style="margin-bottom:6px">Crea el jugador con su usuario y una clave provisoria. Al entrar por primera vez le pide que la cambie. No se manda ningún mail.</p>
+        <div class="row" style="gap:8px">
+          <input id="njNombre" required maxlength="60" placeholder="Nombre" aria-label="Nombre" autocomplete="off" />
+          <input id="njApellido" required maxlength="60" placeholder="Apellido" aria-label="Apellido" autocomplete="off" />
+        </div>
+        <div class="row" style="gap:8px">
+          <select id="njCategoria" required aria-label="Categoría"></select>
+          <input id="njTelefono" type="tel" maxlength="30" placeholder="WhatsApp (opcional)" aria-label="WhatsApp (opcional)" autocomplete="off" />
+        </div>
+        <input id="njEmail" type="email" maxlength="120" placeholder="Email (opcional: si ya intentó registrarse, el mismo que usó)" aria-label="Email (opcional)" autocomplete="off" />
+        <button type="submit" class="primary" id="btnCrearJugador" style="width:100%">Crear jugador y usuario</button>
+      </form>
       <div id="buscarJugadorWrap" style="display:none;margin-top:10px">
         <p class="match-meta" style="margin-bottom:6px">Buscá un jugador para corregir nombre, apellido, categoría o puntos, o para eliminar un perfil repetido/erróneo.</p>
         <input id="buscarJugadorAdmin" placeholder="Escribí nombre o apellido..." autocomplete="off" style="margin-bottom:10px" />
