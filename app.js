@@ -964,14 +964,54 @@ function imagenUsableEnCanvas(img) {
     return true;
   } catch (e) { return false; }
 }
-// todos=true (historias de horarios): además de Principal y Frente, Manga, Espalda y el resto, más chicos
+// todos=true (historias de horarios): además devuelve principal y resto (Frente, Manga, Espalda...) por separado
 async function logosPlaca(todos = false) {
   const elegir = (n) => sponsorsVigentes.filter((s) => (s.nivel || "") === n);
   const cargar = async (lista) => (await Promise.all(lista.map((s) => cargarImagenParaCanvas(urlSegura(s.logo_url))))).filter((img) => img && imagenUsableEnCanvas(img));
   const [general, principal, frente, manga, espalda, otros] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente")),
     ...(todos ? [cargar(elegir("manga")), cargar(elegir("espalda")), cargar(elegir(""))] : [[], [], []])]);
-  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, todos ? 60 : 52]),
-    ...manga.map((img) => [img, 50]), ...[...espalda, ...otros].map((img) => [img, 44])] };
+  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])],
+    principal: principal[0], resto: [...frente.map((img) => [img, 84]), ...manga.map((img) => [img, 72]), ...[...espalda, ...otros].map((img) => [img, 64])] };
+}
+// Historias de horarios: General y Principal grandes lado a lado, y abajo el resto en hasta 2 filas
+// solo uno de los dos (lo más común: el Principal) = todavía más grande
+const altoLogoGrande = (logos) => (logos.general && logos.principal ? 130 : 170);
+function altoSponsorsHistoria(logos, W) {
+  const arriba = logos.general || logos.principal ? 34 + altoLogoGrande(logos) + 24 + 30 : 0;
+  return arriba + (logos.resto.length ? filasDeLogos({ fila: logos.resto }, W, 2).length * 124 : 0);
+}
+function dibujarFilaLogos(ctx, W, y, fila, base) {
+  const anchos = fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
+  const total = anchos.reduce((a, b) => a + b, 0) + 22 * (anchos.length - 1);
+  const escala = Math.min(1, (W - 100) / total);
+  ctx.save();
+  ctx.translate((W - total * escala) / 2, y); ctx.scale(escala, escala);
+  let cx = 0;
+  fila.forEach(([img, alto], i) => { dibujarLogoEnCaja(ctx, img, cx, base - alto, alto); cx += anchos[i] + 22; }); // alineados por abajo
+  ctx.restore();
+}
+function dibujarSponsorsHistoria(ctx, W, H, logos) {
+  let y = H - 110 - altoSponsorsHistoria(logos, W);
+  const grandes = [[logos.general, "PRESENTADO POR"], [logos.principal, "SPONSOR PRINCIPAL"]].filter(([img]) => img);
+  if (grandes.length) {
+    const ALTO_LOGO_GRANDE = altoLogoGrande(logos);
+    const anchos = grandes.map(([img]) => Math.min(ALTO_LOGO_GRANDE * 3.2, (img.width / img.height) * ALTO_LOGO_GRANDE) + 32);
+    const total = anchos.reduce((a, b) => a + b, 0) + 60 * (anchos.length - 1);
+    const escala = Math.min(1, (W - 100) / total);
+    let x = (W - total * escala) / 2;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#C9D1D5";
+    ctx.font = "800 26px 'Barlow Condensed'";
+    grandes.forEach(([img, titulo], i) => {
+      ctx.fillText(titulo.split("").join(String.fromCharCode(8202)), x + anchos[i] * escala / 2, y + 24);
+      ctx.save(); ctx.translate(x, y + 34); ctx.scale(escala, escala);
+      dibujarLogoEnCaja(ctx, img, 0, 0, ALTO_LOGO_GRANDE);
+      ctx.restore();
+      x += (anchos[i] + 60) * escala;
+    });
+    y += 34 + ALTO_LOGO_GRANDE + 24 + 30;
+  }
+  if (logos.resto.length) filasDeLogos({ fila: logos.resto }, W, 2).forEach((fila) => { dibujarFilaLogos(ctx, W, y, fila, 84); y += 124; });
 }
 const ALTO_BANDA_SPONSORS = 230;
 function dibujarLogoEnCaja(ctx, img, x, y, alto) {
@@ -6995,7 +7035,7 @@ function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categori
     textoAjustado(ctx, nombre(p.pareja2_nombre), maxT - anchoVs, "700 {t}px Manrope", 30);
     ctx.fillText(nombre(p.pareja2_nombre), xt + anchoVs, y + 128);
   });
-  if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos, 2, 130);
+  if (logos.general || logos.principal || logos.resto.length) dibujarSponsorsHistoria(ctx, W, H, logos);
   ctx.textAlign = "center";
   ctx.fillStyle = "#8D969C";
   ctx.font = "700 22px Manrope";
@@ -7007,7 +7047,7 @@ async function exportarHorariosInstagram() {
   await cargarFuentesExport();
   const logos = await logosPlaca(true);
   const W = 1080, H = 1920, altoCard = 168, altoDia = 70, inicio = 330;
-  const limite = H - 90 - (logos.general || logos.fila.length ? altoBandaSponsors(logos, W, 2) + 60 : 0);
+  const limite = H - 120 - altoSponsorsHistoria(logos, W);
   const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
   const categorias = [...new Set(conHorario.map((p) => p.categoria))].sort((a, b) => orden(a) - orden(b));
   const torneoNombre = torneoGestionData?.nombre || "Torneo";
