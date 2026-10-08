@@ -5865,6 +5865,7 @@ let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (A
 let partidoSeleccionadoPlanilla = null; // "tocar para mover" en la planilla
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && partidoSeleccionadoPlanilla) { partidoSeleccionadoPlanilla = null; renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion); }
+  else if (e.key === "Escape" && vistaPartidosAdmin === "planilla-grande") document.querySelector('#partidosVistaPills [data-vista="planilla"]')?.click();
 });
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar = null) {
   const cont = document.getElementById(containerId);
@@ -5876,6 +5877,8 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     return;
   }
   const torneoDeReferencia = editable ? torneoGestionData : torneoActualData;
+  // Planilla grande: la misma planilla (mismos datos y mismo mover), a pantalla completa y con nombres
+  const grande = editable && vistaPartidosAdmin === "planilla-grande";
   const { horarios, filas, sinHorario } = calcularSlots(partidos, canchas, torneoDeReferencia, editable);
   if (horarios.length === 0) {
     cont.innerHTML = editable
@@ -5925,9 +5928,13 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     const detalle = escapeHtml(`${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`);
     const etiqueta = `${p.slot_cuadro || (p.grupo ? "G" + p.grupo : "")} ${abreviarCategoria(p.categoria)}`.trim();
     if (p.id === partidoSeleccionadoPlanilla) extraClase += " seleccionado";
+    // planilla grande: además de zona y categoría, las dos parejas
+    const contenido = grande
+      ? `<b>${escapeHtml(etiqueta)}</b><span>${escapeHtml(p.pareja1_nombre || "A confirmar")}</span><span>${escapeHtml(p.pareja2_nombre || "A confirmar")}</span>`
+      : escapeHtml(etiqueta);
     return `<div class="calendario-partido calendario-compacta ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}"
         style="background:${colorCategoria(p.categoria)}" title="${detalle}" draggable="true" data-partido="${p.id}" tabindex="0" role="button" aria-pressed="${p.id === partidoSeleccionadoPlanilla}">
-      ${etiqueta}
+      ${contenido}
     </div>`;
   };
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
@@ -5935,7 +5942,9 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"${partidoSeleccionadoPlanilla ? ` tabindex="0" role="button" aria-label="Mover acá: ${escapeHtml(celda.cancha.nombre)}, ${new Date(fila.horarioISO).toLocaleString("es-AR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}"` : ""}` : ""}></div>`;
   const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">Cerrada</div>`;
 
-  let html = "";
+  let html = grande
+    ? `<div class="planilla-grande-head"><h3>Planilla con nombres</h3><button type="button" class="secondary small" id="planillaGrandeCerrar">Cerrar (Esc)</button></div>`
+    : "";
   // "tocar para mover": el partido elegido queda marcado aunque se cambie de día arriba
   const seleccionado = editable && partidos.find((p) => p.id === partidoSeleccionadoPlanilla);
   if (editable && !seleccionado) partidoSeleccionadoPlanilla = null;
@@ -5964,7 +5973,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   }
 
   const esMobile = window.matchMedia("(max-width:767px)").matches;
-  if (esMobile) {
+  if (esMobile && !grande) {
     // agenda vertical: fecha -> hora -> cancha — nunca scroll horizontal como solución
     let fechaAnterior = null;
     filasVisibles.forEach((fila) => {
@@ -5984,7 +5993,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     });
   } else {
     // grilla de escritorio: auto-fit/minmax se reacomoda al ancho disponible, nunca se corta
-    html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""} ${seleccionado ? "planilla-moviendo" : ""}" style="--calendario-cols:${canchas.length}">`;
+    html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""} ${grande ? "grande" : ""} ${seleccionado ? "planilla-moviendo" : ""}" style="--calendario-cols:${canchas.length}">`;
     // con varios predios que repiten nombre de cancha ("Cancha 1" en cada
     // uno) el nombre solo no alcanza para distinguirlas -- se antepone el
     // predio, mismo formato "Predio · Cancha" que ya se usa en el selector
@@ -6017,6 +6026,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       sinHorario.map((p) => `${escapeHtml(p.pareja1_nombre)} vs ${escapeHtml(p.pareja2_nombre)}`).join(" · ") + "</p>";
   }
   cont.innerHTML = html;
+  cont.querySelector("#planillaGrandeCerrar")?.addEventListener("click", () => document.querySelector('#partidosVistaPills [data-vista="planilla"]')?.click());
 
   if (editable) {
     wirePlanillaDragAndDrop(containerId);
@@ -6649,7 +6659,7 @@ document.getElementById("partidoDetalleOverlay").addEventListener("click", (e) =
 let ultimosPartidosGestion = [];
 let ultimasCanchasTorneoGestion = [];
 let ultimasParejasGestion = [];
-let vistaPartidosAdmin = "lista"; // lista | planilla
+let vistaPartidosAdmin = "lista"; // lista | planilla | planilla-grande | llave | tabla
 
 function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
   ultimosPartidosGestion = partidos;
@@ -6668,6 +6678,9 @@ function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
   if (q) visibles = visibles.filter((p) => `${p.pareja1_nombre || ""} ${p.pareja2_nombre || ""}`.toLowerCase().includes(q));
 
   const contLista = document.getElementById("admPartidosLista");
+  const grande = vistaPartidosAdmin === "planilla-grande";
+  contLista.classList.toggle("planilla-grande", grande);
+  document.documentElement.classList.toggle("sin-scroll", grande);
   const contLlave = document.getElementById("admPartidosLlave");
   const contTabla = document.getElementById("admPartidosTabla");
   contLista.style.display = "none";
@@ -6692,7 +6705,7 @@ function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
     contLista.style.display = "block";
     // la planilla muestra todos los partidos para ver las canchas ocupadas; los filtrados quedan resaltados
     const filtrado = visibles.length !== partidos.length;
-    if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", partidos, canchasTorneo, true, filtrado ? new Set(visibles.map((p) => p.id)) : null);
+    if (vistaPartidosAdmin === "planilla" || grande) renderPartidosCalendario("admPartidosLista", partidos, canchasTorneo, true, filtrado ? new Set(visibles.map((p) => p.id)) : null);
     else renderPartidosLista("admPartidosLista", visibles, canchasTorneo, true, ultimasParejasGestion);
   }
 }

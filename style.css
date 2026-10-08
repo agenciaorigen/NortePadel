@@ -2313,3 +2313,18 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 @media (max-width: 600px) {
   .sp-franja .sponsor-frente img, .bloque-partners .sponsor-frente img { height: 64px; max-width: 70vw; }
 }
+
+/* Planilla con nombres: la misma planilla a pantalla completa, con las parejas en cada cuadro */
+.sin-scroll { overflow: hidden; }
+#admPartidosLista.planilla-grande { position: fixed; inset: 0; z-index: 60; background: var(--bg); padding: 12px 16px; overflow: auto; display: flex !important; flex-direction: column; }
+.planilla-grande .calendario-grid-scroll { flex: 1; max-height: none; min-height: 0; }
+.planilla-grande-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.planilla-grande-head h3 { margin: 0; font-size: 20px; }
+.calendario-grid.compacta.grande { grid-template-columns: 58px repeat(var(--calendario-cols, 1), minmax(150px, 1fr)); gap: 3px; }
+.calendario-grid.grande .calendario-grid-cabecera { font-size: 12px; }
+.calendario-grid.grande .calendario-grid-predio { font-size: 12px; }
+.calendario-grid.grande .calendario-hora { font-size: 15px; font-weight: 800; justify-content: center; }
+.calendario-grid.grande .calendario-compacta { flex-direction: column; align-items: stretch; text-align: left; white-space: normal; gap: 1px; min-height: 64px; padding: 5px 7px; font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.calendario-grid.grande .calendario-compacta b { font-size: 12.5px; font-weight: 800; text-transform: uppercase; }
+.calendario-grid.grande .calendario-compacta span { overflow-wrap: anywhere; }
+.calendario-grid.grande .calendario-compacta span + span::before { content: "vs "; opacity: .75; }
