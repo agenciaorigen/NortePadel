@@ -2012,6 +2012,7 @@ async function cargarComplejos() {
         <div class="row" style="align-items:center;margin-bottom:4px">
           <span class="badge">${k.nombre}</span>
           <input type="number" min="0" step="100" placeholder="$/hora (opcional)" class="inputCostoHora" data-cancha="${k.id}" value="${k.costo_hora ?? ""}" style="max-width:150px" />
+          <button type="button" class="secondary small danger btnQuitarCancha" data-cancha="${k.id}" aria-label="Quitar ${escapeHtml(k.nombre)} de ${escapeHtml(c.nombre)}" title="Quitar cancha">✕</button>
         </div>
       `).join("") || '<span class="match-meta">Sin canchas cargadas</span>'}</div>
       <div class="row" style="margin-top:10px">
@@ -2040,6 +2041,26 @@ async function cargarComplejos() {
       }
     });
   });
+
+  // Quitar una cancha: no se deja si tiene partidos sin jugar asignados (quedarían
+  // sin cancha sin que nadie se entere) -- primero se mueven desde la Planilla.
+  document.querySelectorAll(".btnQuitarCancha").forEach((btn) => btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const cancha = cacheCanchas.find((k) => k.id === btn.dataset.cancha);
+      const complejo = cacheComplejos.find((c) => c.id === cancha?.complejo_id);
+      const { count } = await sb.from("partidos").select("id", { count: "exact", head: true }).eq("cancha_id", btn.dataset.cancha).neq("estado", "jugado");
+      if (count) { toast(`${cancha.nombre} de ${complejo?.nombre || "este predio"} tiene ${count} partido${count === 1 ? "" : "s"} sin jugar: movelos a otra cancha en la Planilla y después quitala`); return; }
+      if (!confirm(`¿Quitar ${cancha.nombre} de ${complejo?.nombre || "este predio"}?`)) return;
+      const { error } = await sb.from("canchas").delete().eq("id", btn.dataset.cancha);
+      if (error) { toast("No se pudo quitar: " + error.message); return; }
+      toast("Cancha quitada");
+      cargarComplejos();
+    } finally {
+      btn.disabled = false;
+    }
+  }));
 
   document.querySelectorAll(".inputCostoHora").forEach((input) => {
     input.addEventListener("change", async () => {
@@ -5789,10 +5810,20 @@ window.matchMedia("(max-width:767px)").addEventListener("change", () => {
 // (un orden alfabético puro los pondría al revés) y todo lo que liste
 // canchas (planilla, dropdown de "Cambiar cancha") va siempre de menor a
 // mayor en vez del orden en que hayan quedado guardadas en la base.
+// Predios: primero la sede del torneo, después los que más partidos tienen en
+// este torneo, y recién ahí por nombre (así el predio que casi no se usa queda al final).
+function prioridadPredio(complejoId, nombre) {
+  const torneo = torneoGestionData || torneoActualData;
+  if (torneo?.complejo_id && torneo.complejo_id === complejoId) return -1e6;
+  const partidos = (torneoGestionData ? ultimosPartidosGestion : ultimosPartidos) || [];
+  return -partidos.filter((p) => p.complejo_nombre === nombre).length;
+}
 function compararCanchas(a, b) {
   const complejoA = cacheComplejos.find((x) => x.id === a?.complejo_id)?.nombre || "";
   const complejoB = cacheComplejos.find((x) => x.id === b?.complejo_id)?.nombre || "";
-  if (complejoA !== complejoB) return complejoA.localeCompare(complejoB);
+  if (complejoA !== complejoB) {
+    return (prioridadPredio(a?.complejo_id, complejoA) - prioridadPredio(b?.complejo_id, complejoB)) || complejoA.localeCompare(complejoB);
+  }
   const numA = parseInt((a?.nombre || "").match(/\d+/)?.[0], 10);
   const numB = parseInt((b?.nombre || "").match(/\d+/)?.[0], 10);
   if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) return numA - numB;
