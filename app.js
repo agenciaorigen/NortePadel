@@ -6567,7 +6567,7 @@ function renderPartidosLlave(containerId, partidos) {
   const columnaHtml = (col) => `
       <div class="llave-columna">
         ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
-        ${ordenarPorSlot(col.partidos).map((p) => p.proyectada ? llaveProyectadaHtml(p) : llavePartidoCardHtml(p)).join("")}
+        ${ordenarPorSlot(col.partidos).map((p) => p.proyectada ? llaveProyectadaHtml(p, partidos) : llavePartidoCardHtml(p)).join("")}
       </div>`;
   // Zona: sus columnas (una por zona) van apiladas en VERTICAL, una debajo de
   // la otra -- no una al lado de la otra como las fases (pedido explícito: los
@@ -6596,12 +6596,24 @@ function renderPartidosLlave(containerId, partidos) {
 // la llave de Gestión es del torneo que se administra; la pública, del que se está mirando
 const torneoDeLlave = (containerId) => containerId === "admPartidosLlave" ? torneoGestionId : torneoActualId;
 
-function llaveProyectadaHtml(f) {
+// pareja que ya quedó definida para un "Ganador Z5"/"Perdedor D2" (null si ese cruce todavía no se jugó)
+function parejaDeRefCuadro(ref, partidos) {
+  const p = partidos.find((x) => x.slot_cuadro === ref.slice(1) && x.estado === "jugado" && x.ganador_pareja_id);
+  if (!p) return null;
+  const ganoLa1 = p.ganador_pareja_id === p.pareja1_id;
+  return ((ref[0] === "G") === ganoLa1 ? p.pareja1_nombre : p.pareja2_nombre) || null;
+}
+function llaveProyectadaHtml(f, partidos = []) {
+  const fila = (ref) => {
+    const nombre = parejaDeRefCuadro(ref, partidos);
+    return nombre
+      ? `<div class="llave-fila llave-definida"><span class="llave-pareja">${escapeHtml(nombre)}<small>${refLabelCuadro(ref)}</small></span></div>`
+      : `<div class="llave-fila"><span class="llave-pareja">${refLabelCuadro(ref)}</span></div>`;
+  };
   return `
     <div class="llave-partido llave-proyectada" data-slot="${f.slot_cuadro}">
       <div class="llave-fecha"><span>a definir</span><span>${f.slot_cuadro}</span></div>
-      <div class="llave-fila"><span class="llave-pareja">${refLabelCuadro(f.refA)}</span></div>
-      <div class="llave-fila"><span class="llave-pareja">${refLabelCuadro(f.refB)}</span></div>
+      ${fila(f.refA)}${fila(f.refB)}
     </div>`;
 }
 

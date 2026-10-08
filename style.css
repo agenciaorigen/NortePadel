@@ -2438,3 +2438,7 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 
 /* Lista de partidos (Gestión): zona y categoría como título de cada tarjeta */
 .match-titulo { margin: 0 0 10px; font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; color: var(--accent-bright); }
+
+/* Llave: cruce futuro con una pareja que ya se sabe (ganó/perdió su partido) */
+.llave-proyectada .llave-definida .llave-pareja { font-style: normal; color: var(--text); font-weight: 700; display: flex; flex-direction: column; }
+.llave-proyectada .llave-definida small { font-size: 11px; font-weight: 600; color: var(--muted); font-style: italic; }
