@@ -5753,6 +5753,7 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
   const ventanaPorCancha = new Map(canchas.map((c) => [c.id, ventanaDeCancha(c._tc || {}, torneo)]));
   const conHorario = partidos.filter((p) => p.horario);
   const filaPorMinuto = new Map(); // timestamp -> horario ISO de esa fila
+  const extra = new Map(); // timestamp -> canchas con hueco "por si se atrasa" (después del cierre, hasta las 00:00)
   conHorario.forEach((p) => filaPorMinuto.set(new Date(p.horario).getTime(), p.horario));
   if (sintetizarVacios && torneo) {
     const duracion = torneo.duracion_minutos || 90;
@@ -5762,10 +5763,19 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
         const ventana = ventanaPorCancha.get(c.id)(dia);
         if (ventana && ventana.cerrado) return; // esta cancha no juega este día -- no sintetiza huecos para ella
         const win = ventana || FRANJA_DEFAULT_DIA;
-        for (let m = win.desde; m + duracion <= win.hasta; m += duracion) {
+        let m = win.desde;
+        for (; m + duracion <= win.hasta; m += duracion) {
           const d = new Date(fecha);
           d.setHours(0, m, 0, 0);
           if (!filaPorMinuto.has(d.getTime())) filaPorMinuto.set(d.getTime(), d.toISOString());
+        }
+        // planilla: huecos de más hasta las 00:00, por si la fecha se atrasa
+        for (; m <= 24 * 60; m += duracion) {
+          const d = new Date(fecha);
+          d.setHours(0, m, 0, 0);
+          if (!filaPorMinuto.has(d.getTime())) filaPorMinuto.set(d.getTime(), d.toISOString());
+          if (!extra.has(d.getTime())) extra.set(d.getTime(), new Set());
+          extra.get(d.getTime()).add(c.id);
         }
       });
     });
@@ -5787,6 +5797,7 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
       // juega este día) -- distinto de "disponible", que sigue siendo zona de
       // drop válida para arrastrar un partido.
       const ventana = ventanaPorCancha.get(c.id)(dia);
+      if (extra.get(desde.getTime())?.has(c.id)) return { cancha: c, estado: "disponible" };
       if (ventana && (ventana.cerrado || minutosDelDia < ventana.desde || minutosDelDia >= ventana.hasta)) {
         return { cancha: c, estado: "cerrado" };
       }
@@ -5863,6 +5874,8 @@ let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (A
 // planilla igual muestra TODOS los partidos (para ver qué cancha está ocupada),
 // pero los de otras categorías quedan apagados.
 let partidoSeleccionadoPlanilla = null; // "tocar para mover" en la planilla
+// día de juego de un horario: lo que se juega después de medianoche (hasta las 6) cuenta para el día anterior
+const jornadaDe = (fecha) => new Date(new Date(fecha).getTime() - 6 * 3600000).toDateString();
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && partidoSeleccionadoPlanilla) { partidoSeleccionadoPlanilla = null; renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion); }
   else if (e.key === "Escape" && vistaPartidosAdmin === "planilla-grande") document.querySelector('#partidosVistaPills [data-vista="planilla"]')?.click();
@@ -5896,15 +5909,15 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   if (editable) {
     const vistos = new Set();
     filas.forEach((fila) => {
-      const key = new Date(fila.horarioISO).toDateString();
+      const key = jornadaDe(fila.horarioISO);
       if (!vistos.has(key)) { vistos.add(key); dias.push(key); }
     });
     if (!dias.includes(planillaDiaFiltro)) {
-      const hoy = new Date().toDateString();
+      const hoy = jornadaDe(new Date());
       planillaDiaFiltro = dias.includes(hoy) ? hoy : (dias[0] || null);
     }
   }
-  const filasVisibles = (editable && planillaDiaFiltro) ? filas.filter((f) => new Date(f.horarioISO).toDateString() === planillaDiaFiltro) : filas;
+  const filasVisibles = (editable && planillaDiaFiltro) ? filas.filter((f) => jornadaDe(f.horarioISO) === planillaDiaFiltro) : filas;
 
   // La Planilla (editable) es para reorganizar horarios/canchas rápido, no
   // para cargar resultados -- eso quedó solo en la vista Lista/tarjeta
