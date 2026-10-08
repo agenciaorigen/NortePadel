@@ -944,7 +944,9 @@ function cargarImagenParaCanvas(url) {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = url;
+    // "?canvas": si el navegador ya tenía el logo guardado de la página (sin permiso
+    // para el canvas), lo vuelve a pedir en vez de reusar esa copia y fallar
+    img.src = /^https?:/.test(url) ? url + (url.includes("?") ? "&" : "?") + "canvas" : url;
   });
 }
 
@@ -962,11 +964,14 @@ function imagenUsableEnCanvas(img) {
     return true;
   } catch (e) { return false; }
 }
-async function logosPlaca() {
-  const elegir = (n) => sponsorsVigentes.filter((s) => s.nivel === n);
+// todos=true (historias de horarios): además de Principal y Frente, Manga, Espalda y el resto, más chicos
+async function logosPlaca(todos = false) {
+  const elegir = (n) => sponsorsVigentes.filter((s) => (s.nivel || "") === n);
   const cargar = async (lista) => (await Promise.all(lista.map((s) => cargarImagenParaCanvas(urlSegura(s.logo_url))))).filter((img) => img && imagenUsableEnCanvas(img));
-  const [general, principal, frente] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente"))]);
-  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])] };
+  const [general, principal, frente, manga, espalda, otros] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente")),
+    ...(todos ? [cargar(elegir("manga")), cargar(elegir("espalda")), cargar(elegir(""))] : [[], [], []])]);
+  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, todos ? 60 : 52]),
+    ...manga.map((img) => [img, 50]), ...[...espalda, ...otros].map((img) => [img, 44])] };
 }
 const ALTO_BANDA_SPONSORS = 230;
 function dibujarLogoEnCaja(ctx, img, x, y, alto) {
@@ -978,8 +983,24 @@ function dibujarLogoEnCaja(ctx, img, x, y, alto) {
   ctx.drawImage(img, x + 16, y + 12, ancho, alto);
   return ancho + 32;
 }
-function dibujarSponsorsPlaca(ctx, W, H, logos) {
-  const y0 = H - 100 - ALTO_BANDA_SPONSORS;
+// reparte los logos en hasta maxFilas renglones (si igual no entran, se achican parejo)
+function filasDeLogos(logos, W, maxFilas) {
+  const anchoDe = ([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32;
+  const total = logos.fila.reduce((a, l) => a + anchoDe(l) + 18, 0);
+  const filas = Math.max(1, Math.min(maxFilas, Math.ceil(total / (W - 120))));
+  const objetivo = total / filas, res = [[]];
+  let acum = 0;
+  logos.fila.forEach((l) => {
+    if (acum > 0 && acum + anchoDe(l) / 2 > objetivo * res.length && res.length < filas) res.push([]);
+    res[res.length - 1].push(l);
+    acum += anchoDe(l) + 18;
+  });
+  return res.filter((f) => f.length);
+}
+const altoBandaSponsors = (logos, W, maxFilas = 1) =>
+  (logos.general ? 152 : 40) + Math.max(1, logos.fila.length ? filasDeLogos(logos, W, maxFilas).length : 0) * 112 - 34;
+function dibujarSponsorsPlaca(ctx, W, H, logos, maxFilas = 1, abajo = 100) {
+  const y0 = H - abajo - altoBandaSponsors(logos, W, maxFilas);
   ctx.textAlign = "center";
   ctx.fillStyle = "#8D969C";
   ctx.font = "700 26px 'Barlow Condensed'";
@@ -988,21 +1009,21 @@ function dibujarSponsorsPlaca(ctx, W, H, logos) {
     const ancho = Math.min(80 * 3.2, (logos.general.width / logos.general.height) * 80) + 32;
     dibujarLogoEnCaja(ctx, logos.general, (W - ancho) / 2, y0 + 34, 80);
   }
-  if (logos.fila.length) {
-    const yFila = y0 + (logos.general ? 152 : 40);
-    const anchos = logos.fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
+  if (logos.fila.length) filasDeLogos(logos, W, maxFilas).forEach((fila, n) => {
+    const yFila = y0 + (logos.general ? 152 : 40) + n * 112;
+    const anchos = fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
     const total = anchos.reduce((a, b) => a + b, 0) + 18 * (anchos.length - 1);
     const escala = Math.min(1, (W - 120) / total); // si no entran, se achican todos parejo
     let x = (W - total * escala) / 2;
     ctx.save();
     ctx.translate(x, yFila); ctx.scale(escala, escala);
     let cx = 0;
-    logos.fila.forEach(([img, alto], i) => {
+    fila.forEach(([img, alto], i) => {
       dibujarLogoEnCaja(ctx, img, cx, 76 - alto, alto); // alineados por abajo
       cx += anchos[i] + 18;
     });
     ctx.restore();
-  }
+  });
 }
 
 async function exportarRankingTop20() {
@@ -6974,7 +6995,7 @@ function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categori
     textoAjustado(ctx, nombre(p.pareja2_nombre), maxT - anchoVs, "700 {t}px Manrope", 30);
     ctx.fillText(nombre(p.pareja2_nombre), xt + anchoVs, y + 128);
   });
-  if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos);
+  if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos, 2, 130);
   ctx.textAlign = "center";
   ctx.fillStyle = "#8D969C";
   ctx.font = "700 22px Manrope";
@@ -6984,9 +7005,9 @@ async function exportarHorariosInstagram() {
   const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro));
   if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
   await cargarFuentesExport();
-  const logos = await logosPlaca();
+  const logos = await logosPlaca(true);
   const W = 1080, H = 1920, altoCard = 168, altoDia = 70, inicio = 330;
-  const limite = H - 90 - (logos.general || logos.fila.length ? ALTO_BANDA_SPONSORS + 30 : 0);
+  const limite = H - 90 - (logos.general || logos.fila.length ? altoBandaSponsors(logos, W, 2) + 60 : 0);
   const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
   const categorias = [...new Set(conHorario.map((p) => p.categoria))].sort((a, b) => orden(a) - orden(b));
   const torneoNombre = torneoGestionData?.nombre || "Torneo";
