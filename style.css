@@ -2208,3 +2208,13 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .disp-otros { margin-top: 12px; }
 .disp-otros summary { cursor: pointer; font-size: 13.5px; color: var(--muted); padding: 6px 0; }
 @media (min-width: 700px) { .disp-dia { grid-template-columns: 110px 1fr; align-items: center; } }
+
+/* Inicio · Horarios por categoría */
+.horario-dia { font-family: var(--font-display); font-size: 1.05rem; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-bright); margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(var(--accent-rgb), .35); }
+.horario-fila { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 10px 12px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
+.horario-fila.en-vivo-ahora { border-color: var(--accent-2); }
+.horario-hora { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.5rem; color: var(--accent-bright); font-variant-numeric: tabular-nums; }
+.horario-info { min-width: 0; font-weight: 600; }
+.horario-info em { color: var(--accent-bright); font-style: italic; font-weight: 800; margin-right: 6px; }
+.horario-cabeza { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.horario-zona { background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 2px 9px; }

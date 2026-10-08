@@ -1689,16 +1689,28 @@ async function cargarAscendidos() {
 // Reutiliza la misma tarjeta de Resultados (llavePartidoCardHtml) en vez de
 // una tira que gira -- con la banda de arriba ya en movimiento, sumarle más
 // quedaba recargado.
+// Partidos de las categorías con el calendario ya PUBLICADO (lo que está "de
+// prueba" en Gestión no se muestra en Inicio ni en En vivo, igual que en la
+// pantalla del torneo).
+async function partidosPublicados(idTorneo) {
+  const [{ data }, { data: cats }] = await Promise.all([
+    sb.rpc("partidos_publicos", { p_torneo_id: idTorneo }),
+    sb.from("torneo_categorias").select("categoria, estado_fase").eq("torneo_id", idTorneo)
+  ]);
+  const publicadas = new Set((cats || []).filter((c) => c.estado_fase === "calendario_confirmado" || c.estado_fase === "finalizada").map((c) => c.categoria));
+  return (data || []).filter((p) => publicadas.has(p.categoria));
+}
+
 async function cargarUltimosProximos() {
   await calcularTorneoDestacado();
   const idTorneo = torneoDestacadoId;
   if (!idTorneo) {
     document.getElementById("inicioResultadosWrap").style.display = "none";
     document.getElementById("inicioProximoDestacadoWrap").style.display = "none";
+    document.getElementById("inicioHorariosWrap").style.display = "none";
     return;
   }
-  const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: idTorneo });
-  const partidos = data || [];
+  const partidos = await partidosPublicados(idTorneo);
   const ahora = new Date();
 
   const jugados = partidos.filter((p) => p.estado === "jugado" && p.horario)
@@ -1713,6 +1725,45 @@ async function cargarUltimosProximos() {
   // hasta 3 próximos partidos, en vez de un banner fijo + una lista aparte
   // (quedaban duplicados). Rota solo, como el carrusel del hero.
   renderProximosCarrusel(proximos, idTorneo);
+  renderHorariosInicio(partidos, idTorneo);
+}
+
+// "Horarios": todos los partidos que faltan jugar del torneo, por categoría
+// (una pastilla por categoría) y agrupados por día.
+let horariosInicioCategoria = "";
+const nombrePareja = (n) => escapeHtml((n || "?").replace(/A confirmar \([^)]*\)/g, "A confirmar"));
+function renderHorariosInicio(partidos, idTorneo) {
+  const wrap = document.getElementById("inicioHorariosWrap");
+  const pendientes = partidos.filter((p) => p.horario && p.estado !== "jugado")
+    .sort((a, b) => new Date(a.horario) - new Date(b.horario));
+  wrap.style.display = pendientes.length ? "block" : "none";
+  if (!pendientes.length) return;
+  const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
+  const categorias = [...new Set(pendientes.map((p) => p.categoria))]
+    .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, "es", { numeric: true }));
+  if (!categorias.includes(horariosInicioCategoria)) horariosInicioCategoria = categorias[0];
+  document.getElementById("inicioHorariosPills").innerHTML = categorias.map((c) =>
+    `<button type="button" class="pill${c === horariosInicioCategoria ? " active" : ""}" data-cat="${escapeHtml(c)}" aria-pressed="${c === horariosInicioCategoria}">${escapeHtml(c)}</button>`).join("");
+  let diaActual = "";
+  document.getElementById("inicioHorariosLista").innerHTML = pendientes.filter((p) => p.categoria === horariosInicioCategoria).map((p) => {
+    const fecha = new Date(p.horario);
+    const dia = fecha.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+    const titulo = dia !== diaActual ? `<h3 class="horario-dia">${dia}</h3>` : "";
+    diaActual = dia;
+    return `${titulo}<div class="horario-fila${p.estado === "en_juego" ? " en-vivo-ahora" : ""}">
+      <span class="horario-hora">${fecha.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+      <div class="horario-info">
+        <div class="horario-cabeza"><span class="horario-zona">${escapeHtml(p.slot_cuadro ? p.slot_cuadro.replace(/^Z/, "Zona ") : p.ronda || "")}</span><span>${escapeHtml(p.complejo_nombre || "Sede a confirmar")}</span></div>
+        <div>${nombrePareja(p.pareja1_nombre)}</div>
+        <div><em>vs</em>${nombrePareja(p.pareja2_nombre)}</div>
+      </div>
+    </div>`;
+  }).join("");
+  document.querySelectorAll("#inicioHorariosPills .pill").forEach((b) => b.onclick = () => {
+    horariosInicioCategoria = b.dataset.cat;
+    renderHorariosInicio(partidos, idTorneo);
+  });
+  document.getElementById("inicioHorariosVerTodo").onclick = () => abrirTorneo(idTorneo, "");
 }
 
 // Carrusel de "Próximo partido destacado": una slide .match-pair-destacado por
@@ -1783,8 +1834,7 @@ async function cargarEnVivo() {
   await calcularTorneoDestacado(); // idempotente -- asegura torneoEnCursoId sin depender del orden de carga en init()
   const wrapPartidos = document.getElementById("enVivoPartidosWrap");
   if (!torneoEnCursoId) { wrapPartidos.style.display = "none"; return; }
-  const { data } = await sb.rpc("partidos_publicos", { p_torneo_id: torneoEnCursoId });
-  const partidos = data || [];
+  const partidos = await partidosPublicados(torneoEnCursoId);
   const ahora = new Date();
   const jugandoAhora = partidos.filter((p) => p.estado === "en_juego");
   const proximos = partidos.filter((p) => p.horario && p.estado === "programado" && new Date(p.horario) >= ahora)
@@ -6547,12 +6597,21 @@ async function exportarHorariosInstagram() {
   const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro));
   if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
   await cargarFuentesExport();
-  const [fotoDamas, fotoCaballeros, logos] = await Promise.all([cargarImagenParaCanvas("foto-torneos.jpg"), cargarImagenParaCanvas("foto-cancha.jpg"), logosPlaca()]);
+  const logos = await logosPlaca();
   const W = 1080, H = 1920, altoCard = 168, altoDia = 70, inicio = 330;
   const limite = H - 90 - (logos.general || logos.fila.length ? ALTO_BANDA_SPONSORS + 30 : 0);
   const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
   const categorias = [...new Set(conHorario.map((p) => p.categoria))].sort((a, b) => orden(a) - orden(b));
   const torneoNombre = torneoGestionData?.nombre || "Torneo";
+  // una foto distinta por categoría, así cada historia se distingue de un vistazo
+  const fotosDamas = ["foto-torneos.jpg", "foto-ranking.jpg", "hero-ranking.jpg", "hero-cancha.jpg"];
+  const fotosCaballeros = ["foto-cancha.jpg", "foto-portada.jpg", "foto-portada-movil.jpg", "hero-torneos.jpg", "energia-pelota.jpg", "ranking-bg-campeon.jpg", "pelotas.jpg", "destacados-fondo.jpg", "ranking-bg-top20.jpg"];
+  const cuenta = { Damas: 0, otras: 0 };
+  const fotoDe = Object.fromEntries(categorias.map((c) => {
+    const damas = generoDeCategoria(c) === "Damas", lista = damas ? fotosDamas : fotosCaballeros;
+    return [c, lista[cuenta[damas ? "Damas" : "otras"]++ % lista.length]];
+  }));
+  const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
   const imagenes = [];
   for (const categoria of categorias) {
     const partidos = conHorario.filter((p) => p.categoria === categoria).sort((a, b) => new Date(a.horario) - new Date(b.horario));
@@ -6569,7 +6628,7 @@ async function exportarHorariosInstagram() {
     paginas.forEach((items, i) => {
       const canvas = document.createElement("canvas");
       canvas.width = W; canvas.height = H;
-      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, generoDeCategoria(categoria) === "Damas" ? fotoDamas : fotoCaballeros, logos, torneoNombre, categoria, items, i + 1, paginas.length);
+      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, fotos[fotoDe[categoria]], logos, torneoNombre, categoria, items, i + 1, paginas.length);
       imagenes.push({ canvas, nombre: `horarios-${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
     });
   }
