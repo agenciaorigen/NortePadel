@@ -2300,3 +2300,16 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 #remeraSinUbicar:empty { display: none; }
 #remeraSinUbicar { color: var(--state-warn); }
 @media (max-width: 520px) { .remera-par { gap: 8px; } }
+
+/* Sponsors por importancia: Frente > Manga > Espalda/partners, a color y más grandes */
+.bloque-partners .sponsor-strip, .sp-franja .sponsor-strip, #dtSponsors { flex-wrap: wrap; justify-content: center; overflow: visible; gap: 14px; }
+.bloque-partners #sponsorsInline { display: grid; gap: 16px; }
+.bloque-partners .sponsor-strip img, .sp-franja .sponsor-strip img, #dtSponsors img { filter: none; opacity: 1; height: 52px; max-width: 180px; }
+.bloque-partners .sponsor-manga img, #dtSponsors .sponsor-manga img { height: 62px; max-width: 210px; }
+.bloque-partners .sponsor-frente img, #dtSponsors .sponsor-frente img, .sp-franja .sponsor-manga img { height: 74px; max-width: 250px; }
+#dtSponsors .sponsor-principal img, #dtSponsors .sponsor-general img { height: 84px; max-width: 280px; }
+.sp-franja { margin: 0 0 40px; text-align: center; }
+.sp-franja .sponsor-frente img { height: 88px; max-width: 300px; }
+@media (max-width: 600px) {
+  .sp-franja .sponsor-frente img, .bloque-partners .sponsor-frente img { height: 64px; max-width: 70vw; }
+}

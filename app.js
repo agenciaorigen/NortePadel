@@ -7375,7 +7375,7 @@ function renderSponsorItem(s, caption, admin) {
   // si el logo no carga, se muestra el nombre del auspiciante en su lugar (ver data-si-falla)
   const contenido = `<img src="${urlSegura(s.logo_url)}" alt="${escapeHtml(s.nombre)}" loading="lazy" data-si-falla="texto" />` +
     (caption ? `<span class="sponsor-caption">${escapeHtml(caption)}</span>` : "");
-  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "") + (s.nivel === "frente" ? " sponsor-frente" : s.nivel === "principal" ? " sponsor-principal" : "");
+  const clase = "sponsor-item" + (esJpg ? " sponsor-sin-fondo" : "") + (NIVELES_SPONSOR[s.nivel] ? " sponsor-" + s.nivel : "");
   const item = hrefSeguro(s.link_url)
     ? `<a href="${hrefSeguro(s.link_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(s.nombre)}" class="${clase}">${contenido}</a>`
     : `<span class="${clase}" title="${escapeHtml(s.nombre)}">${contenido}</span>`;
@@ -7467,7 +7467,14 @@ function renderUbicacionesSponsors(vigentes) {
   mostrarEn("spPresentado", general ? `<span class="sp-presentado-texto">El Norte Pádel <span>presentado por</span></span>${renderSponsorItem(general)}` : "");
   const principal = vigentes.find((s) => s.nivel === "principal");
   mostrarEn("inicioSponsorPrincipal", principal ? bannerPrincipalHtml(principal) : "");
+  // Frente: franja grande a mitad de Inicio; Frente y Manga: debajo del Ranking
+  const de = (...niveles) => vigentes.filter((s) => niveles.includes(s.nivel));
+  mostrarEn("inicioSponsorsFrente", franjaSponsors(de("frente"), "Sponsors de la fecha"));
+  mostrarEn("rankingSponsors", franjaSponsors(de("frente", "manga"), "Acompañan el ranking"));
 }
+// renglón de logos con título; vacío si no hay nadie (mostrarEn lo oculta)
+const franjaSponsors = (lista, titulo) => lista.length
+  ? `<p class="sponsor-label">${escapeHtml(titulo)}</p><div class="sponsor-strip">${lista.map((s) => renderSponsorItem(s)).join("")}</div>` : "";
 
 // Página Sponsors: "Nos acompañan" (los vigentes, con la jerarquía de su
 // nivel), lugares libres por nivel y posiciones ocupadas marcadas en la remera.
@@ -7685,7 +7692,9 @@ async function cargarSponsors() {
   // últimos solo si no son de un torneo puntual, como siempre)
   const generales = data.filter((s) => s.nivel ? ["frente", "manga", "espalda"].includes(s.nivel) : !s.torneo_id);
   if (generales.length > 0) {
-    if (inline) inline.innerHTML = generales.map((s) => renderSponsorItem(s)).join("");
+    // un renglón por nivel (Frente, Manga, Espalda, resto), cada uno más chico que el anterior
+    if (inline) inline.innerHTML = ["frente", "manga", "espalda", ""].map((n) => generales.filter((s) => (NIVELES_SPONSOR[s.nivel] ? s.nivel : "") === n))
+      .filter((g) => g.length).map((g) => `<div class="sponsor-strip">${g.map((s) => renderSponsorItem(s)).join("")}</div>`).join("");
     if (inlineCard) inlineCard.style.display = "block";
     if (marqueeTrack) {
       const items = generales.map((s) => renderSponsorItem(s)).join("");
@@ -7823,7 +7832,7 @@ async function cargarSponsorsTorneo() {
   if (!cont || !torneoActualId) return;
   const { data } = await sb.from("sponsors").select("*").eq("activo", true)
     .or(`torneo_id.eq.${torneoActualId},torneo_id.is.null`).order("orden");
-  const vigentes = (data || []).filter(sponsorVigenteHoy);
+  const vigentes = (data || []).filter(sponsorVigenteHoy).sort((a, b) => (ORDEN_NIVEL[a.nivel] ?? 9) - (ORDEN_NIVEL[b.nivel] ?? 9));
   if (vigentes.length > 0) {
     cont.innerHTML = vigentes.map((s) => renderSponsorItem(s)).join("");
     cont.style.display = "flex";
