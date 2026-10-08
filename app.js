@@ -5807,7 +5807,10 @@ function abreviarCategoria(categoria) {
 // cancha/horario en la vista Lista, ver renderPartidosLista). El público/
 // jugador ya no ve esta grilla — ve la llave de Torneo (renderPartidosLlave).
 let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (Administración) — se mantiene entre re-renders (drag&drop, cambio de categoría)
-function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable) {
+// resaltar (opcional, Set de ids): con un filtro de categoría puesto, la
+// planilla igual muestra TODOS los partidos (para ver qué cancha está ocupada),
+// pero los de otras categorías quedan apagados.
+function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar = null) {
   const cont = document.getElementById(containerId);
   // _tc: referencia a la fila de torneo_canchas (dias_semana/horarios_por_dia)
   // de esta cancha puntual -- la usa calcularSlots vía ventanaDeCancha().
@@ -5861,6 +5864,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       ${p.categoria ? `<span class="badge" style="margin-top:4px">${p.categoria}</span>` : ""}
     </div>`;
   const tarjetaCompactaHtml = (p, extraClase = "") => {
+    if (resaltar && !resaltar.has(p.id)) extraClase += " otra-cat";
     const horarioTxt = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
     const detalle = escapeHtml(`${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`);
     const etiqueta = `${p.slot_cuadro || (p.grupo ? "G" + p.grupo : "")} ${abreviarCategoria(p.categoria)}`.trim();
@@ -5875,9 +5879,10 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">Cerrada</div>`;
 
   let html = "";
-  if (editable && sinHorario.length > 0) {
+  const bandeja = resaltar ? sinHorario.filter((p) => resaltar.has(p.id)) : sinHorario;
+  if (editable && bandeja.length > 0) {
     html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario a un hueco libre (en el celular, asignalo desde su tarjeta en la vista Lista):</p>
-      <div class="planilla-bandeja" id="planillaBandeja">${sinHorario.map((p) => tarjetaHtml(p, "pendiente")).join("")}</div>`;
+      <div class="planilla-bandeja" id="planillaBandeja">${bandeja.map((p) => tarjetaHtml(p, "pendiente")).join("")}</div>`;
   }
   if (editable && dias.length > 1) {
     html += `<div class="pill-row" id="planillaDiasPills">${dias.map((key) => {
@@ -5940,14 +5945,14 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     cont.querySelectorAll("#planillaDiasPills .pill").forEach((btn) => {
       btn.addEventListener("click", () => {
         planillaDiaFiltro = btn.dataset.dia;
-        renderPartidosCalendario(containerId, partidos, canchasTorneo, editable);
+        renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar);
       });
     });
   }
   cont.querySelectorAll("[data-abrir-partido]").forEach((el) => {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
-  registrarRerenderResponsive(containerId, () => renderPartidosCalendario(containerId, partidos, canchasTorneo, editable));
+  registrarRerenderResponsive(containerId, () => renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar));
 }
 
 // Drag & drop nativo del navegador (sin librerías, solo desktop): tomar un partido y
@@ -6500,7 +6505,9 @@ function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
     if (partidosCategoriaFiltro) renderPartidosTabla("admPartidosTabla", visibles, canchasTorneo, ultimasParejasGestion);
   } else {
     contLista.style.display = "block";
-    if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", visibles, canchasTorneo, true);
+    // la planilla muestra todos los partidos para ver las canchas ocupadas; los filtrados quedan resaltados
+    const filtrado = visibles.length !== partidos.length;
+    if (vistaPartidosAdmin === "planilla") renderPartidosCalendario("admPartidosLista", partidos, canchasTorneo, true, filtrado ? new Set(visibles.map((p) => p.id)) : null);
     else renderPartidosLista("admPartidosLista", visibles, canchasTorneo, true, ultimasParejasGestion);
   }
 }

@@ -2218,3 +2218,7 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .horario-info em { color: var(--accent-bright); font-style: italic; font-weight: 800; margin-right: 6px; }
 .horario-cabeza { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 .horario-zona { background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 2px 9px; }
+
+/* Planilla con filtro de categoría: los partidos de otras categorías se ven (cancha ocupada) pero apagados */
+.calendario-partido.otra-cat { opacity: .35; filter: grayscale(.7); }
+.calendario-partido.otra-cat:hover, .calendario-partido.otra-cat:focus-visible { opacity: 1; filter: none; }
