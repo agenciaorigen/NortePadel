@@ -2222,3 +2222,32 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 /* Planilla con filtro de categoría: los partidos de otras categorías se ven (cancha ocupada) pero apagados */
 .calendario-partido.otra-cat { opacity: .35; filter: grayscale(.7); }
 .calendario-partido.otra-cat:hover, .calendario-partido.otra-cat:focus-visible { opacity: 1; filter: none; }
+
+/* Llave: rondas todavía no armadas (casilleros "Ganador Z1 vs Perdedor Z7") */
+.llave-partido.llave-proyectada { border-style: dashed; opacity: .7; cursor: default; }
+.llave-partido.llave-proyectada .llave-pareja { font-style: italic; }
+/* Gestión → Llave: intercambiar una pareja con otra de la misma ronda */
+.llave-intercambiar { flex: none; width: 28px; height: 28px; padding: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--accent-bright); font-size: 15px; line-height: 1; cursor: pointer; }
+.llave-intercambiar:hover, .llave-intercambiar:focus-visible { background: var(--accent); color: var(--accent-ink); }
+.dlg-intercambio { max-width: 420px; width: calc(100% - 32px); background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+.dlg-intercambio::backdrop { background: rgba(0,0,0,.6); }
+.dlg-intercambio select { width: 100%; }
+.dlg-intercambio .match-actions button { flex: 1; margin: 0; }
+
+/* Gestión → Editar cuadro */
+.dlg-cuadro { max-width: 640px; max-height: 90vh; overflow-y: auto; }
+.cuadro-fase { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px 12px; margin: 0 0 12px; }
+.cuadro-fase legend { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; text-transform: uppercase; color: var(--accent-bright); padding: 0 6px; }
+.cuadro-cruce { display: grid; grid-template-columns: 34px 1fr auto 1fr 32px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.cuadro-cruce select { width: 100%; min-width: 0; margin: 0; }
+.cuadro-slot { font-family: var(--font-display); font-weight: 800; color: var(--muted); }
+.cuadro-vs { font-style: italic; font-weight: 800; color: var(--accent-bright); }
+.cuadro-quitar { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: var(--radius-sm); min-height: 30px; padding: 0 8px; cursor: pointer; font-size: 12px; }
+.cuadro-quitar:hover, .cuadro-quitar:focus-visible { color: var(--danger); border-color: var(--danger); }
+.cuadro-error { color: var(--danger); font-weight: 700; min-height: 1em; margin: 6px 0; }
+.dlg-cuadro-pie { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .cuadro-cruce { grid-template-columns: 34px 1fr 32px; }
+  .cuadro-cruce .cuadro-vs { display: none; }
+  .cuadro-cruce select[data-l="1"] { grid-column: 2; }
+}

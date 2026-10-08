@@ -4023,8 +4023,22 @@ function wirearBotonWhatsappPago(id, t) {
 // vez vía .view/.active), así que refrescar acá adentro es tan simple como
 // era antes con una sola pantalla. Ninguna acción de administración vive
 // más acá: eso es refrescarGestionTorneo/cargarGestionTorneo, en Administración.
+// Cuadros editados a mano (torneo_categorias.plantilla_cuadro) de un torneo.
+// Va en una consulta aparte y tolerante: si la base todavía no tiene la
+// columna, el torneo carga igual con la plantilla del club.
+async function cargarPlantillasCuadro(torneoId) {
+  const { data, error } = await sb.from("torneo_categorias").select("categoria, plantilla_cuadro").eq("torneo_id", torneoId);
+  if (error) return;
+  (data || []).forEach((c) => {
+    const clave = `${torneoId}|${c.categoria}`;
+    if (Array.isArray(c.plantilla_cuadro) && c.plantilla_cuadro.length) plantillasCuadroEditadas[clave] = plantillaDesdeLista(c.plantilla_cuadro);
+    else delete plantillasCuadroEditadas[clave];
+  });
+}
+
 async function refrescarDetalleTorneo() {
   if (!torneoActualId) return;
+  await cargarPlantillasCuadro(torneoActualId);
   const { data: t, error } = await sb.from("torneos").select("*, complejos(nombre), torneo_categorias(categoria, estado_fase)").eq("id", torneoActualId).single();
   if (!t) {
     // antes esto fallaba en silencio (pantalla vacía, sin categorías ni jugadores,
@@ -4556,6 +4570,7 @@ async function cargarGestionTorneo(id) {
     return;
   }
   torneoGestionData = t;
+  await cargarPlantillasCuadro(id);
   document.getElementById("admSelectTorneoGestion").value = id;
   document.getElementById("admGestionTorneoWrap").style.display = "block";
   // Pantalla enfocada SOLO en este torneo (dashboard aparte): se oculta el
@@ -5311,7 +5326,7 @@ async function generarSiguienteRondaCuadro(categoria, torneoId) {
   if (!partidos || partidos.length === 0) return null;
 
   const nZonas = partidos.filter((p) => p.slot_cuadro[0] === "Z").length;
-  const plantilla = PLANTILLAS_CUADRO[nZonas];
+  const plantilla = plantillaCuadro(nZonas, torneoId, categoria);
   if (!plantilla) return null;
 
   const mapaSlots = {};
@@ -6239,6 +6254,14 @@ function renderPartidosLlave(containerId, partidos) {
   // columna con todos sus partidos apilados en vertical (igual que una Zona con varios
   // partidos) — lo horizontal es solo el avance de fase (Zona -> Cuartos -> Semis -> Final).
   const eliminacion = partidos.filter((p) => p.ronda && p.ronda !== "Fase de grupos" && p.grupo == null && !(p.ronda === "Zona" && p.slot_cuadro));
+  // cuadro del club: las rondas que todavía no se armaron se muestran igual,
+  // como casilleros "Ganador Z1 vs Perdedor Z7", así se ve el cuadro completo
+  // desde el principio (igual que el Excel de los organizadores)
+  if (zonasCuadro.length) {
+    const yaArmados = new Set(partidos.map((p) => p.slot_cuadro).filter(Boolean));
+    proyeccionCuadroCompleto(zonasCuadro.length, plantillaCuadro(zonasCuadro.length, torneoDeLlave(containerId), partidos[0]?.categoria)).filter((f) => !yaArmados.has(f.slot)).forEach((f) =>
+      eliminacion.push({ proyectada: true, ronda: RONDA_DISPLAY_CUADRO[f.ronda] || f.ronda, slot_cuadro: f.slot, refA: f.refA, refB: f.refB }));
+  }
   // Orden de fases: primero el orden estándar del cuadro (Dieciseisavos -> Final),
   // sin depender de created_at -- una carga masiva por SQL inserta todo en la misma
   // transacción y ahí todas las filas quedan con el mismo created_at, así que ese
@@ -6284,7 +6307,7 @@ function renderPartidosLlave(containerId, partidos) {
   const columnaHtml = (col) => `
       <div class="llave-columna">
         ${col.titulo ? `<h4>${col.titulo}</h4>` : ""}
-        ${ordenarPorSlot(col.partidos).map((p) => llavePartidoCardHtml(p)).join("")}
+        ${ordenarPorSlot(col.partidos).map((p) => p.proyectada ? llaveProyectadaHtml(p) : llavePartidoCardHtml(p)).join("")}
       </div>`;
   // Zona: sus columnas (una por zona) van apiladas en VERTICAL, una debajo de
   // la otra -- no una al lado de la otra como las fases (pedido explícito: los
@@ -6302,11 +6325,86 @@ function renderPartidosLlave(containerId, partidos) {
     el.addEventListener("click", () => abrirDetallePartido(el.dataset.abrirPartido));
   });
   wireCargaResultado(cont);
+  if (isAdmin && containerId === "admPartidosLlave") wireIntercambioLlave(cont, partidos);
   // se guarda para poder volver a trazar las líneas si cambia el ancho de
   // pantalla (dibujarConectoresLlave usa posiciones ya renderizadas, así que
   // un resize las deja desalineadas si no se recalculan con los mismos datos)
   cont._partidosLlave = partidos;
   dibujarConectoresLlave(cont, partidos);
+}
+
+// la llave de Gestión es del torneo que se administra; la pública, del que se está mirando
+const torneoDeLlave = (containerId) => containerId === "admPartidosLlave" ? torneoGestionId : torneoActualId;
+
+function llaveProyectadaHtml(f) {
+  return `
+    <div class="llave-partido llave-proyectada" data-slot="${f.slot_cuadro}">
+      <div class="llave-fecha"><span>a definir</span><span>${f.slot_cuadro}</span></div>
+      <div class="llave-fila"><span class="llave-pareja">${refLabelCuadro(f.refA)}</span></div>
+      <div class="llave-fila"><span class="llave-pareja">${refLabelCuadro(f.refB)}</span></div>
+    </div>`;
+}
+
+// Gestión → Llave: botón ⇄ en cada pareja de un partido sin resultado para
+// intercambiarla con otra pareja de la misma ronda (ej. pasar una pareja de la
+// Zona 3 a la Zona 5 y viceversa). Si ya hay rondas siguientes armadas, se
+// recalculan solas (propagarCuadro).
+function wireIntercambioLlave(cont, partidos) {
+  const editable = (p) => p.pareja1_id && p.pareja2_id && p.estado !== "jugado" && !(p.sets || []).length;
+  cont.querySelectorAll(".llave-partido[data-abrir-partido]").forEach((card) => {
+    const p = partidos.find((x) => x.id === card.dataset.abrirPartido);
+    if (!p || !editable(p)) return;
+    card.querySelectorAll(".llave-fila").forEach((fila, i) => {
+      const nombre = i === 0 ? p.pareja1_nombre : p.pareja2_nombre;
+      fila.insertAdjacentHTML("beforeend", `<button type="button" class="llave-intercambiar" data-lado="${i + 1}" title="Intercambiar pareja" aria-label="Intercambiar ${escapeHtml(nombre)} con otra pareja">⇄</button>`);
+    });
+    card.querySelectorAll(".llave-intercambiar").forEach((btn) => btn.addEventListener("click", (e) => {
+      e.stopPropagation(); // que no abra el detalle del partido
+      abrirIntercambio(p, Number(btn.dataset.lado), partidos.filter((x) => x.id !== p.id && x.ronda === p.ronda && editable(x)));
+    }));
+  });
+}
+function abrirIntercambio(origen, lado, candidatos) {
+  let dlg = document.getElementById("dlgIntercambio");
+  if (!dlg) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <dialog id="dlgIntercambio" class="dlg-intercambio" aria-labelledby="dlgIntercambioTitulo">
+        <form method="dialog">
+          <h3 id="dlgIntercambioTitulo">Intercambiar pareja</h3>
+          <p class="match-meta" id="dlgIntercambioOrigen"></p>
+          <label for="dlgIntercambioDestino">Cambiar de lugar con</label>
+          <select id="dlgIntercambioDestino" required></select>
+          <div class="match-actions" style="margin-top:12px">
+            <button type="submit" value="cancelar" class="secondary small" formnovalidate>Cancelar</button>
+            <button type="submit" value="ok" class="primary small">Intercambiar</button>
+          </div>
+        </form>
+      </dialog>`);
+    dlg = document.getElementById("dlgIntercambio");
+  }
+  const nombreOrigen = lado === 1 ? origen.pareja1_nombre : origen.pareja2_nombre;
+  document.getElementById("dlgIntercambioOrigen").textContent = `${origen.slot_cuadro || origen.ronda}: ${nombreOrigen}`;
+  document.getElementById("dlgIntercambioDestino").innerHTML = '<option value="">Elegí la pareja…</option>' + candidatos
+    .sort((a, b) => (Number(a.slot_cuadro?.slice(1)) || 0) - (Number(b.slot_cuadro?.slice(1)) || 0))
+    .flatMap((c) => [1, 2].map((l) => `<option value="${c.id}|${l}">${escapeHtml(c.slot_cuadro || "")} · ${escapeHtml(l === 1 ? c.pareja1_nombre : c.pareja2_nombre)}</option>`)).join("");
+  dlg.onclose = async () => {
+    const valor = document.getElementById("dlgIntercambioDestino").value;
+    if (dlg.returnValue !== "ok" || !valor) return;
+    const [destinoId, ladoDestino] = valor.split("|");
+    const destino = candidatos.find((c) => c.id === destinoId);
+    const campoA = `pareja${lado}_id`, campoB = `pareja${ladoDestino}_id`;
+    const [r1, r2] = await Promise.all([
+      sb.from("partidos").update({ [campoA]: destino[campoB] }).eq("id", origen.id),
+      sb.from("partidos").update({ [campoB]: origen[campoA] }).eq("id", destino.id)
+    ]);
+    if (r1.error || r2.error) { toast("Error: " + (r1.error || r2.error).message); return; }
+    const { avisos } = await propagarCuadro(origen.categoria, torneoGestionId);
+    toast(avisos?.length ? avisos.join(" · ") : "Parejas intercambiadas");
+    avisarActualizacionEnVivo();
+    refrescarTrasAccionGestion();
+  };
+  dlg.returnValue = "";
+  dlg.showModal();
 }
 
 // Líneas conectoras estilo "cuadro de torneo" (cada partido, unido con el/los
@@ -6327,7 +6425,8 @@ function dibujarConectoresLlave(cont, partidos) {
   const llave = cont.querySelector(".llave");
   cont.querySelector(".llave-conectores")?.remove();
   const nZonas = partidos.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === "Z").length;
-  if (!llave || !nZonas || !PLANTILLAS_CUADRO[nZonas]) return;
+  const plantilla = nZonas && plantillaCuadro(nZonas, torneoDeLlave(cont.id), partidos[0]?.categoria);
+  if (!llave || !plantilla) return;
 
   const base = llave.getBoundingClientRect();
   const rectRelativo = (el) => {
@@ -6336,7 +6435,7 @@ function dibujarConectoresLlave(cont, partidos) {
   };
 
   const trazos = [];
-  proyeccionCuadroCompleto(nZonas).forEach(({ slot, refA, refB }) => {
+  proyeccionCuadroCompleto(nZonas, plantilla).forEach(({ slot, refA, refB }) => {
     const destino = cont.querySelector(`.llave-partido[data-slot="${slot}"]`);
     if (!destino) return;
     [refA, refB].forEach((ref) => {
@@ -6652,6 +6751,117 @@ async function exportarHorariosInstagram() {
   toast(imagenes.length === 1 ? "Imagen descargada" : `${imagenes.length} imágenes descargadas`);
 }
 document.getElementById("btnExportarHorarios").addEventListener("click", conBotonOcupado(exportarHorariosInstagram));
+
+// ---------- Editor del cuadro (fases y cruces) de una categoría ----------
+// Arranca con el cuadro actual (el editado, o la plantilla del club) y se
+// guarda en torneo_categorias.plantilla_cuadro como [{ronda, cruces}].
+const RONDAS_CUADRO = ["DIECISEISAVOS", "OCTAVOS", "CUARTOS", "SEMIFINAL", "FINAL"];
+let cuadroEditado = null; // { categoria, nZonas, fases: [{ ronda, cruces: [[refA, refB], ...] }] }
+
+function abrirEditorCuadro() {
+  const categoria = partidosCategoriaFiltro;
+  if (!categoria) { toast("Elegí arriba la categoría del cuadro que querés editar"); return; }
+  const nZonas = ultimosPartidosGestion.filter((p) => p.categoria === categoria && p.ronda === "Zona" && p.slot_cuadro).length;
+  if (!nZonas) { toast(`${categoria} todavía no tiene zonas armadas`); return; }
+  const plantilla = plantillaCuadro(nZonas, torneoGestionId, categoria) || {};
+  cuadroEditado = { categoria, nZonas, fases: RONDAS_CUADRO.filter((r) => plantilla[r]).map((r) => ({ ronda: r, cruces: plantilla[r].map((c) => [...c]) })) };
+  document.getElementById("dlgCuadroTitulo").textContent = `Cuadro de ${categoria}`;
+  renderEditorCuadro();
+  document.getElementById("dlgCuadro").showModal();
+}
+// de dónde puede salir una pareja en la fase i: ganador o perdedor de cualquier
+// zona, o de un cruce de una fase anterior
+function origenesCuadro(i) {
+  const slots = Array.from({ length: cuadroEditado.nZonas }, (_, k) => "Z" + (k + 1));
+  cuadroEditado.fases.slice(0, i).forEach((f) => f.cruces.forEach((_, k) => slots.push(f.ronda[0] + (k + 1))));
+  return slots.flatMap((s) => ["G" + s, "P" + s]);
+}
+function renderEditorCuadro() {
+  const opciones = (i, valor) => '<option value="">Elegí…</option>' +
+    origenesCuadro(i).map((r) => `<option value="${r}" ${r === valor ? "selected" : ""}>${refLabelCuadro(r)}</option>`).join("");
+  document.getElementById("dlgCuadroFases").innerHTML = cuadroEditado.fases.map((f, i) => `
+    <fieldset class="cuadro-fase">
+      <legend>${RONDA_DISPLAY_CUADRO[f.ronda]} <button type="button" class="cuadro-quitar" data-quitar-fase="${i}">Quitar fase</button></legend>
+      ${f.cruces.map((c, j) => `
+        <div class="cuadro-cruce">
+          <span class="cuadro-slot">${f.ronda[0]}${j + 1}</span>
+          <select data-f="${i}" data-c="${j}" data-l="0" aria-label="${f.ronda[0]}${j + 1}, primera pareja">${opciones(i, c[0])}</select>
+          <span class="cuadro-vs">vs</span>
+          <select data-f="${i}" data-c="${j}" data-l="1" aria-label="${f.ronda[0]}${j + 1}, segunda pareja">${opciones(i, c[1])}</select>
+          <button type="button" class="cuadro-quitar" data-quitar-cruce="${i}-${j}" aria-label="Quitar cruce ${f.ronda[0]}${j + 1}">✕</button>
+        </div>`).join("")}
+      <button type="button" class="secondary small" data-agregar-cruce="${i}">+ Agregar cruce</button>
+    </fieldset>`).join("") || '<p class="empty">Sin fases: agregá al menos una.</p>';
+  const faltan = RONDAS_CUADRO.filter((r) => !cuadroEditado.fases.some((f) => f.ronda === r));
+  document.getElementById("dlgCuadroNuevaFase").innerHTML = faltan.map((r) => `<option value="${r}">${RONDA_DISPLAY_CUADRO[r]}</option>`).join("");
+  document.getElementById("dlgCuadroAgregarFase").disabled = !faltan.length;
+  document.getElementById("dlgCuadroError").textContent = "";
+}
+function validarCuadro() {
+  if (!cuadroEditado.fases.length) return "Agregá al menos una fase.";
+  const usados = new Set();
+  for (const [i, f] of cuadroEditado.fases.entries()) {
+    if (!f.cruces.length) return `${RONDA_DISPLAY_CUADRO[f.ronda]} no tiene cruces: agregá uno o quitá la fase.`;
+    const validos = new Set(origenesCuadro(i));
+    for (const [j, cruce] of f.cruces.entries()) for (const ref of cruce) {
+      const slot = `${f.ronda[0]}${j + 1}`;
+      if (!ref) return `Falta elegir una pareja en ${slot}.`;
+      if (!validos.has(ref)) return `${slot}: "${refLabelCuadro(ref)}" ya no existe (se quitó esa fase o ese cruce). Elegí otra.`;
+      if (usados.has(ref)) return `"${refLabelCuadro(ref)}" está en dos cruces: cada ganador o perdedor va a un solo lugar.`;
+      usados.add(ref);
+    }
+  }
+  return "";
+}
+async function guardarCuadro(lista) { // lista null = volver a la plantilla del club
+  const { categoria } = cuadroEditado;
+  const error = document.getElementById("dlgCuadroError");
+  const siguientes = ultimosPartidosGestion.filter((p) => p.categoria === categoria && p.ronda !== "Zona");
+  if (siguientes.some((p) => (p.sets || []).length || (p.estado === "jugado" && p.pareja2_id))) {
+    error.textContent = "Ya hay partidos de las fases siguientes con resultado: el cuadro no se puede cambiar.";
+    return;
+  }
+  if (siguientes.length) {
+    const { error: e1 } = await sb.from("partidos").delete().in("id", siguientes.map((p) => p.id));
+    if (e1) { error.textContent = "Error: " + e1.message; return; }
+  }
+  const { error: e2 } = await sb.from("torneo_categorias").update({ plantilla_cuadro: lista }).eq("torneo_id", torneoGestionId).eq("categoria", categoria);
+  if (e2) { error.textContent = "Error: " + e2.message + (/plantilla_cuadro/.test(e2.message) ? " (falta correr el SQL del editor de cuadro)" : ""); return; }
+  const clave = `${torneoGestionId}|${categoria}`;
+  if (lista) plantillasCuadroEditadas[clave] = plantillaDesdeLista(lista);
+  else delete plantillasCuadroEditadas[clave];
+  document.getElementById("dlgCuadro").close();
+  toast(lista ? `Cuadro de ${categoria} guardado` : `${categoria} volvió a la plantilla del club`);
+  refrescarTrasAccionGestion();
+}
+document.getElementById("btnEditarCuadro").addEventListener("click", abrirEditorCuadro);
+document.getElementById("dlgCuadroFases").addEventListener("change", (e) => {
+  const { f, c, l } = e.target.dataset;
+  if (f !== undefined) cuadroEditado.fases[f].cruces[c][l] = e.target.value;
+});
+document.getElementById("dlgCuadroFases").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.quitarFase !== undefined) cuadroEditado.fases.splice(Number(b.dataset.quitarFase), 1);
+  else if (b.dataset.quitarCruce) { const [i, j] = b.dataset.quitarCruce.split("-").map(Number); cuadroEditado.fases[i].cruces.splice(j, 1); }
+  else if (b.dataset.agregarCruce !== undefined) cuadroEditado.fases[Number(b.dataset.agregarCruce)].cruces.push(["", ""]);
+  else return;
+  renderEditorCuadro();
+});
+document.getElementById("dlgCuadroAgregarFase").addEventListener("click", () => {
+  const ronda = document.getElementById("dlgCuadroNuevaFase").value;
+  if (!ronda) return;
+  cuadroEditado.fases.push({ ronda, cruces: [["", ""]] });
+  cuadroEditado.fases.sort((a, b) => RONDAS_CUADRO.indexOf(a.ronda) - RONDAS_CUADRO.indexOf(b.ronda));
+  renderEditorCuadro();
+});
+document.getElementById("dlgCuadroCancelar").addEventListener("click", () => document.getElementById("dlgCuadro").close());
+document.getElementById("dlgCuadroGuardar").addEventListener("click", conBotonOcupado(async () => {
+  const problema = validarCuadro();
+  if (problema) { document.getElementById("dlgCuadroError").textContent = problema; return; }
+  await guardarCuadro(cuadroEditado.fases.map((f) => ({ ronda: f.ronda, cruces: f.cruces })));
+}));
+document.getElementById("dlgCuadroRestaurar").addEventListener("click", conBotonOcupado(() => guardarCuadro(null)));
 
 // resultado por sets como grilla de casillas (una fila por pareja, una casilla por
 // set) en vez de un "6-3, 6-4" suelto — la fila ganadora se resalta, igual que en
@@ -7006,7 +7216,7 @@ function renderPartidosTabla(containerId, partidos, canchasTorneo, parejasTorneo
   const nZonas = partidos.filter((p) => p.slot_cuadro && p.slot_cuadro[0] === "Z").length;
   const slotsYaArmados = new Set(partidos.map((p) => p.slot_cuadro).filter(Boolean));
   const proyectadas = nZonas
-    ? proyeccionCuadroCompleto(nZonas).filter((f) => !slotsYaArmados.has(f.slot))
+    ? proyeccionCuadroCompleto(nZonas, plantillaCuadro(nZonas, torneoGestionId, partidos[0]?.categoria)).filter((f) => !slotsYaArmados.has(f.slot))
     : [];
   const categoriaTabla = partidos[0]?.categoria;
   const parejasCategoriaTabla = parejasTorneo.filter((pj) => pj.categoria === categoriaTabla);

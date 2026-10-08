@@ -364,6 +364,20 @@ const PLANTILLAS_CUADRO = {
   }
 };
 
+// Cuadro editado a mano por el admin para una categoría de un torneo
+// (torneo_categorias.plantilla_cuadro, ver el editor en app.js): si existe,
+// reemplaza a la plantilla del club en TODOS lados (llave, tabla, "Generar
+// siguiente fase", propagarCuadro). Clave: "torneoId|categoria".
+const plantillasCuadroEditadas = {};
+function plantillaCuadro(nZonas, torneoId, categoria) {
+  return plantillasCuadroEditadas[`${torneoId}|${categoria}`] || PLANTILLAS_CUADRO[nZonas];
+}
+// En la base se guarda como lista [{ronda, cruces}] porque jsonb no respeta el
+// orden de las claves de un objeto, y acá el orden de las rondas importa.
+function plantillaDesdeLista(lista) {
+  return Object.fromEntries((lista || []).map((f) => [f.ronda, f.cruces]));
+}
+
 // Traduce una referencia de plantilla ("GZ3", "PO2") a texto para mostrar
 // ("Ganador Z3", "Perdedor O2") -- se usa para proyectar en la tabla quién
 // entraría en un cruce que todavía no se armó como partido real (ver
@@ -378,8 +392,7 @@ function refLabelCuadro(ref) {
 // la tabla, ni bien se arman las zonas, la pinta completa del cuadro ("Octavos
 // 1: Ganador Z1 vs Perdedor Z7") aunque esas rondas todavía no se jugaron ni
 // se armaron como partido real.
-function proyeccionCuadroCompleto(nZonas) {
-  const plantilla = PLANTILLAS_CUADRO[nZonas];
+function proyeccionCuadroCompleto(nZonas, plantilla = PLANTILLAS_CUADRO[nZonas]) {
   if (!plantilla) return [];
   const filas = [];
   Object.keys(plantilla).forEach((nombreRonda) => {
@@ -464,7 +477,7 @@ async function propagarCuadro(categoria, torneoId) {
   if (!partidos || partidos.length === 0) return { avisos: [] };
 
   const nZonas = partidos.filter((p) => p.slot_cuadro[0] === "Z").length;
-  const plantilla = PLANTILLAS_CUADRO[nZonas];
+  const plantilla = plantillaCuadro(nZonas, torneoId, categoria);
   if (!plantilla) return { avisos: [] };
 
   const porSlot = {};

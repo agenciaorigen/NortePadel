@@ -1265,6 +1265,22 @@
         <button class="secondary" id="btnPublicarCalendario" style="margin-top:8px">3. Publicar calendario (recién ahí lo ven los jugadores)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
         <button class="secondary" id="btnExportarHorarios" style="margin-top:8px">Exportar horarios para Instagram (una imagen por categoría)</button>
+        <button class="secondary" id="btnEditarCuadro" style="margin-top:8px">Editar cuadro de la categoría (fases y cruces)</button>
+        <dialog id="dlgCuadro" class="dlg-intercambio dlg-cuadro" aria-labelledby="dlgCuadroTitulo">
+          <h3 id="dlgCuadroTitulo">Editar cuadro</h3>
+          <p class="match-meta">Elegí de dónde sale cada pareja de cada cruce. Este cuadro es solo para esta categoría en este torneo: lo usan la Llave, la Tabla y "Generar siguiente fase". Si ya había cruces de fases siguientes armados (sin resultado), se borran y se vuelven a generar con el cuadro nuevo.</p>
+          <div id="dlgCuadroFases"></div>
+          <div class="match-actions">
+            <select id="dlgCuadroNuevaFase" aria-label="Fase para agregar"></select>
+            <button type="button" class="secondary small" id="dlgCuadroAgregarFase">+ Agregar fase</button>
+          </div>
+          <p class="cuadro-error" id="dlgCuadroError" role="alert"></p>
+          <div class="match-actions dlg-cuadro-pie">
+            <button type="button" class="secondary small" id="dlgCuadroRestaurar">Volver a la plantilla del club</button>
+            <button type="button" class="secondary small" id="dlgCuadroCancelar">Cancelar</button>
+            <button type="button" class="primary small" id="dlgCuadroGuardar">Guardar cuadro</button>
+          </div>
+        </dialog>
         <div id="admEstadoCategorias" style="margin-top:10px"></div>
         <label style="margin-top:12px" for="partidosBusqueda">Buscar partido (por jugador o pareja)</label>
         <input type="text" id="partidosBusqueda" placeholder="Ej: Rodríguez, o Gómez / Pérez" autocomplete="off" />
