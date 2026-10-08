@@ -2281,7 +2281,7 @@ function parejaRowHtml(p, editable, dispPorJugador) {
         ${!ambosPagaron ? `<button type="button" class="secondary small btnMarcarPagoAmbos" data-pareja="${p.id}">Marcar pago de los 2</button>` : ""}
       </div>`
     : "";
-  return `<div class="pareja-row-wrap">
+  return `<div class="pareja-row-wrap" data-buscar="${escapeHtml(normalizarTexto(`${p.jugador1_nombre} ${p.jugador2_nombre}`))}">
     <div class="pareja-row">
       <span>${etiquetas}${nombrePareja} ${catBadge} ${estadoBadge}</span>
       <span style="display:flex;gap:6px;align-items:center;flex-shrink:0">
@@ -2336,7 +2336,7 @@ function sinParejaChipHtml(i, editable, dispPorJugador) {
       <div id="${idFormSuelto}"></div>
       <button type="button" class="secondary small btnGuardarDispAdmin" data-jugador="${i.jugador_id}" data-cont="${idFormSuelto}" style="margin-top:6px">Guardar</button>
     </div>` : "";
-  return `<span class="pill removable" style="display:inline-flex;flex-wrap:wrap;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${botonDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}${panelDisp}</span>${dispResumen}`;
+  return `<span class="pill removable" data-buscar="${escapeHtml(normalizarTexto(`${i.nombre} ${i.apellido}`))}" style="display:inline-flex;flex-wrap:wrap;margin:0 6px 6px 0">${editable ? etiquetaDotHtml(i.jugador_id) : ""}${pagoHtml}${nombreCompleto}${i.categoria_torneo ? ` · ${i.categoria_torneo}` : ""}${sufijoEstado}${botonDisp}${editable ? `<button type="button" class="btnBorrarInscripto" data-id="${i.jugador_id}" data-nombre="${nombreCompleto}" aria-label="Sacar a ${nombreCompleto} del torneo">×</button>` : ""}${panelDisp}</span>${dispResumen}`;
 }
 // Cablea los toggles de pago (💰 por jugador + "marcar pago de los 2") de un
 // contenedor -- se usa igual en la lista de parejas y en la de "sin pareja",
@@ -2374,6 +2374,26 @@ function wireTogglesPago(cont) {
     });
   });
 }
+// Buscador de inscriptos (Gestión e Info del torneo): sin tildes ni mayúsculas
+const normalizarTexto = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function aplicarBusquedaInscriptos(inp) {
+  const q = normalizarTexto(inp.value.trim());
+  let encontrados = 0;
+  inp.dataset.filtra.split(",").forEach((id) => {
+    const cont = document.getElementById(id);
+    if (!cont) return;
+    cont.querySelectorAll("[data-buscar]").forEach((el) => {
+      el.hidden = !!q && !el.dataset.buscar.includes(q);
+      if (!el.hidden) encontrados++;
+    });
+    cont.querySelectorAll(".insc-grupo").forEach((g) => { g.hidden = !!q && !g.querySelector("[data-buscar]:not([hidden])"); });
+  });
+  inp.nextElementSibling.hidden = !q || encontrados > 0;
+}
+document.addEventListener("input", (e) => {
+  if (e.target.matches(".buscar-inscripto")) aplicarBusquedaInscriptos(e.target);
+});
+
 function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable, dispPorJugador = {}) {
   // al público no se le muestran parejas rechazadas ni inscripciones
   // canceladas/rechazadas — son historial para el admin, no algo vigente
@@ -2396,7 +2416,18 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   const resumenPagoHtml = editable && parejasBase.length
     ? `<p class="match-meta" style="margin-bottom:8px">${pagas} de ${parejasBase.length} parejas con el pago confirmado${pagas < parejasBase.length ? " — las que faltan no entran al fixture hasta confirmarlas" : ""}.</p>`
     : "";
-  contParejas.innerHTML = resumenPagoHtml + (parejasOrdenadas.map((p) => parejaRowHtml(p, editable, dispPorJugador)).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
+  // agrupadas por categoría, en el orden de las categorías del club
+  const ordenCat = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
+  const categorias = [...new Set(parejasOrdenadas.map((p) => p.categoria || "Sin categoría"))]
+    .sort((a, b) => ordenCat(a) - ordenCat(b) || a.localeCompare(b, "es", { numeric: true }));
+  contParejas.innerHTML = resumenPagoHtml + (categorias.map((c) => {
+    const delaCat = parejasOrdenadas.filter((p) => (p.categoria || "Sin categoría") === c);
+    const pagasCat = delaCat.filter((p) => p.jugador1_pago && p.jugador2_pago).length;
+    return `<section class="insc-grupo">
+      <h4 class="insc-grupo-titulo">${escapeHtml(c)} <span>${delaCat.length} pareja${delaCat.length === 1 ? "" : "s"}${editable ? ` · ${pagasCat} paga${pagasCat === 1 ? "" : "s"}` : ""}</span></h4>
+      ${delaCat.map((p) => parejaRowHtml(p, editable, dispPorJugador)).join("")}
+    </section>`;
+  }).join("") || '<p class="empty">Todavía no hay parejas anotadas.</p>');
   if (editable) {
     contParejas.querySelectorAll(".btnBorrarPareja").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -2501,6 +2532,8 @@ function renderParejasEn(contParejasId, contSinParejaId, insc, parejas, editable
   contSinPareja.innerHTML = sinPareja.length === 0 ? "" : `
     <p class="match-meta" style="margin:12px 0 6px">Todavía sin pareja:</p>
     ${sinPareja.map((i) => sinParejaChipHtml(i, editable, dispPorJugador)).join("")}`;
+  // si había algo escrito en el buscador, se vuelve a aplicar sobre la lista nueva
+  document.querySelectorAll(".buscar-inscripto").forEach((inp) => { if (inp.value) aplicarBusquedaInscriptos(inp); });
   if (editable) {
     contSinPareja.querySelectorAll(".btnBorrarInscripto").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -4508,6 +4541,8 @@ async function cargarGestionTorneo(id) {
   const categoriasGestion = (t.torneo_categorias || []).map((c) => c.categoria);
   document.getElementById("dtSelectCategoriaInscribir").innerHTML = `<option value="">Elegí la categoría</option>` +
     categoriasGestion.map((c) => `<option value="${c}">${c}</option>`).join("");
+  renderDisponibilidadForm("dtDispManual1");
+  renderDisponibilidadForm("dtDispManual2");
   const selCatPartidos = document.getElementById("partidosCategoriaFiltro");
   if (!categoriasGestion.includes(partidosCategoriaFiltro)) partidosCategoriaFiltro = "";
   selCatPartidos.innerHTML = `<option value="">Todas</option>` +
@@ -4891,6 +4926,12 @@ document.getElementById("btnAgregarCanchaTorneo").addEventListener("click", asyn
 
 // Inscribe una pareja completa a mano (ej: dos amigos que se lo pidieron directo al club).
 // Siempre entran los dos juntos, nunca un jugador suelto — así nunca queda nadie sin pareja.
+// el nombre de cada jugador arriba de su formulario de horarios
+["1", "2"].forEach((n) => {
+  document.getElementById("dtSelectJugador" + n).addEventListener("change", (e) => {
+    document.getElementById("dtDispManualNombre" + n).textContent = e.target.value.trim() || "Jugador " + n;
+  });
+});
 document.getElementById("btnInscribir").addEventListener("click", async () => {
   const btn = document.getElementById("btnInscribir");
   if (btn.disabled) return;
@@ -4924,9 +4965,21 @@ document.getElementById("btnInscribir").addEventListener("click", async () => {
   if (e1) { toast("Error: " + e1.message); return; }
   const { error: e3 } = await sb.from("parejas").insert({ torneo_id: torneoGestionId, jugador1_id: jugador1Id, jugador2_id: jugador2Id, categoria, estado: "confirmada" });
   if (e3) { toast("Se inscribieron pero no se pudo armar la pareja: " + e3.message); refrescarTrasAccionGestion(); return; }
+  // horarios en que no pueden jugar (si se cargaron al anotarlos)
+  for (const [jugadorId, contId] of [[jugador1Id, "dtDispManual1"], [jugador2Id, "dtDispManual2"]]) {
+    const filas = leerRestriccionesDeForm(contId).map((r) => ({ jugador_id: jugadorId, torneo_id: torneoGestionId, ...r }));
+    if (!filas.length) continue;
+    await sb.from("disponibilidad").delete().eq("jugador_id", jugadorId).eq("torneo_id", torneoGestionId);
+    const { error } = await sb.from("disponibilidad").insert(filas);
+    if (error) toast("Se inscribieron, pero no se guardaron los horarios: " + error.message);
+  }
   toast("Pareja inscripta");
   in1.value = "";
   in2.value = "";
+  renderDisponibilidadForm("dtDispManual1");
+  renderDisponibilidadForm("dtDispManual2");
+  document.querySelector(".insc-manual-disp").open = false;
+  ["1", "2"].forEach((n) => { document.getElementById("dtDispManualNombre" + n).textContent = "Jugador " + n; });
   avisarActualizacionEnVivo();
   refrescarTrasAccionGestion();
   } finally {

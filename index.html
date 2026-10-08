@@ -398,6 +398,8 @@
     </div>
     <div class="card">
       <h3>Jugadores / Parejas</h3>
+      <input type="search" class="buscar-inscripto" data-filtra="dtParejas,dtSinPareja" placeholder="Buscar si alguien está anotado…" aria-label="Buscar jugador anotado" autocomplete="off" />
+      <p class="match-meta buscar-sin-resultado" role="status" hidden>Nadie anotado con ese nombre en este torneo.</p>
       <div id="dtParejas"></div>
       <div id="dtSinPareja"></div>
     </div>
@@ -1062,6 +1064,8 @@
 
       <div class="card card-accent" id="admSeccionInscripciones">
         <h2>Inscripciones y parejas</h2>
+        <input type="search" class="buscar-inscripto" data-filtra="admParejas,admSinPareja" placeholder="Buscar si alguien está anotado…" aria-label="Buscar jugador anotado" autocomplete="off" />
+        <p class="match-meta buscar-sin-resultado" role="status" hidden>Nadie anotado con ese nombre en este torneo.</p>
         <div id="admParejas"></div>
         <div id="admSinPareja"></div>
         <label style="margin-top:12px" for="dtSelectJugador1">Inscribir una pareja manualmente</label>
@@ -1070,6 +1074,13 @@
         <input type="text" id="dtSelectJugador2" list="dtListaJugadores2" placeholder="Buscar jugador 2 por nombre..." autocomplete="off" style="margin-top:6px" />
         <datalist id="dtListaJugadores2"></datalist>
         <select id="dtSelectCategoriaInscribir" style="margin-top:6px"><option value="">Elegí la categoría</option></select>
+        <details class="insc-manual-disp">
+          <summary>¿Alguno tiene problemas de horario?</summary>
+          <p class="insc-manual-nombre" id="dtDispManualNombre1">Jugador 1</p>
+          <div id="dtDispManual1"></div>
+          <p class="insc-manual-nombre" id="dtDispManualNombre2">Jugador 2</p>
+          <div id="dtDispManual2"></div>
+        </details>
         <button class="secondary small" id="btnInscribir" style="margin-top:6px">Inscribir</button>
       </div>
 
