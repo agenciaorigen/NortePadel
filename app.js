@@ -391,61 +391,76 @@ document.getElementById("btnEditarPerfil").addEventListener("click", () => {
 // la vez, y para no tener que tocar el patrón de guardado (borrar todo +
 // reinsertar) que ya usan btnGuardarPerfil y btnGuardarDispTorneo — solo
 // cambia CÓMO se arma esa lista antes de guardarla (ver leerRestriccionesDeForm).
+// Carga rápida: para jueves a domingo se elige desde qué hora puede jugar
+// (o que ese día no puede). Se guarda igual que siempre, como horarios en
+// los que NO puede: "desde las 17" = no puede de 00:00 a 17:00; "no puede" =
+// de 00:00 a 23:59. Para casos raros queda "Otro horario" (día + desde/hasta).
+const DIAS_RAPIDOS = [4, 5, 6, 0]; // jue, vie, sáb, dom
+const OPCIONES_DESDE = [["todo", "Todo el día"], ["15:00", "Desde 15 h"], ["17:00", "Desde 17 h"], ["19:00", "Desde 19 h"], ["23:59", "No puede"]];
+const esRapida = (r) => DIAS_RAPIDOS.includes(r.dia_semana) && r.hora_desde === "00:00" && OPCIONES_DESDE.some(([v]) => v === r.hora_hasta);
 function renderDisponibilidadForm(contenedorId = "disponibilidadForm") {
   const cont = document.getElementById(contenedorId);
   cont._restricciones = [];
   cont.innerHTML = `
-    <div class="pill-row disp-toggle">
-      <button type="button" class="pill active" data-disp="completa">Tengo disponibilidad completa</button>
-      <button type="button" class="pill" data-disp="restringida">Tengo horarios en los que no puedo jugar</button>
+    <p class="match-meta disp-ayuda">¿Desde qué hora puede jugar cada día? Si no hay problema, dejá "Todo el día".</p>
+    <div class="disp-rapida">
+      ${DIAS_RAPIDOS.map((d) => `
+        <div class="disp-dia" role="group" aria-label="${DIAS[d]}">
+          <span class="disp-dia-nombre">${DIAS[d]}</span>
+          <div class="disp-opciones">${OPCIONES_DESDE.map(([v, txt]) =>
+            `<button type="button" class="pill" data-dia="${d}" data-desde="${v}" aria-pressed="false">${txt}</button>`).join("")}</div>
+        </div>`).join("")}
     </div>
-    <div class="disp-restricciones-wrap" style="display:none">
+    <details class="disp-otros">
+      <summary>Otro horario (otro día o una franja puntual)</summary>
       <div class="disp-lista-restricciones"></div>
-      <div class="disp-nueva-restriccion" style="display:none">
-        <label>Día</label>
-        <select class="disp-nueva-dia">${DIAS.map((d, i) => `<option value="${i}">${d}</option>`).join("")}</select>
-        <div class="row" style="margin-top:6px">
-          <div><label>Desde</label><input type="time" class="disp-nueva-desde" /></div>
-          <div><label>Hasta</label><input type="time" class="disp-nueva-hasta" /></div>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button type="button" class="secondary small disp-btn-confirmar-restriccion">Agregar</button>
-          <button type="button" class="secondary small disp-btn-cancelar-restriccion">Cancelar</button>
-        </div>
+      <label>Día</label>
+      <select class="disp-nueva-dia">${DIAS.map((d, i) => `<option value="${i}">${d}</option>`).join("")}</select>
+      <div class="row" style="margin-top:6px">
+        <div><label>No puede desde</label><input type="time" class="disp-nueva-desde" /></div>
+        <div><label>Hasta</label><input type="time" class="disp-nueva-hasta" /></div>
       </div>
-      <button type="button" class="secondary small disp-btn-agregar-restriccion" style="margin-top:8px">+ Agregar horario</button>
-    </div>
+      <button type="button" class="secondary small disp-btn-confirmar-restriccion" style="margin-top:8px">Agregar</button>
+    </details>
   `;
-
-  const wrapRestricciones = cont.querySelector(".disp-restricciones-wrap");
   const listaEl = cont.querySelector(".disp-lista-restricciones");
-  const nuevaEl = cont.querySelector(".disp-nueva-restriccion");
 
   function pintarLista() {
-    listaEl.innerHTML = cont._restricciones.length === 0
-      ? '<p class="match-meta">Todavía no agregaste ningún horario.</p>'
-      : cont._restricciones.map((r, i) => `
-        <span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">
-          ${DIAS_CORTO[r.dia_semana]} ${r.hora_desde.slice(0, 5)}–${r.hora_hasta.slice(0, 5)}
-          <button type="button" class="disp-btn-quitar" data-i="${i}" aria-label="Quitar este horario">×</button>
-        </span>`).join("");
-    listaEl.querySelectorAll(".disp-btn-quitar").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        cont._restricciones.splice(Number(btn.dataset.i), 1);
-        pintarLista();
+    // botones rápidos: el elegido de cada día
+    DIAS_RAPIDOS.forEach((d) => {
+      const r = cont._restricciones.find((x) => x.dia_semana === d && esRapida(x));
+      const elegido = r ? r.hora_hasta : "todo";
+      cont.querySelectorAll(`.disp-opciones [data-dia="${d}"]`).forEach((b) => {
+        const activo = b.dataset.desde === elegido;
+        b.classList.toggle("active", activo);
+        b.setAttribute("aria-pressed", activo);
       });
     });
+    // el resto, como lista removible
+    const otros = cont._restricciones.map((r, i) => [r, i]).filter(([r]) => !esRapida(r));
+    listaEl.innerHTML = otros.map(([r, i]) => `
+      <span class="pill removable" style="display:inline-flex;margin:0 6px 6px 0">
+        ${DIAS_CORTO[r.dia_semana]} ${r.hora_desde.slice(0, 5)}–${r.hora_hasta.slice(0, 5)}
+        <button type="button" class="disp-btn-quitar" data-i="${i}" aria-label="Quitar este horario">×</button>
+      </span>`).join("");
+    if (otros.length) cont.querySelector(".disp-otros").open = true;
   }
   cont._pintarLista = pintarLista; // para que precargarRestriccionesEnForm pueda repintar tras precargar
 
-  cont.querySelectorAll(".disp-toggle .pill").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      cont.querySelectorAll(".disp-toggle .pill").forEach((b) => b.classList.toggle("active", b === btn));
-      wrapRestricciones.style.display = btn.dataset.disp === "restringida" ? "block" : "none";
+  // el contenedor se re-renderiza varias veces: el listener se engancha una sola
+  if (!cont._dispEscuchando) {
+    cont._dispEscuchando = true;
+    cont.addEventListener("click", (e) => {
+      const quitar = e.target.closest(".disp-btn-quitar");
+      if (quitar) { cont._restricciones.splice(Number(quitar.dataset.i), 1); cont._pintarLista(); return; }
+      const opcion = e.target.closest(".disp-opciones [data-dia]");
+      if (!opcion) return;
+      const dia = Number(opcion.dataset.dia);
+      cont._restricciones = cont._restricciones.filter((r) => !(r.dia_semana === dia && esRapida(r)));
+      if (opcion.dataset.desde !== "todo") cont._restricciones.push({ dia_semana: dia, hora_desde: "00:00", hora_hasta: opcion.dataset.desde });
+      cont._pintarLista();
     });
-  });
-  cont.querySelector(".disp-btn-agregar-restriccion").addEventListener("click", () => { nuevaEl.style.display = "block"; });
-  cont.querySelector(".disp-btn-cancelar-restriccion").addEventListener("click", () => { nuevaEl.style.display = "none"; });
+  }
   cont.querySelector(".disp-btn-confirmar-restriccion").addEventListener("click", () => {
     const dia = Number(cont.querySelector(".disp-nueva-dia").value);
     const desde = cont.querySelector(".disp-nueva-desde").value;
@@ -454,7 +469,6 @@ function renderDisponibilidadForm(contenedorId = "disponibilidadForm") {
     if (hasta <= desde) { toast('El horario "hasta" tiene que ser después del "desde"'); return; }
     cont._restricciones.push({ dia_semana: dia, hora_desde: desde, hora_hasta: hasta });
     pintarLista();
-    nuevaEl.style.display = "none";
     cont.querySelector(".disp-nueva-desde").value = "";
     cont.querySelector(".disp-nueva-hasta").value = "";
   });
@@ -462,9 +476,7 @@ function renderDisponibilidadForm(contenedorId = "disponibilidadForm") {
   pintarLista();
 }
 
-// Precarga filas ya guardadas (de la DB) en el picker: si hay alguna, arranca
-// mostrando el toggle en 🔴 con la lista ya cargada; si no hay ninguna, se
-// queda en 🟢 disponibilidad completa (el default).
+// Precarga filas ya guardadas (de la DB) en el picker
 function precargarRestriccionesEnForm(contenedorId, filas) {
   const cont = document.getElementById(contenedorId);
   if (!cont) return;
@@ -473,9 +485,6 @@ function precargarRestriccionesEnForm(contenedorId, filas) {
     hora_desde: String(d.hora_desde).slice(0, 5),
     hora_hasta: String(d.hora_hasta).slice(0, 5)
   }));
-  const hayRestricciones = cont._restricciones.length > 0;
-  cont.querySelectorAll(".disp-toggle .pill").forEach((b) => b.classList.toggle("active", (b.dataset.disp === "restringida") === hayRestricciones));
-  cont.querySelector(".disp-restricciones-wrap").style.display = hayRestricciones ? "block" : "none";
   if (cont._pintarLista) cont._pintarLista();
 }
 
@@ -2219,9 +2228,14 @@ function etiquetaDotHtml(jugadorId) {
 function dispResumenHtml(nombreCompleto, filas) {
   if (!filas || !filas.length) return "";
   const detalle = filas
-    .map((d) => `${DIAS[d.dia_semana]} de ${String(d.hora_desde).slice(0, 5)} a ${String(d.hora_hasta).slice(0, 5)}`)
+    .map((d) => {
+      const desde = String(d.hora_desde).slice(0, 5), hasta = String(d.hora_hasta).slice(0, 5);
+      if (desde === "00:00" && hasta === "23:59") return `${DIAS[d.dia_semana]}: no puede`;
+      if (desde === "00:00") return `${DIAS[d.dia_semana]}: recién desde las ${hasta.replace(":00", "")} h`;
+      return `${DIAS[d.dia_semana]}: no puede de ${desde} a ${hasta}`;
+    })
     .join("<br>");
-  return `<p class="match-meta disp-resumen">${iconoReloj()} <strong>${escapeHtml((nombreCompleto || "").split(" ")[0])} no puede jugar:</strong><br>${detalle}</p>`;
+  return `<p class="match-meta disp-resumen">${iconoReloj()} <strong>Horarios de ${escapeHtml((nombreCompleto || "").split(" ")[0])}:</strong><br>${detalle}</p>`;
 }
 
 // Carga el picker de horarios bloqueados de UN jugador puntual para ESTE

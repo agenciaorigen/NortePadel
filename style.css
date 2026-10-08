@@ -2196,3 +2196,15 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .insc-manual-disp summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 14px; }
 .insc-manual-nombre { margin: 10px 0 4px; font-weight: 700; font-size: 14px; }
 .insc-grupo .pareja-row > span > .badge:not(.solid):not(.orange):not(.danger) { display: none; } /* la categoría ya está en el título del grupo */
+
+/* Horarios: carga rápida jueves a domingo */
+.disp-ayuda { margin: 4px 0 10px; }
+.disp-rapida { display: grid; gap: 10px; }
+.disp-dia { display: grid; gap: 6px; }
+.disp-dia-nombre { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 15px; }
+.disp-opciones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.disp-opciones .pill { margin: 0; padding: 8px 4px; font-size: 12.5px; line-height: 1.15; white-space: normal; text-align: center; min-height: 44px; border-radius: var(--radius-sm); }
+.disp-opciones .pill[data-desde="23:59"].active { background: rgba(255,92,108,.16); border-color: var(--danger); color: var(--danger); }
+.disp-otros { margin-top: 12px; }
+.disp-otros summary { cursor: pointer; font-size: 13.5px; color: var(--muted); padding: 6px 0; }
+@media (min-width: 700px) { .disp-dia { grid-template-columns: 110px 1fr; align-items: center; } }
