@@ -2262,3 +2262,14 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .calendario-grid-cabecera.predio-3 { --predio: var(--accent-3); }
 .calendario-grid-esquina { position: sticky; top: 0; left: 0; z-index: 4; background: var(--card); }
 .calendario-grid .calendario-hora { position: sticky; left: 0; z-index: 2; background: var(--card); display: flex; align-items: center; }
+
+/* Planilla: "tocar para mover" */
+.calendario-compacta { cursor: pointer; }
+.calendario-compacta:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.calendario-compacta.seleccionado { outline: 3px solid var(--accent-bright); outline-offset: 2px; opacity: 1; filter: none; box-shadow: 0 0 0 6px rgba(var(--accent-rgb), .25); }
+.planilla-seleccion { position: sticky; top: 8px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; padding: 10px 14px; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.planilla-seleccion b { font-weight: 800; }
+.planilla-seleccion-acciones { display: flex; gap: 8px; }
+.planilla-seleccion .secondary { background: rgba(0,0,0,.12); color: var(--accent-ink); border-color: rgba(0,0,0,.25); }
+.planilla-moviendo .calendario-vacia { cursor: pointer; }
+.planilla-moviendo .calendario-vacia:hover, .planilla-moviendo .calendario-vacia:focus-visible { background: rgba(var(--accent-rgb), .22); outline: 2px dashed var(--accent-bright); outline-offset: -2px; }

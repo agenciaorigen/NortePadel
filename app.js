@@ -5830,6 +5830,10 @@ let planillaDiaFiltro = null; // día elegido en las pestañas de la Planilla (A
 // resaltar (opcional, Set de ids): con un filtro de categoría puesto, la
 // planilla igual muestra TODOS los partidos (para ver qué cancha está ocupada),
 // pero los de otras categorías quedan apagados.
+let partidoSeleccionadoPlanilla = null; // "tocar para mover" en la planilla
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && partidoSeleccionadoPlanilla) { partidoSeleccionadoPlanilla = null; renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion); }
+});
 function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar = null) {
   const cont = document.getElementById(containerId);
   // _tc: referencia a la fila de torneo_canchas (dias_semana/horarios_por_dia)
@@ -5888,17 +5892,33 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     const horarioTxt = p.horario ? new Date(p.horario).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
     const detalle = escapeHtml(`${p.pareja1_nombre} vs ${p.pareja2_nombre}${horarioTxt ? " · " + horarioTxt : ""}${p.estado === "jugado" ? " · Jugado" : ""}`);
     const etiqueta = `${p.slot_cuadro || (p.grupo ? "G" + p.grupo : "")} ${abreviarCategoria(p.categoria)}`.trim();
+    if (p.id === partidoSeleccionadoPlanilla) extraClase += " seleccionado";
     return `<div class="calendario-partido calendario-compacta ${p.estado === "jugado" ? "jugado" : ""} ${extraClase}"
-        style="background:${colorCategoria(p.categoria)}" title="${detalle}" draggable="true" data-partido="${p.id}">
+        style="background:${colorCategoria(p.categoria)}" title="${detalle}" draggable="true" data-partido="${p.id}" tabindex="0" role="button" aria-pressed="${p.id === partidoSeleccionadoPlanilla}">
       ${etiqueta}
     </div>`;
   };
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
   const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
-  const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"` : ""}></div>`;
+  const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"${partidoSeleccionadoPlanilla ? ` tabindex="0" role="button" aria-label="Mover acá: ${escapeHtml(celda.cancha.nombre)}, ${new Date(fila.horarioISO).toLocaleString("es-AR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}"` : ""}` : ""}></div>`;
   const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">Cerrada</div>`;
 
   let html = "";
+  // "tocar para mover": el partido elegido queda marcado aunque se cambie de día arriba
+  const seleccionado = editable && partidos.find((p) => p.id === partidoSeleccionadoPlanilla);
+  if (editable && !seleccionado) partidoSeleccionadoPlanilla = null;
+  if (seleccionado) {
+    const donde = seleccionado.horario ? new Date(seleccionado.horario).toLocaleString("es-AR", { weekday: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "sin horario";
+    html += `<div class="planilla-seleccion" role="status">
+      <span>Moviendo <b>${escapeHtml(`${seleccionado.slot_cuadro || ""} ${seleccionado.categoria || ""}`.trim())}</b> (${donde}): tocá un hueco libre. Si va otro día, cambiá de día arriba.</span>
+      <span class="planilla-seleccion-acciones">
+        <button type="button" class="secondary small" id="planillaSacar">Sacar del calendario</button>
+        <button type="button" class="secondary small" id="planillaCancelarSeleccion">Cancelar</button>
+      </span>
+    </div>`;
+  } else if (editable) {
+    html += `<p class="match-meta" style="margin-bottom:6px">Tocá un partido para elegirlo y después tocá el hueco adonde va (podés cambiar de día en el medio). También podés arrastrarlo.</p>`;
+  }
   const bandeja = resaltar ? sinHorario.filter((p) => resaltar.has(p.id)) : sinHorario;
   if (editable && bandeja.length > 0) {
     html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario a un hueco libre (en el celular, asignalo desde su tarjeta en la vista Lista):</p>
@@ -5932,7 +5952,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
     });
   } else {
     // grilla de escritorio: auto-fit/minmax se reacomoda al ancho disponible, nunca se corta
-    html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""}" style="--calendario-cols:${canchas.length}">`;
+    html += `<div class="calendario-grid-scroll"><div class="calendario-grid ${editable ? "compacta" : ""} ${seleccionado ? "planilla-moviendo" : ""}" style="--calendario-cols:${canchas.length}">`;
     // con varios predios que repiten nombre de cancha ("Cancha 1" en cada
     // uno) el nombre solo no alcanza para distinguirlas -- se antepone el
     // predio, mismo formato "Predio · Cancha" que ya se usa en el selector
@@ -5968,6 +5988,28 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
 
   if (editable) {
     wirePlanillaDragAndDrop(containerId);
+    const rerender = () => renderPartidosCalendario(containerId, partidos, canchasTorneo, editable, resaltar);
+    const activar = (el, fn) => {
+      el.addEventListener("click", fn);
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } });
+    };
+    cont.querySelectorAll(".calendario-compacta[data-partido]").forEach((el) => activar(el, () => {
+      partidoSeleccionadoPlanilla = partidoSeleccionadoPlanilla === el.dataset.partido ? null : el.dataset.partido;
+      rerender();
+      cont.querySelector(".calendario-compacta.seleccionado")?.focus();
+    }));
+    if (seleccionado) {
+      cont.querySelectorAll(".calendario-vacia[data-horario]").forEach((el) => activar(el, async () => {
+        if (el.dataset.busy) return;
+        el.dataset.busy = "1";
+        if (await moverPartidoPlanilla(partidoSeleccionadoPlanilla, el.dataset.horario, el.dataset.cancha)) partidoSeleccionadoPlanilla = null;
+        delete el.dataset.busy;
+      }));
+      cont.querySelector("#planillaSacar").addEventListener("click", async () => {
+        if (await moverPartidoPlanilla(partidoSeleccionadoPlanilla, null, null)) partidoSeleccionadoPlanilla = null;
+      });
+      cont.querySelector("#planillaCancelarSeleccion").addEventListener("click", () => { partidoSeleccionadoPlanilla = null; rerender(); });
+    }
     cont.querySelectorAll("#planillaDiasPills .pill").forEach((btn) => {
       btn.addEventListener("click", () => {
         planillaDiaFiltro = btn.dataset.dia;
@@ -6003,23 +6045,28 @@ function wirePlanillaDragAndDrop(containerId) {
     zona.addEventListener("dragover", (e) => e.preventDefault());
     zona.addEventListener("drop", async (e) => {
       e.preventDefault();
-      if (zona.dataset.busy) return;
-      const partidoId = arrastrando;
-      if (!partidoId) return;
+      if (zona.dataset.busy || !arrastrando) return;
       zona.dataset.busy = "1";
-      try {
-      const nuevoHorario = zona.dataset.horario || null; // sin dataset.horario = soltado en la bandeja
-      const nuevaCancha = zona.dataset.cancha || null;
+      // sin dataset.horario = soltado en la bandeja
+      try { await moverPartidoPlanilla(arrastrando, zona.dataset.horario || null, zona.dataset.cancha || null); }
+      finally { delete zona.dataset.busy; }
+    });
+  });
+}
+
+// Cambia cancha y horario de un partido (null/null = lo saca del calendario).
+// La usan el arrastrar y soltar y el "tocar para mover" de la planilla.
+async function moverPartidoPlanilla(partidoId, nuevoHorario, nuevaCancha) {
       const duracion = torneoGestionData?.duracion_minutos || 90;
       const bloqueosDeCancha = nuevaCancha ? (bloqueosPorCanchaMapa()[nuevaCancha] || []) : [];
 
       if (nuevoHorario && nuevaCancha && hayConflictoCancha(ultimosPartidosGestion, partidoId, nuevaCancha, nuevoHorario, duracion, bloqueosDeCancha)) {
         toast("Ese horario ya está ocupado (cancha bloqueada, o alguna de las parejas ya tiene otro partido a esa hora)");
-        return;
+        return false;
       }
       const partido = ultimosPartidosGestion.find((x) => x.id === partidoId);
       const { error } = await sb.from("partidos").update({ cancha_id: nuevaCancha, horario: nuevoHorario }).eq("id", partidoId);
-      if (error) { toast("Error: " + error.message); return; }
+      if (error) { toast("Error: " + error.message); return false; }
       // mismo motivo que en btnCambiarHorario: si este partido no tenía horario
       // y ahora se le asignó arrastrándolo, esta categoría ya tiene calendario.
       // Si esa categoría YA estaba publicada, el cambio queda visible al toque
@@ -6035,11 +6082,7 @@ function wirePlanillaDragAndDrop(containerId) {
       toast(nuevoHorario ? "Partido reubicado" : "Partido movido a \"sin horario\"");
       avisarActualizacionEnVivo();
       refrescarTrasAccionGestion();
-      } finally {
-        delete zona.dataset.busy;
-      }
-    });
-  });
+      return true;
 }
 
 // ---------- Carga de resultado (sets) — compartida entre Administración
