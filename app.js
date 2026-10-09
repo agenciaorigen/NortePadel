@@ -971,14 +971,14 @@ async function logosPlaca(todos = false) {
   const [general, principal, frente, manga, espalda, otros] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente")),
     ...(todos ? [cargar(elegir("manga")), cargar(elegir("espalda")), cargar(elegir(""))] : [[], [], []])]);
   return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])],
-    principal: principal[0], resto: [...frente.map((img) => [img, 84]), ...manga.map((img) => [img, 72]), ...[...espalda, ...otros].map((img) => [img, 64])] };
+    principal: principal[0], resto: [...frente.map((img) => [img, 100]), ...manga.map((img) => [img, 86]), ...[...espalda, ...otros].map((img) => [img, 76])] };
 }
 // Historias de horarios: General y Principal grandes lado a lado, y abajo el resto en hasta 2 filas
 // solo uno de los dos (lo más común: el Principal) = todavía más grande
-const altoLogoGrande = (logos) => (logos.general && logos.principal ? 130 : 170);
+const altoLogoGrande = (logos) => (logos.general && logos.principal ? 160 : 220);
 function altoSponsorsHistoria(logos, W) {
   const arriba = logos.general || logos.principal ? 34 + altoLogoGrande(logos) + 24 + 30 : 0;
-  return arriba + (logos.resto.length ? filasDeLogos({ fila: logos.resto }, W, 2).length * 124 : 0);
+  return arriba + (logos.resto.length ? filasDeLogos({ fila: logos.resto }, W, 2).length * 140 : 0);
 }
 function dibujarFilaLogos(ctx, W, y, fila, base) {
   const anchos = fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
@@ -1011,7 +1011,7 @@ function dibujarSponsorsHistoria(ctx, W, H, logos) {
     });
     y += 34 + ALTO_LOGO_GRANDE + 24 + 30;
   }
-  if (logos.resto.length) filasDeLogos({ fila: logos.resto }, W, 2).forEach((fila) => { dibujarFilaLogos(ctx, W, y, fila, 84); y += 124; });
+  if (logos.resto.length) filasDeLogos({ fila: logos.resto }, W, 2).forEach((fila) => { dibujarFilaLogos(ctx, W, y, fila, 100); y += 140; });
 }
 const ALTO_BANDA_SPONSORS = 230;
 function dibujarLogoEnCaja(ctx, img, x, y, alto) {
@@ -2902,6 +2902,8 @@ async function cargarConfig() {
   if (inputWspFotos) inputWspFotos.value = configApp.whatsapp_fotos || "";
   if (inputIg) inputIg.value = configApp.instagram_url || "";
   if (inputYt) inputYt.value = configApp.youtube_en_vivo || "";
+  const inputPrecioFotos = document.getElementById("admFotosPrecio");
+  if (inputPrecioFotos && !inputPrecioFotos.value) inputPrecioFotos.value = configApp.foto_precio || "";
   if (sponsorsVigentes.length || document.getElementById("spRemera")) { renderSponsorsPagina(sponsorsVigentes); renderRemeraMuestra(); }
 }
 
@@ -6905,6 +6907,14 @@ let ultimasParejasGestion = [];
 let vistaPartidosAdmin = "lista"; // lista | planilla | planilla-grande | llave | tabla
 
 function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
+  // días con partidos, para exportar las historias de un solo día
+  const selDia = document.getElementById("exportarHorariosDia");
+  if (selDia) {
+    const elegido = selDia.value;
+    const dias = [...new Set(partidos.filter((p) => p.horario).sort((a, b) => new Date(a.horario) - new Date(b.horario)).map((p) => jornadaDe(p.horario)))];
+    selDia.innerHTML = '<option value="">Todos los días</option>' + dias.map((d) =>
+      `<option value="${d}" ${d === elegido ? "selected" : ""}>${new Date(d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" })}</option>`).join("");
+  }
   ultimosPartidosGestion = partidos;
   ultimasCanchasTorneoGestion = canchasTorneo;
   if (parejasTorneo) ultimasParejasGestion = parejasTorneo;
@@ -7042,7 +7052,8 @@ function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categori
   ctx.fillText("Horarios sujetos a cambios · seguilos en vivo en la web", W / 2, H - 50);
 }
 async function exportarHorariosInstagram() {
-  const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro));
+  const dia = document.getElementById("exportarHorariosDia").value; // "" = todos los días
+  const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro) && (!dia || jornadaDe(p.horario) === dia));
   if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
   await cargarFuentesExport();
   const logos = await logosPlaca(true);
@@ -7060,6 +7071,17 @@ async function exportarHorariosInstagram() {
     return [c, lista[cuenta[damas ? "Damas" : "otras"]++ % lista.length]];
   }));
   const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
+  // primero las fotos del propio torneo (una distinta por imagen, mezcladas); las que están
+  // a la venta no, porque su vista tiene marca de agua. Si se acaban, las fijas de arriba.
+  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).is("precio", null);
+  const banco = (await firmarFotosTorneo(delTorneo || [])).map((f) => f.urlVista).filter(Boolean).sort(() => Math.random() - 0.5);
+  const fondoSiguiente = async (categoria) => {
+    while (banco.length) {
+      const img = await cargarImagenParaCanvas(banco.shift());
+      if (img && imagenUsableEnCanvas(img)) return img;
+    }
+    return fotos[fotoDe[categoria]];
+  };
   const imagenes = [];
   for (const categoria of categorias) {
     const partidos = conHorario.filter((p) => p.categoria === categoria).sort((a, b) => new Date(a.horario) - new Date(b.horario));
@@ -7073,12 +7095,12 @@ async function exportarHorariosInstagram() {
       paginas[paginas.length - 1].push({ partido: p, y, alto: altoCard - 16 });
       y += altoCard;
     });
-    paginas.forEach((items, i) => {
+    for (const [i, items] of paginas.entries()) {
       const canvas = document.createElement("canvas");
       canvas.width = W; canvas.height = H;
-      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, fotos[fotoDe[categoria]], logos, torneoNombre, categoria, items, i + 1, paginas.length);
-      imagenes.push({ canvas, nombre: `horarios-${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
-    });
+      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, await fondoSiguiente(categoria), logos, torneoNombre, categoria, items, i + 1, paginas.length);
+      imagenes.push({ canvas, nombre: `horarios-${dia ? new Date(dia).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }).replace(/\W+/g, "-") + "-" : ""}${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
+    }
   }
   // en el celular: un solo menú de compartir con todas las imágenes; en la compu, se descargan
   if (matchMedia("(pointer: coarse)").matches && navigator.canShare) {
@@ -8178,10 +8200,24 @@ async function firmarFotosTorneo(fotos) {
   return fotos.map((f, i) => ({ ...f, urlVista: firmada[rutas[i]] || "", archivo: rutas[i].split("/").pop() }));
 }
 
+const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
+let fotosCompradas = new Set(); // ids de fotos que el jugador ya pagó
+const fotosElegidas = new Map(); // id -> precio (carrito)
 function fotoTorneoItemHtml(foto, admin) {
   const url = urlSegura(foto.urlVista);
   if (!url) return "";
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  // a la venta: la vista es chica y con marca de agua; el original se baja pagando
+  if (foto.precio != null && foto.original_path) {
+    const accion = admin || fotosCompradas.has(foto.id)
+      ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>`
+      : `<button type="button" class="foto-accion" data-elegir-foto="${foto.id}" data-precio="${Number(foto.precio)}" aria-pressed="${fotosElegidas.has(foto.id)}">${fotosElegidas.has(foto.id) ? "✓ Elegida" : `Comprar ${precioTexto(foto.precio)}`}</button>`;
+    return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
+      <img src="${url}" alt="Foto del torneo (vista previa)" loading="lazy" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+      ${borrar}${admin ? `<span class="foto-precio">${precioTexto(foto.precio)}</span>` : ""}
+      ${accion}
+    </div>`;
+  }
   // se pide por nombre de archivo (el mismo que tiene el original en la cámara), no por link
   const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
     ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${escapeHtml(foto.archivo)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
@@ -8206,9 +8242,74 @@ async function cargarFotosTorneo() {
   }
   avisoLogin.style.display = "none";
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
-  const fotos = await firmarFotosTorneo(data || []);
+  const [fotos, { data: compras }] = await Promise.all([
+    firmarFotosTorneo(data || []),
+    sb.from("compras_fotos").select("foto_id").eq("estado", "pagada")
+  ]);
+  fotosCompradas = new Set((compras || []).map((c) => c.foto_id));
   cont.innerHTML = fotos.map((f) => fotoTorneoItemHtml(f, false)).join("");
   if (vacio) vacio.style.display = fotos.length ? "none" : "block";
+  renderCarritoFotos();
+}
+function renderCarritoFotos() {
+  const barra = document.getElementById("fotosCarrito");
+  if (!barra) return;
+  const total = [...fotosElegidas.values()].reduce((a, b) => a + b, 0);
+  barra.hidden = !fotosElegidas.size;
+  document.getElementById("fotosCarritoTexto").textContent = `${fotosElegidas.size} ${fotosElegidas.size === 1 ? "foto" : "fotos"} · ${precioTexto(total)}`;
+}
+// elegir/sacar del carrito y descargar originales (galería del torneo y de Gestión)
+document.addEventListener("click", async (e) => {
+  const elegir = e.target.closest("[data-elegir-foto]");
+  if (elegir) {
+    const id = elegir.dataset.elegirFoto;
+    if (fotosElegidas.has(id)) fotosElegidas.delete(id); else fotosElegidas.set(id, Number(elegir.dataset.precio));
+    const sel = fotosElegidas.has(id);
+    elegir.setAttribute("aria-pressed", sel);
+    elegir.textContent = sel ? "✓ Elegida" : `Comprar ${precioTexto(elegir.dataset.precio)}`;
+    elegir.closest(".foto-item").classList.toggle("elegida", sel);
+    renderCarritoFotos();
+    return;
+  }
+  const bajar = e.target.closest("[data-descargar-foto]");
+  if (bajar && !bajar.disabled) {
+    bajar.disabled = true;
+    try {
+      const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: bajar.dataset.descargarFoto } });
+      if (error || !data?.url) { toast(data?.error || "No se pudo descargar la foto"); return; }
+      location.assign(data.url);
+    } finally { bajar.disabled = false; }
+  }
+});
+document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled || !fotosElegidas.size) return;
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "crear", fotoIds: [...fotosElegidas.keys()] } });
+    let detalle = data?.error;
+    if (error && !detalle) { try { detalle = (await error.context.json()).error; } catch (x) { detalle = error.message; } }
+    if (!data?.link) { toast(detalle || "No se pudo iniciar el pago"); return; }
+    location.assign(data.link); // Checkout de Mercado Pago
+  } finally { btn.disabled = false; }
+});
+// al volver de Mercado Pago: confirma el pago y lleva a las fotos del torneo
+async function volverDeMercadoPago() {
+  const q = new URLSearchParams(location.search);
+  const torneo = q.get("fotos_torneo");
+  if (!torneo) return;
+  const pago = q.get("payment_id") || q.get("collection_id");
+  const estado = q.get("status") || q.get("collection_status");
+  history.replaceState(null, "", location.pathname + `#/torneo/${torneo}/fotos`);
+  fotosElegidas.clear();
+  if (pago && pago !== "null") {
+    // la confirmación la hace igual el aviso de Mercado Pago; esto solo la adelanta
+    await sb.functions.invoke("mp-fotos", { body: { accion: "verificar", paymentId: pago } }).catch(() => {});
+    toast(estado === "approved" ? "¡Pago aprobado! Ya podés descargar tus fotos en calidad original"
+      : estado === "pending" || estado === "in_process" ? "Tu pago está pendiente: cuando se acredite, vas a poder descargar las fotos"
+      : "El pago no se completó");
+  }
+  abrirTorneo(torneo, "fotos");
 }
 
 async function cargarFotosTorneoAdmin() {
@@ -8224,8 +8325,10 @@ async function cargarFotosTorneoAdmin() {
       if (btn.disabled) return;
       btn.disabled = true;
       try {
+        const foto = (data || []).find((f) => f.id === btn.dataset.id);
         const { error } = await sb.from("torneo_fotos").delete().eq("id", btn.dataset.id);
         if (error) { toast("Error: " + error.message); return; }
+        if (foto?.original_path) await sb.storage.from("fotos-venta").remove([foto.original_path]);
         toast("Foto eliminada");
         cargarFotosTorneoAdmin();
         if (torneoActualId === torneoGestionId) cargarFotosTorneo();
@@ -8244,7 +8347,7 @@ async function cargarFotosTorneoAdmin() {
 // nativo del navegador -- sin librerías, y sin pérdida de calidad visible.
 // Si por lo que sea el navegador no puede procesarla, sube el archivo
 // original antes que no subir nada.
-function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
+function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82, marca = false) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(archivo);
     const img = new Image();
@@ -8258,7 +8361,25 @@ function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      if (marca) { // vista previa de una foto a la venta: "NORTE PADEL" cruzado por toda la foto
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.rotate(-Math.PI / 6);
+        ctx.font = `800 ${Math.round(width / 9)}px 'Barlow Condensed', Arial, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,.32)";
+        ctx.strokeStyle = "rgba(0,0,0,.18)";
+        ctx.lineWidth = 2;
+        const paso = width / 4.2;
+        for (let y = -height; y <= height; y += paso) { ctx.fillText("NORTE PADEL", 0, y); ctx.strokeText("NORTE PADEL", 0, y); }
+        ctx.restore();
+        ctx.font = `700 ${Math.round(width / 32)}px Manrope, Arial, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,.85)";
+        ctx.textAlign = "right";
+        ctx.fillText("Vista previa · elnortepadel.com", width - 14, height - 14);
+      }
       canvas.toBlob((blob) => resolve(blob || archivo), "image/jpeg", calidad);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
@@ -8272,19 +8393,34 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
   const input = document.getElementById("admFotosArchivos");
   const archivos = Array.from(input.files || []);
   if (!archivos.length) { toast("Elegí una o más fotos"); return; }
+  const textoPrecio = document.getElementById("admFotosPrecio").value.trim();
+  const precio = textoPrecio === "" ? null : Number(textoPrecio);
+  if (precio != null && !(precio > 0)) { toast("Poné un precio mayor a 0, o dejalo vacío para subirlas gratis"); return; }
+  if (precio != null && String(precio) !== configApp.foto_precio) {
+    await sb.from("config").upsert({ clave: "foto_precio", valor: String(precio) }, { onConflict: "clave" });
+    configApp.foto_precio = String(precio);
+  }
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   try {
     for (let i = 0; i < archivos.length; i++) {
       const archivo = archivos[i];
       btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
-      const comprimida = await comprimirFoto(archivo);
       const nombreBase = archivo.name.replace(/\.[^.]+$/, "");
       const path = `${torneoGestionId}/${Date.now()}-${nombreBase}.jpg`;
+      // a la venta: vista chica con marca de agua + original aparte (bucket privado)
+      let original_path = null;
+      if (precio != null) {
+        const original = await comprimirFoto(archivo, 4000, 0.92);
+        const { error: upOrig } = await sb.storage.from("fotos-venta").upload(path, original, { contentType: "image/jpeg" });
+        if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); continue; }
+        original_path = path;
+      }
+      const comprimida = precio != null ? await comprimirFoto(archivo, 900, 0.7, true) : await comprimirFoto(archivo);
       const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg" });
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
-      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl });
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, original_path, precio });
       if (error) toast("Error guardando " + archivo.name + ": " + error.message);
     }
     toast("Fotos subidas");
@@ -8909,5 +9045,6 @@ async function init() {
   // después del bloque de arriba, no adentro: necesita que cargarConfig() ya haya
   // llenado configApp (el link de YouTube vive ahí) antes de leerlo
   cargarEnVivo();
+  volverDeMercadoPago();
 }
 init();
