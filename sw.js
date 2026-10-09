@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v191";
+const CACHE = "norte-padel-v193";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -40,14 +40,23 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Cache-first para el shell, red primero para todo lo demás (datos de Supabase siempre frescos)
+// Páginas, código y estilos: red primero (así nadie queda con una versión vieja, por
+// ejemplo la que pedía iniciar sesión para ver fotos); sin conexión, lo guardado.
+// Imágenes del shell: caché primero. Datos de Supabase (otro origen): no se tocan.
+const FRESCO = ["document", "script", "style", "manifest"];
 self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-  if (url.origin === self.location.origin) {
+  const req = event.request, url = new URL(req.url);
+  if (url.origin !== self.location.origin || req.method !== "GET") return;
+  if (FRESCO.includes(req.destination)) {
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
+      fetch(req, { cache: "no-cache" }).then((r) => {
+        if (r.ok && !url.search) { const copia = r.clone(); caches.open(CACHE).then((c) => c.put(req, copia)); }
+        return r;
+      }).catch(() => caches.match(req, { ignoreSearch: true }).then((c) => c || caches.match("./index.html")))
     );
+    return;
   }
+  event.respondWith(caches.match(req).then((cached) => cached || fetch(req)));
 });
 
 // Notificaciones push reales (cuando el organizador configure el envío server-side con VAPID)

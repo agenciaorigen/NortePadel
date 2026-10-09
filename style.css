@@ -2466,17 +2466,27 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 
 /* Inicio: aviso de fotos nuevas del torneo */
 .aviso-fotos {
-  width: 100%; display: flex; align-items: center; gap: 14px; margin: 16px 0; padding: 14px 18px; text-align: left; cursor: pointer;
-  border-radius: var(--radius); border: 1px solid rgba(var(--accent-rgb),.45); color: var(--text);
-  background: linear-gradient(100deg, rgba(var(--accent-rgb),.16), rgba(var(--accent-rgb),.03) 60%), var(--card);
+  width: 100%; display: flex; align-items: center; gap: 24px; margin: 20px 0; padding: 26px 28px; text-align: left; cursor: pointer;
+  border-radius: var(--radius); border: 1px solid rgba(var(--accent-rgb),.5); color: var(--text); overflow: hidden;
+  background: radial-gradient(120% 140% at 0% 0%, rgba(var(--accent-rgb),.22), transparent 60%), var(--card);
 }
 .aviso-fotos[hidden] { display: none; }
 .aviso-fotos:hover, .aviso-fotos:focus-visible { border-color: var(--accent); }
-.aviso-fotos-icono { font-size: 28px; }
-.aviso-fotos-texto { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.aviso-fotos-texto strong { font-family: var(--font-display); font-size: 20px; font-style: italic; text-transform: uppercase; letter-spacing: .02em; }
-.aviso-fotos-texto small { color: var(--muted); font-size: 13px; }
-.aviso-fotos-cta { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-bright); white-space: nowrap; }
+.aviso-fotos-texto { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.aviso-fotos-eyebrow { font-family: var(--font-display); font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-bright); }
+.aviso-fotos-texto strong { font-family: var(--font-display); font-size: clamp(30px, 5vw, 52px); line-height: .95; font-style: italic; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
+.aviso-fotos-texto small { color: var(--muted); font-size: 15px; }
+.aviso-fotos-cta { margin-top: 8px; padding: 11px 22px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.aviso-fotos-minis { display: grid; grid-template-columns: repeat(2, 110px); gap: 8px; flex-shrink: 0; }
+.aviso-fotos-minis:empty { display: none; }
+.aviso-fotos-minis img { width: 110px; height: 110px; object-fit: cover; border-radius: 10px; display: block; }
+.aviso-fotos-minis img:nth-child(odd) { transform: rotate(-2deg); }
+.aviso-fotos-minis img:nth-child(even) { transform: rotate(2deg); }
+@media (max-width: 699px) {
+  .aviso-fotos { flex-direction: column; align-items: stretch; padding: 20px 18px; gap: 16px; }
+  .aviso-fotos-minis { order: -1; grid-template-columns: repeat(4, 1fr); }
+  .aviso-fotos-minis img { width: 100%; height: auto; aspect-ratio: 1; }
+}
 .fotos-ver-mas { grid-column: 1 / -1; }
 .foto-item .foto-genero { position: absolute; right: 40px; top: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; cursor: pointer; background: rgba(var(--bg-rgb),.8); color: var(--text); border: 1px solid var(--border); }
 .foto-item .foto-genero:hover, .foto-item .foto-genero:focus-visible { border-color: var(--accent); }

@@ -728,6 +728,7 @@ async function manejarCambioSesion(session) {
   // si este celular ya dio permiso, se re-registra solo (sin preguntar)
   if (miJugador) suscribirAvisos(false).catch(() => {}).then(renderAvisos);
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
+  if (torneoActualId) cargarFotosTorneo(); // compradas / admin: cambian las opciones de cada foto
   calcularTorneoDestacado();
   cargarHeroPosicion();
   cargarMiProximoPartido();
@@ -8296,9 +8297,10 @@ function fotoTorneoItemHtml(foto, admin) {
   // a la venta: la vista es chica y con marca de agua; el original se baja pagando
   // (sin precio a la vista: al tocarla se elige entre la descarga con marca de agua y el original)
   if (foto.precio != null && foto.original_path) {
-    const comprada = fotosCompradas.has(foto.id);
+    // admins/coordinadores: la bajan en original sin pagar (la Edge Function ya los deja)
+    const comprada = isAdmin || fotosCompradas.has(foto.id);
     const marca = admin ? `<span class="foto-precio">${precioTexto(foto.precio)}</span>`
-      : comprada ? '<span class="foto-precio">✓ Comprada</span>'
+      : isAdmin ? "" : comprada ? '<span class="foto-precio">✓ Comprada</span>'
       : fotosElegidas.has(foto.id) ? '<span class="foto-precio">✓ En tu pedido</span>' : "";
     return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
       <img src="${mini}" alt="Foto del torneo (vista previa)" loading="lazy" decoding="async" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
@@ -8392,12 +8394,15 @@ async function cargarAvisoFotos() {
   const aviso = document.getElementById("inicioAvisoFotos");
   if (!aviso) return;
   const desde = new Date(Date.now() - 7 * 864e5).toISOString();
-  const { data } = await sb.from("torneo_fotos").select("torneo_id, created_at").gte("created_at", desde).order("created_at", { ascending: false }).limit(500);
+  const { data } = await sb.from("torneo_fotos").select("torneo_id, created_at, url, thumb_url").gte("created_at", desde).order("created_at", { ascending: false }).limit(500);
   const ultimo = data?.[0];
   if (!ultimo) { aviso.hidden = true; return; }
   const torneo = cacheTorneos.find((t) => t.id === ultimo.torneo_id);
   const cuantas = data.filter((f) => f.torneo_id === ultimo.torneo_id).length;
   document.getElementById("inicioAvisoFotosTexto").textContent = `${cuantas} ${cuantas === 1 ? "foto nueva" : "fotos nuevas"}${torneo ? " de " + torneo.nombre : " del torneo"}`;
+  // 4 miniaturas (las chicas, ya cacheadas) para que se vea que hay fotos
+  document.getElementById("inicioAvisoFotosMinis").innerHTML = data.filter((f) => f.torneo_id === ultimo.torneo_id).slice(0, 4)
+    .map((f) => urlSegura(f.thumb_url || f.url)).filter(Boolean).map((u) => `<img src="${u}" alt="" loading="lazy" decoding="async" />`).join("");
   aviso.hidden = false;
   aviso.onclick = () => abrirTorneo(ultimo.torneo_id, "fotos");
 }
