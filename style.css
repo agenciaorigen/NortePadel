@@ -2477,3 +2477,4 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .aviso-fotos-texto strong { font-family: var(--font-display); font-size: 20px; font-style: italic; text-transform: uppercase; letter-spacing: .02em; }
 .aviso-fotos-texto small { color: var(--muted); font-size: 13px; }
 .aviso-fotos-cta { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-bright); white-space: nowrap; }
+.fotos-ver-mas { grid-column: 1 / -1; }

@@ -7144,7 +7144,7 @@ async function exportarHorariosInstagram() {
   // primero las fotos del propio torneo (una distinta por imagen, mezcladas); las que están
   // a la venta no, porque su vista tiene marca de agua. Si se acaban, las fijas de arriba.
   const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).is("precio", null);
-  const banco = (await firmarFotosTorneo(delTorneo || [])).map((f) => f.urlVista).filter(Boolean).sort(() => Math.random() - 0.5);
+  const banco = vistasFotosTorneo(delTorneo || []).map((f) => f.urlVista).filter(Boolean).sort(() => Math.random() - 0.5);
   const fondoSiguiente = async (categoria) => {
     while (banco.length) {
       const img = await cargarImagenParaCanvas(banco.shift());
@@ -8250,23 +8250,16 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
 // la versión liviana; quien quiera la foto de calidad completa la pide por
 // WhatsApp (mismo patrón que ya se usa para coordinar el pago de la
 // inscripción) y el club se la manda/vende por fuera del sitio.
-// Las fotos del torneo son solo para quien inició sesión: el bucket
-// "fotos-torneos" es privado y cada foto se muestra con un link firmado que
-// vence en una hora. torneo_fotos.url guarda la dirección de siempre; de ahí
-// sale la ruta del archivo dentro del bucket.
+// ruta del archivo dentro del bucket, a partir de su link público
 function rutaFotoTorneo(url, bucket = "fotos-torneos") {
   const marca = `/${bucket}/`;
   const i = String(url || "").indexOf(marca);
   return i === -1 ? "" : decodeURIComponent(String(url).slice(i + marca.length).split("?")[0]);
 }
-async function firmarFotosTorneo(fotos) {
-  const rutas = fotos.map((f) => rutaFotoTorneo(f.url));
-  const validas = rutas.filter(Boolean);
-  const { data } = validas.length
-    ? await sb.storage.from("fotos-torneos").createSignedUrls(validas, 3600)
-    : { data: [] };
-  const firmada = Object.fromEntries((data || []).filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
-  return fotos.map((f, i) => ({ ...f, urlVista: firmada[rutas[i]] || "", archivo: rutas[i].split("/").pop() }));
+// el bucket de las vistas es público: links fijos que el navegador guarda (uno firmado
+// cambia en cada visita y obliga a bajar todo de nuevo); la grilla usa la miniatura
+function vistasFotosTorneo(fotos) {
+  return fotos.map((f) => ({ ...f, urlVista: f.url, urlMini: f.thumb_url || f.url, archivo: rutaFotoTorneo(f.url).split("/").pop() }));
 }
 
 const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
@@ -8283,6 +8276,7 @@ const fotosElegidas = new Map(); // id -> precio (carrito)
 function fotoTorneoItemHtml(foto, admin) {
   const url = urlSegura(foto.urlVista);
   if (!url) return "";
+  const mini = urlSegura(foto.urlMini) || url;
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
   // a la venta: la vista es chica y con marca de agua; el original se baja pagando
   // (sin precio a la vista: al tocarla se elige entre la descarga con marca de agua y el original)
@@ -8292,7 +8286,7 @@ function fotoTorneoItemHtml(foto, admin) {
       : comprada ? '<span class="foto-precio">✓ Comprada</span>'
       : fotosElegidas.has(foto.id) ? '<span class="foto-precio">✓ En tu pedido</span>' : "";
     return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
-      <img src="${url}" alt="Foto del torneo (vista previa)" loading="lazy" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
+      <img src="${mini}" alt="Foto del torneo (vista previa)" loading="lazy" decoding="async" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
       ${borrar}${marca}
       ${admin ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>` : ""}
     </div>`;
@@ -8302,7 +8296,7 @@ function fotoTorneoItemHtml(foto, admin) {
     ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${escapeHtml(foto.archivo)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
     : "";
   return `<div class="foto-item">
-    <img src="${url}" alt="Foto del torneo" loading="lazy" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+    <img src="${mini}" alt="Foto del torneo" loading="lazy" decoding="async" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
     ${borrar}
     ${pedirOriginal}
   </div>`;
@@ -8317,12 +8311,19 @@ async function cargarFotosTorneo() {
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
   const ordenes = ordenesFotos();
   const [fotos, { data: compras }, { data: deOrdenes }] = await Promise.all([
-    firmarFotosTorneo(data || []),
+    vistasFotosTorneo(data || []),
     currentUser ? sb.from("compras_fotos").select("foto_id").eq("estado", "pagada") : { data: [] },
     ordenes.length ? sb.functions.invoke("mp-fotos", { body: { accion: "compradas", ordenes } }) : { data: null }
   ]);
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
-  cont.innerHTML = fotos.map((f) => fotoTorneoItemHtml(f, false)).join("");
+  // de a 24: así quien entra no baja todas las fotos del torneo de una
+  let mostradas = 24;
+  const pintar = () => {
+    cont.innerHTML = fotos.slice(0, mostradas).map((f) => fotoTorneoItemHtml(f, false)).join("") +
+      (fotos.length > mostradas ? `<button type="button" class="secondary fotos-ver-mas" id="btnVerMasFotos">Ver más fotos (${fotos.length - mostradas})</button>` : "");
+    document.getElementById("btnVerMasFotos")?.addEventListener("click", () => { mostradas += 24; pintar(); });
+  };
+  pintar();
   if (vacio) vacio.style.display = fotos.length ? "none" : "block";
   renderCarritoFotos();
 }
@@ -8409,7 +8410,7 @@ async function cargarFotosTorneoAdmin() {
   const cont = document.getElementById("admFotosLista");
   if (!cont || !torneoGestionId) return;
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
-  const fotos = await firmarFotosTorneo(data || []);
+  const fotos = vistasFotosTorneo(data || []);
   cont.innerHTML = fotos.length
     ? fotos.map((f) => fotoTorneoItemHtml(f, true)).join("")
     : '<p class="empty">Todavía no subiste ninguna foto de este torneo.</p>';
@@ -8532,11 +8533,22 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
         if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); continue; }
         original_path = path;
       }
-      const comprimida = precio != null ? await comprimirFoto(archivo, 900, 0.7, true) : await comprimirFoto(archivo);
-      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg", cacheControl: "31536000" });
+      // vista (al abrirla) + miniatura chiquita para la grilla: la galería entera pesa poco
+      const aLaVenta = precio != null;
+      const [comprimida, mini] = await Promise.all([
+        comprimirFoto(archivo, aLaVenta ? 900 : 1280, aLaVenta ? 0.7 : 0.78, aLaVenta),
+        comprimirFoto(archivo, 400, 0.7, aLaVenta)
+      ]);
+      const pathMini = path.replace(/\/([^/]+)$/, "/mini-$1");
+      const opciones = { contentType: "image/jpeg", cacheControl: "31536000" };
+      const [{ error: upErr }, { error: upMini }] = await Promise.all([
+        sb.storage.from("fotos-torneos").upload(path, comprimida, opciones),
+        sb.storage.from("fotos-torneos").upload(pathMini, mini, opciones)
+      ]);
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
-      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, original_path, precio });
+      const thumb_url = upMini ? null : sb.storage.from("fotos-torneos").getPublicUrl(pathMini).data.publicUrl;
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio });
       if (error) toast("Error guardando " + archivo.name + ": " + error.message);
     }
     toast("Fotos subidas");
