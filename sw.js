@@ -1,4 +1,4 @@
-const CACHE = "norte-padel-v183";
+const CACHE = "norte-padel-v184";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -24,7 +24,9 @@ const APP_SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL))
+    // "reload": cada archivo se pide a la red y no a la caché del navegador; si no,
+    // puede quedar guardado un index.html viejo junto a un app.js nuevo (y se rompe)
+    caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL.map((u) => new Request(u, { cache: "reload" }))))
   );
   self.skipWaiting();
 });

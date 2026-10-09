@@ -7056,7 +7056,7 @@ function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categori
   ctx.fillText("Horarios sujetos a cambios · seguilos en vivo en la web", W / 2, H - 50);
 }
 async function exportarHorariosInstagram() {
-  const dia = document.getElementById("exportarHorariosDia").value; // "" = todos los días
+  const dia = document.getElementById("exportarHorariosDia")?.value || ""; // "" = todos los días
   const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro) && (!dia || jornadaDe(p.horario) === dia));
   if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
   await cargarFuentesExport();
@@ -8875,9 +8875,8 @@ function mostrarFotoGrande(el) {
   const id = el.dataset.fotoId, aLaVenta = !!id;
   const btnOriginal = document.getElementById("fotoGrandeOriginal"), btnPedido = document.getElementById("fotoGrandePedido");
   document.getElementById("fotoGrandeDescargar").textContent = aLaVenta ? "Descargar con marca de agua" : "Descargar";
-  btnOriginal.hidden = !aLaVenta;
-  btnPedido.hidden = !aLaVenta || !!el.dataset.comprada;
-  if (aLaVenta) {
+  if (btnOriginal && btnPedido) btnOriginal.hidden = !aLaVenta, btnPedido.hidden = !aLaVenta || !!el.dataset.comprada;
+  if (aLaVenta && btnOriginal && btnPedido) {
     btnOriginal.dataset.fotoId = id;
     btnOriginal.textContent = el.dataset.comprada ? "Descargar original" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
     btnPedido.textContent = fotosElegidas.has(id) ? "✓ En tu pedido (quitar)" : "Sumar al pedido";
@@ -8902,7 +8901,7 @@ function cerrarFotoGrande() {
   document.getElementById("fotoGrandeImg").src = "";
   document.getElementById("fotoGrandeDescargar").href = "";
 }
-document.getElementById("fotoGrandeOriginal").addEventListener("click", async (e) => {
+document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget, el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;
   if (el?.dataset.comprada) { // ya es suya: baja el original
     if (btn.disabled) return;
@@ -8916,7 +8915,7 @@ document.getElementById("fotoGrandeOriginal").addEventListener("click", async (e
   }
   pagarFotos([btn.dataset.fotoId], btn); // recién acá se cobra
 });
-document.getElementById("fotoGrandePedido").addEventListener("click", () => {
+document.getElementById("fotoGrandePedido")?.addEventListener("click", () => {
   const el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;
   const id = el?.dataset.fotoId;
   if (!id) return;

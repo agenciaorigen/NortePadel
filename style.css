@@ -2462,3 +2462,4 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 }
 #fotoGrandePedido { width: auto; margin: 0; text-transform: none; letter-spacing: 0; }
 @media (max-width: 600px) { .fotogrande-acciones { flex-wrap: wrap; justify-content: flex-end; } .fotogrande-acciones > * { white-space: normal; } }
+.fotos-carrito[hidden] { display: none; }
