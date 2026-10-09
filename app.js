@@ -944,7 +944,9 @@ function cargarImagenParaCanvas(url) {
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = url;
+    // "?canvas": si el navegador ya tenía el logo guardado de la página (sin permiso
+    // para el canvas), lo vuelve a pedir en vez de reusar esa copia y fallar
+    img.src = /^https?:/.test(url) ? url + (url.includes("?") ? "&" : "?") + "canvas" : url;
   });
 }
 
@@ -962,11 +964,54 @@ function imagenUsableEnCanvas(img) {
     return true;
   } catch (e) { return false; }
 }
-async function logosPlaca() {
-  const elegir = (n) => sponsorsVigentes.filter((s) => s.nivel === n);
+// todos=true (historias de horarios): además devuelve principal y resto (Frente, Manga, Espalda...) por separado
+async function logosPlaca(todos = false) {
+  const elegir = (n) => sponsorsVigentes.filter((s) => (s.nivel || "") === n);
   const cargar = async (lista) => (await Promise.all(lista.map((s) => cargarImagenParaCanvas(urlSegura(s.logo_url))))).filter((img) => img && imagenUsableEnCanvas(img));
-  const [general, principal, frente] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente"))]);
-  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])] };
+  const [general, principal, frente, manga, espalda, otros] = await Promise.all([cargar(elegir("general").slice(0, 1)), cargar(elegir("principal").slice(0, 1)), cargar(elegir("frente")),
+    ...(todos ? [cargar(elegir("manga")), cargar(elegir("espalda")), cargar(elegir(""))] : [[], [], []])]);
+  return { general: general[0], fila: [...principal.map((img) => [img, 76]), ...frente.map((img) => [img, 52])],
+    principal: principal[0], resto: [...frente.map((img) => [img, 100]), ...manga.map((img) => [img, 86]), ...[...espalda, ...otros].map((img) => [img, 76])] };
+}
+// Historias de horarios: General y Principal grandes lado a lado, y abajo el resto en hasta 2 filas
+// solo uno de los dos (lo más común: el Principal) = todavía más grande
+const altoLogoGrande = (logos) => (logos.general && logos.principal ? 160 : 220);
+function altoSponsorsHistoria(logos, W) {
+  const arriba = logos.general || logos.principal ? 34 + altoLogoGrande(logos) + 24 + 30 : 0;
+  return arriba + (logos.resto.length ? filasDeLogos({ fila: logos.resto }, W, 2).length * 140 : 0);
+}
+function dibujarFilaLogos(ctx, W, y, fila, base) {
+  const anchos = fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
+  const total = anchos.reduce((a, b) => a + b, 0) + 22 * (anchos.length - 1);
+  const escala = Math.min(1, (W - 100) / total);
+  ctx.save();
+  ctx.translate((W - total * escala) / 2, y); ctx.scale(escala, escala);
+  let cx = 0;
+  fila.forEach(([img, alto], i) => { dibujarLogoEnCaja(ctx, img, cx, base - alto, alto); cx += anchos[i] + 22; }); // alineados por abajo
+  ctx.restore();
+}
+function dibujarSponsorsHistoria(ctx, W, H, logos) {
+  let y = H - 110 - altoSponsorsHistoria(logos, W);
+  const grandes = [[logos.general, "PRESENTADO POR"], [logos.principal, "SPONSOR PRINCIPAL"]].filter(([img]) => img);
+  if (grandes.length) {
+    const ALTO_LOGO_GRANDE = altoLogoGrande(logos);
+    const anchos = grandes.map(([img]) => Math.min(ALTO_LOGO_GRANDE * 3.2, (img.width / img.height) * ALTO_LOGO_GRANDE) + 32);
+    const total = anchos.reduce((a, b) => a + b, 0) + 60 * (anchos.length - 1);
+    const escala = Math.min(1, (W - 100) / total);
+    let x = (W - total * escala) / 2;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#C9D1D5";
+    ctx.font = "800 26px 'Barlow Condensed'";
+    grandes.forEach(([img, titulo], i) => {
+      ctx.fillText(titulo.split("").join(String.fromCharCode(8202)), x + anchos[i] * escala / 2, y + 24);
+      ctx.save(); ctx.translate(x, y + 34); ctx.scale(escala, escala);
+      dibujarLogoEnCaja(ctx, img, 0, 0, ALTO_LOGO_GRANDE);
+      ctx.restore();
+      x += (anchos[i] + 60) * escala;
+    });
+    y += 34 + ALTO_LOGO_GRANDE + 24 + 30;
+  }
+  if (logos.resto.length) filasDeLogos({ fila: logos.resto }, W, 2).forEach((fila) => { dibujarFilaLogos(ctx, W, y, fila, 100); y += 140; });
 }
 const ALTO_BANDA_SPONSORS = 230;
 function dibujarLogoEnCaja(ctx, img, x, y, alto) {
@@ -978,8 +1023,24 @@ function dibujarLogoEnCaja(ctx, img, x, y, alto) {
   ctx.drawImage(img, x + 16, y + 12, ancho, alto);
   return ancho + 32;
 }
-function dibujarSponsorsPlaca(ctx, W, H, logos) {
-  const y0 = H - 100 - ALTO_BANDA_SPONSORS;
+// reparte los logos en hasta maxFilas renglones (si igual no entran, se achican parejo)
+function filasDeLogos(logos, W, maxFilas) {
+  const anchoDe = ([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32;
+  const total = logos.fila.reduce((a, l) => a + anchoDe(l) + 18, 0);
+  const filas = Math.max(1, Math.min(maxFilas, Math.ceil(total / (W - 120))));
+  const objetivo = total / filas, res = [[]];
+  let acum = 0;
+  logos.fila.forEach((l) => {
+    if (acum > 0 && acum + anchoDe(l) / 2 > objetivo * res.length && res.length < filas) res.push([]);
+    res[res.length - 1].push(l);
+    acum += anchoDe(l) + 18;
+  });
+  return res.filter((f) => f.length);
+}
+const altoBandaSponsors = (logos, W, maxFilas = 1) =>
+  (logos.general ? 152 : 40) + Math.max(1, logos.fila.length ? filasDeLogos(logos, W, maxFilas).length : 0) * 112 - 34;
+function dibujarSponsorsPlaca(ctx, W, H, logos, maxFilas = 1, abajo = 100) {
+  const y0 = H - abajo - altoBandaSponsors(logos, W, maxFilas);
   ctx.textAlign = "center";
   ctx.fillStyle = "#8D969C";
   ctx.font = "700 26px 'Barlow Condensed'";
@@ -988,21 +1049,21 @@ function dibujarSponsorsPlaca(ctx, W, H, logos) {
     const ancho = Math.min(80 * 3.2, (logos.general.width / logos.general.height) * 80) + 32;
     dibujarLogoEnCaja(ctx, logos.general, (W - ancho) / 2, y0 + 34, 80);
   }
-  if (logos.fila.length) {
-    const yFila = y0 + (logos.general ? 152 : 40);
-    const anchos = logos.fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
+  if (logos.fila.length) filasDeLogos(logos, W, maxFilas).forEach((fila, n) => {
+    const yFila = y0 + (logos.general ? 152 : 40) + n * 112;
+    const anchos = fila.map(([img, alto]) => Math.min(alto * 3.2, (img.width / img.height) * alto) + 32);
     const total = anchos.reduce((a, b) => a + b, 0) + 18 * (anchos.length - 1);
     const escala = Math.min(1, (W - 120) / total); // si no entran, se achican todos parejo
     let x = (W - total * escala) / 2;
     ctx.save();
     ctx.translate(x, yFila); ctx.scale(escala, escala);
     let cx = 0;
-    logos.fila.forEach(([img, alto], i) => {
+    fila.forEach(([img, alto], i) => {
       dibujarLogoEnCaja(ctx, img, cx, 76 - alto, alto); // alineados por abajo
       cx += anchos[i] + 18;
     });
     ctx.restore();
-  }
+  });
 }
 
 async function exportarRankingTop20() {
@@ -2841,6 +2902,12 @@ async function cargarConfig() {
   if (inputWspFotos) inputWspFotos.value = configApp.whatsapp_fotos || "";
   if (inputIg) inputIg.value = configApp.instagram_url || "";
   if (inputYt) inputYt.value = configApp.youtube_en_vivo || "";
+  if (document.getElementById("admComboCantidad")) {
+    document.getElementById("admComboCantidad").value = configApp.foto_combo_cantidad || "";
+    document.getElementById("admComboPrecio").value = configApp.foto_combo_precio || "";
+  }
+  const inputPrecioFotos = document.getElementById("admFotosPrecio");
+  if (inputPrecioFotos && !inputPrecioFotos.value) inputPrecioFotos.value = configApp.foto_precio || "";
   if (sponsorsVigentes.length || document.getElementById("spRemera")) { renderSponsorsPagina(sponsorsVigentes); renderRemeraMuestra(); }
 }
 
@@ -6844,6 +6911,14 @@ let ultimasParejasGestion = [];
 let vistaPartidosAdmin = "lista"; // lista | planilla | planilla-grande | llave | tabla
 
 function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
+  // días con partidos, para exportar las historias de un solo día
+  const selDia = document.getElementById("exportarHorariosDia");
+  if (selDia) {
+    const elegido = selDia.value;
+    const dias = [...new Set(partidos.filter((p) => p.horario).sort((a, b) => new Date(a.horario) - new Date(b.horario)).map((p) => jornadaDe(p.horario)))];
+    selDia.innerHTML = '<option value="">Todos los días</option>' + dias.map((d) =>
+      `<option value="${d}" ${d === elegido ? "selected" : ""}>${new Date(d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" })}</option>`).join("");
+  }
   ultimosPartidosGestion = partidos;
   ultimasCanchasTorneoGestion = canchasTorneo;
   if (parejasTorneo) ultimasParejasGestion = parejasTorneo;
@@ -6974,19 +7049,20 @@ function dibujarHistoriaHorarios(ctx, W, H, fondo, logos, torneoNombre, categori
     textoAjustado(ctx, nombre(p.pareja2_nombre), maxT - anchoVs, "700 {t}px Manrope", 30);
     ctx.fillText(nombre(p.pareja2_nombre), xt + anchoVs, y + 128);
   });
-  if (logos.general || logos.fila.length) dibujarSponsorsPlaca(ctx, W, H, logos);
+  if (logos.general || logos.principal || logos.resto.length) dibujarSponsorsHistoria(ctx, W, H, logos);
   ctx.textAlign = "center";
   ctx.fillStyle = "#8D969C";
   ctx.font = "700 22px Manrope";
   ctx.fillText("Horarios sujetos a cambios · seguilos en vivo en la web", W / 2, H - 50);
 }
 async function exportarHorariosInstagram() {
-  const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro));
+  const dia = document.getElementById("exportarHorariosDia").value; // "" = todos los días
+  const conHorario = ultimosPartidosGestion.filter((p) => p.horario && (!partidosCategoriaFiltro || p.categoria === partidosCategoriaFiltro) && (!dia || jornadaDe(p.horario) === dia));
   if (!conHorario.length) { toast("No hay partidos con horario para exportar"); return; }
   await cargarFuentesExport();
-  const logos = await logosPlaca();
+  const logos = await logosPlaca(true);
   const W = 1080, H = 1920, altoCard = 168, altoDia = 70, inicio = 330;
-  const limite = H - 90 - (logos.general || logos.fila.length ? ALTO_BANDA_SPONSORS + 30 : 0);
+  const limite = H - 120 - altoSponsorsHistoria(logos, W);
   const orden = (c) => cacheCategorias.find((x) => x.nombre === c)?.orden ?? 999;
   const categorias = [...new Set(conHorario.map((p) => p.categoria))].sort((a, b) => orden(a) - orden(b));
   const torneoNombre = torneoGestionData?.nombre || "Torneo";
@@ -6999,6 +7075,17 @@ async function exportarHorariosInstagram() {
     return [c, lista[cuenta[damas ? "Damas" : "otras"]++ % lista.length]];
   }));
   const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
+  // primero las fotos del propio torneo (una distinta por imagen, mezcladas); las que están
+  // a la venta no, porque su vista tiene marca de agua. Si se acaban, las fijas de arriba.
+  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).is("precio", null);
+  const banco = (await firmarFotosTorneo(delTorneo || [])).map((f) => f.urlVista).filter(Boolean).sort(() => Math.random() - 0.5);
+  const fondoSiguiente = async (categoria) => {
+    while (banco.length) {
+      const img = await cargarImagenParaCanvas(banco.shift());
+      if (img && imagenUsableEnCanvas(img)) return img;
+    }
+    return fotos[fotoDe[categoria]];
+  };
   const imagenes = [];
   for (const categoria of categorias) {
     const partidos = conHorario.filter((p) => p.categoria === categoria).sort((a, b) => new Date(a.horario) - new Date(b.horario));
@@ -7012,12 +7099,12 @@ async function exportarHorariosInstagram() {
       paginas[paginas.length - 1].push({ partido: p, y, alto: altoCard - 16 });
       y += altoCard;
     });
-    paginas.forEach((items, i) => {
+    for (const [i, items] of paginas.entries()) {
       const canvas = document.createElement("canvas");
       canvas.width = W; canvas.height = H;
-      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, fotos[fotoDe[categoria]], logos, torneoNombre, categoria, items, i + 1, paginas.length);
-      imagenes.push({ canvas, nombre: `horarios-${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
-    });
+      dibujarHistoriaHorarios(canvas.getContext("2d"), W, H, await fondoSiguiente(categoria), logos, torneoNombre, categoria, items, i + 1, paginas.length);
+      imagenes.push({ canvas, nombre: `horarios-${dia ? new Date(dia).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" }).replace(/\W+/g, "-") + "-" : ""}${categoria.replace(/\s+/g, "-").toLowerCase()}${paginas.length > 1 ? `-${i + 1}` : ""}.png` });
+    }
   }
   // en el celular: un solo menú de compartir con todas las imágenes; en la compu, se descargan
   if (matchMedia("(pointer: coarse)").matches && navigator.canShare) {
@@ -8117,10 +8204,26 @@ async function firmarFotosTorneo(fotos) {
   return fotos.map((f, i) => ({ ...f, urlVista: firmada[rutas[i]] || "", archivo: rutas[i].split("/").pop() }));
 }
 
+const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
+let fotosCompradas = new Set(); // ids de fotos que el jugador ya pagó
+const fotosElegidas = new Map(); // id -> precio (carrito)
 function fotoTorneoItemHtml(foto, admin) {
   const url = urlSegura(foto.urlVista);
   if (!url) return "";
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  // a la venta: la vista es chica y con marca de agua; el original se baja pagando
+  // (sin precio a la vista: al tocarla se elige entre la descarga con marca de agua y el original)
+  if (foto.precio != null && foto.original_path) {
+    const comprada = fotosCompradas.has(foto.id);
+    const marca = admin ? `<span class="foto-precio">${precioTexto(foto.precio)}</span>`
+      : comprada ? '<span class="foto-precio">✓ Comprada</span>'
+      : fotosElegidas.has(foto.id) ? '<span class="foto-precio">✓ En tu pedido</span>' : "";
+    return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
+      <img src="${url}" alt="Foto del torneo (vista previa)" loading="lazy" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
+      ${borrar}${marca}
+      ${admin ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>` : ""}
+    </div>`;
+  }
   // se pide por nombre de archivo (el mismo que tiene el original en la cámara), no por link
   const pedirOriginal = (!admin && (configApp.whatsapp_fotos || configApp.whatsapp_numero))
     ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${escapeHtml(foto.archivo)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
@@ -8145,9 +8248,76 @@ async function cargarFotosTorneo() {
   }
   avisoLogin.style.display = "none";
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
-  const fotos = await firmarFotosTorneo(data || []);
+  const [fotos, { data: compras }] = await Promise.all([
+    firmarFotosTorneo(data || []),
+    sb.from("compras_fotos").select("foto_id").eq("estado", "pagada")
+  ]);
+  fotosCompradas = new Set((compras || []).map((c) => c.foto_id));
   cont.innerHTML = fotos.map((f) => fotoTorneoItemHtml(f, false)).join("");
   if (vacio) vacio.style.display = fotos.length ? "none" : "block";
+  renderCarritoFotos();
+}
+// combo (Gestión › Fotos): cada grupo completo paga el precio del combo y las que sobran
+// pagan su precio, sin pasarse de un combo más. La Edge Function cobra con esta misma cuenta.
+const comboFotos = () => ({ cantidad: Number(configApp.foto_combo_cantidad) || 0, precio: Number(configApp.foto_combo_precio) || 0 });
+function totalFotos(precios) {
+  const { cantidad, precio } = comboFotos();
+  const p = [...precios].sort((a, b) => b - a);
+  const suma = (l) => l.reduce((a, b) => a + b, 0);
+  if (!(cantidad > 1) || !(precio > 0)) return suma(p);
+  const combos = Math.floor(p.length / cantidad);
+  return combos * precio + Math.min(suma(p.slice(combos * cantidad)), precio);
+}
+function renderCarritoFotos() {
+  const barra = document.getElementById("fotosCarrito");
+  if (!barra) return;
+  const n = fotosElegidas.size, { cantidad, precio } = comboFotos();
+  barra.hidden = !n;
+  const falta = cantidad > 1 && precio > 0 ? cantidad - (n % cantidad) : 0;
+  document.getElementById("fotosCarritoTexto").textContent = `${n} ${n === 1 ? "foto" : "fotos"} · ${precioTexto(totalFotos([...fotosElegidas.values()]))}` +
+    (falta && falta < cantidad ? ` · combo ${cantidad} por ${precioTexto(precio)}: sumá ${falta} más` : "");
+}
+// elegir/sacar del carrito y descargar originales (galería del torneo y de Gestión)
+document.addEventListener("click", async (e) => {
+  const bajar = e.target.closest("[data-descargar-foto]");
+  if (bajar && !bajar.disabled) {
+    bajar.disabled = true;
+    try {
+      const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: bajar.dataset.descargarFoto } });
+      if (error || !data?.url) { toast(data?.error || "No se pudo descargar la foto"); return; }
+      location.assign(data.url);
+    } finally { bajar.disabled = false; }
+  }
+});
+document.getElementById("btnPagarFotos")?.addEventListener("click", (e) => pagarFotos([...fotosElegidas.keys()], e.currentTarget));
+async function pagarFotos(ids, btn) {
+  if (btn.disabled || !ids.length) return;
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "crear", fotoIds: ids } });
+    let detalle = data?.error;
+    if (error && !detalle) { try { detalle = (await error.context.json()).error; } catch (x) { detalle = error.message; } }
+    if (!data?.link) { toast(detalle || "No se pudo iniciar el pago"); return; }
+    location.assign(data.link); // Checkout de Mercado Pago
+  } finally { btn.disabled = false; }
+}
+// al volver de Mercado Pago: confirma el pago y lleva a las fotos del torneo
+async function volverDeMercadoPago() {
+  const q = new URLSearchParams(location.search);
+  const torneo = q.get("fotos_torneo");
+  if (!torneo) return;
+  const pago = q.get("payment_id") || q.get("collection_id");
+  const estado = q.get("status") || q.get("collection_status");
+  history.replaceState(null, "", location.pathname + `#/torneo/${torneo}/fotos`);
+  fotosElegidas.clear();
+  if (pago && pago !== "null") {
+    // la confirmación la hace igual el aviso de Mercado Pago; esto solo la adelanta
+    await sb.functions.invoke("mp-fotos", { body: { accion: "verificar", paymentId: pago } }).catch(() => {});
+    toast(estado === "approved" ? "¡Pago aprobado! Ya podés descargar tus fotos en calidad original"
+      : estado === "pending" || estado === "in_process" ? "Tu pago está pendiente: cuando se acredite, vas a poder descargar las fotos"
+      : "El pago no se completó");
+  }
+  abrirTorneo(torneo, "fotos");
 }
 
 async function cargarFotosTorneoAdmin() {
@@ -8163,8 +8333,10 @@ async function cargarFotosTorneoAdmin() {
       if (btn.disabled) return;
       btn.disabled = true;
       try {
+        const foto = (data || []).find((f) => f.id === btn.dataset.id);
         const { error } = await sb.from("torneo_fotos").delete().eq("id", btn.dataset.id);
         if (error) { toast("Error: " + error.message); return; }
+        if (foto?.original_path) await sb.storage.from("fotos-venta").remove([foto.original_path]);
         toast("Foto eliminada");
         cargarFotosTorneoAdmin();
         if (torneoActualId === torneoGestionId) cargarFotosTorneo();
@@ -8183,7 +8355,7 @@ async function cargarFotosTorneoAdmin() {
 // nativo del navegador -- sin librerías, y sin pérdida de calidad visible.
 // Si por lo que sea el navegador no puede procesarla, sube el archivo
 // original antes que no subir nada.
-function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
+function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82, marca = false) {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(archivo);
     const img = new Image();
@@ -8197,7 +8369,25 @@ function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      if (marca) { // vista previa de una foto a la venta: "NORTE PADEL" cruzado por toda la foto
+        ctx.save();
+        ctx.translate(width / 2, height / 2);
+        ctx.rotate(-Math.PI / 6);
+        ctx.font = `800 ${Math.round(width / 9)}px 'Barlow Condensed', Arial, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,.32)";
+        ctx.strokeStyle = "rgba(0,0,0,.18)";
+        ctx.lineWidth = 2;
+        const paso = width / 4.2;
+        for (let y = -height; y <= height; y += paso) { ctx.fillText("NORTE PADEL", 0, y); ctx.strokeText("NORTE PADEL", 0, y); }
+        ctx.restore();
+        ctx.font = `700 ${Math.round(width / 32)}px Manrope, Arial, sans-serif`;
+        ctx.fillStyle = "rgba(255,255,255,.85)";
+        ctx.textAlign = "right";
+        ctx.fillText("Vista previa · elnortepadel.com", width - 14, height - 14);
+      }
       canvas.toBlob((blob) => resolve(blob || archivo), "image/jpeg", calidad);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
@@ -8205,25 +8395,50 @@ function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82) {
   });
 }
 
+document.getElementById("btnGuardarCombo")?.addEventListener("click", conBotonOcupado(async () => {
+  const cantidad = document.getElementById("admComboCantidad").value.trim(), precio = document.getElementById("admComboPrecio").value.trim();
+  if ((cantidad || precio) && !(Number(cantidad) > 1 && Number(precio) > 0)) { toast("Poné cuántas fotos (2 o más) y el precio del combo, o dejá los dos vacíos para no tener combo"); return; }
+  const { error } = await sb.from("config").upsert([
+    { clave: "foto_combo_cantidad", valor: cantidad || null }, { clave: "foto_combo_precio", valor: precio || null }
+  ], { onConflict: "clave" });
+  if (error) { toast("Error: " + error.message); return; }
+  configApp.foto_combo_cantidad = cantidad; configApp.foto_combo_precio = precio;
+  toast(cantidad ? `Combo guardado: ${cantidad} fotos por ${precioTexto(precio)}` : "Combo desactivado");
+}));
 document.getElementById("btnSubirFotosTorneo").addEventListener("click", async () => {
   const btn = document.getElementById("btnSubirFotosTorneo");
   if (btn.disabled || !torneoGestionId) return;
   const input = document.getElementById("admFotosArchivos");
   const archivos = Array.from(input.files || []);
   if (!archivos.length) { toast("Elegí una o más fotos"); return; }
+  const textoPrecio = document.getElementById("admFotosPrecio").value.trim();
+  const precio = textoPrecio === "" ? null : Number(textoPrecio);
+  if (precio != null && !(precio > 0)) { toast("Poné un precio mayor a 0, o dejalo vacío para subirlas gratis"); return; }
+  if (precio != null && String(precio) !== configApp.foto_precio) {
+    await sb.from("config").upsert({ clave: "foto_precio", valor: String(precio) }, { onConflict: "clave" });
+    configApp.foto_precio = String(precio);
+  }
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   try {
     for (let i = 0; i < archivos.length; i++) {
       const archivo = archivos[i];
       btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
-      const comprimida = await comprimirFoto(archivo);
       const nombreBase = archivo.name.replace(/\.[^.]+$/, "");
       const path = `${torneoGestionId}/${Date.now()}-${nombreBase}.jpg`;
+      // a la venta: vista chica con marca de agua + original aparte (bucket privado)
+      let original_path = null;
+      if (precio != null) {
+        const original = await comprimirFoto(archivo, 4000, 0.92);
+        const { error: upOrig } = await sb.storage.from("fotos-venta").upload(path, original, { contentType: "image/jpeg" });
+        if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); continue; }
+        original_path = path;
+      }
+      const comprimida = precio != null ? await comprimirFoto(archivo, 900, 0.7, true) : await comprimirFoto(archivo);
       const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg" });
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
-      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl });
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, original_path, precio });
       if (error) toast("Error guardando " + archivo.name + ": " + error.message);
     }
     toast("Fotos subidas");
@@ -8656,6 +8871,18 @@ function mostrarFotoGrande(el) {
   const url = el.dataset.fotoGrande;
   document.getElementById("fotoGrandeImg").src = url;
   document.getElementById("fotoGrandeDescargar").href = url;
+  // foto a la venta: con marca de agua gratis, o el original pagando (o sumándola al pedido/combo)
+  const id = el.dataset.fotoId, aLaVenta = !!id;
+  const btnOriginal = document.getElementById("fotoGrandeOriginal"), btnPedido = document.getElementById("fotoGrandePedido");
+  document.getElementById("fotoGrandeDescargar").textContent = aLaVenta ? "Descargar con marca de agua" : "Descargar";
+  btnOriginal.hidden = !aLaVenta;
+  btnPedido.hidden = !aLaVenta || !!el.dataset.comprada;
+  if (aLaVenta) {
+    btnOriginal.dataset.fotoId = id;
+    btnOriginal.textContent = el.dataset.comprada ? "Descargar original" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
+    btnPedido.textContent = fotosElegidas.has(id) ? "✓ En tu pedido (quitar)" : "Sumar al pedido";
+    btnPedido.setAttribute("aria-pressed", fotosElegidas.has(id));
+  }
   const pedir = el.parentElement.querySelector("[data-pedir-foto]");
   const btnPedir = document.getElementById("fotoGrandePedir");
   btnPedir.hidden = !pedir;
@@ -8675,6 +8902,32 @@ function cerrarFotoGrande() {
   document.getElementById("fotoGrandeImg").src = "";
   document.getElementById("fotoGrandeDescargar").href = "";
 }
+document.getElementById("fotoGrandeOriginal").addEventListener("click", async (e) => {
+  const btn = e.currentTarget, el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;
+  if (el?.dataset.comprada) { // ya es suya: baja el original
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: btn.dataset.fotoId } });
+      if (error || !data?.url) { toast(data?.error || "No se pudo descargar la foto"); return; }
+      location.assign(data.url);
+    } finally { btn.disabled = false; }
+    return;
+  }
+  pagarFotos([btn.dataset.fotoId], btn); // recién acá se cobra
+});
+document.getElementById("fotoGrandePedido").addEventListener("click", () => {
+  const el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;
+  const id = el?.dataset.fotoId;
+  if (!id) return;
+  if (fotosElegidas.has(id)) fotosElegidas.delete(id); else fotosElegidas.set(id, Number(el.dataset.precio));
+  const item = el.closest(".foto-item");
+  item.classList.toggle("elegida", fotosElegidas.has(id));
+  item.querySelector(".foto-precio")?.remove();
+  if (fotosElegidas.has(id)) item.insertAdjacentHTML("beforeend", '<span class="foto-precio">✓ En tu pedido</span>');
+  mostrarFotoGrande(el);
+  renderCarritoFotos();
+});
 // La foto vive en Supabase Storage (otro origen), así que el atributo
 // download del <a> no alcanza para forzar la descarga en la mayoría de los
 // navegadores — bajan el archivo con fetch y lo disparan como blob local,
@@ -8848,5 +9101,6 @@ async function init() {
   // después del bloque de arriba, no adentro: necesita que cargarConfig() ya haya
   // llenado configApp (el link de YouTube vive ahí) antes de leerlo
   cargarEnVivo();
+  volverDeMercadoPago();
 }
 init();

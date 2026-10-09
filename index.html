@@ -68,6 +68,8 @@
   <div class="fotogrande-acciones">
     <span id="fotoGrandeContador" class="fotogrande-contador" aria-live="polite"></span>
     <button type="button" class="primary small" id="fotoGrandePedir" hidden>Pedir original</button>
+    <button type="button" class="secondary small" id="fotoGrandePedido" hidden>Sumar al pedido</button>
+    <button type="button" class="primary small" id="fotoGrandeOriginal" hidden>Original en alta calidad</button>
     <a href="" download id="fotoGrandeDescargar" class="secondary small">Descargar</a>
     <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">Cerrar</button>
   </div>
@@ -388,6 +390,10 @@
         <button type="button" class="primary cta-hero" id="btnFotosIngresar">Iniciar sesión</button>
       </div>
       <p class="empty" id="dtFotosVacio" style="display:none">Todavía no hay fotos subidas de este torneo.</p>
+      <div class="fotos-carrito" id="fotosCarrito" role="region" aria-label="Fotos elegidas" hidden>
+        <span id="fotosCarritoTexto"></span>
+        <button type="button" class="primary" id="btnPagarFotos">Pagar con Mercado Pago</button>
+      </div>
       <p class="match-meta fotos-aviso">¿Aparecés en una foto y preferís que no esté publicada? Escribinos por WhatsApp y la sacamos. Más info en <a href="privacidad.html#imagenes" target="_blank" rel="noopener">Privacidad</a>.</p>
     </div>
   </section>
@@ -1165,6 +1171,16 @@
         <div id="admFotosLista" class="fotos-galeria"></div>
         <label style="margin-top:10px" for="admFotosArchivos">Subir fotos</label>
         <input type="file" id="admFotosArchivos" accept="image/*" multiple />
+        <label for="admFotosPrecio">Precio por foto en $ (vacío = gratis, como antes)</label>
+        <input type="number" id="admFotosPrecio" min="1" step="1" inputmode="numeric" placeholder="Ej: 3000" />
+        <p class="match-meta">Con precio: se publica una vista chica con marca de agua y el original solo se baja pagando con Mercado Pago.</p>
+        <label for="admComboCantidad">Combo (vacío = sin combo)</label>
+        <div class="row" style="gap:8px;align-items:center">
+          <input type="number" id="admComboCantidad" min="2" step="1" inputmode="numeric" placeholder="10" aria-label="Cantidad de fotos del combo" style="flex:0 1 90px" />
+          <span>fotos por $</span>
+          <input type="number" id="admComboPrecio" min="1" step="1" inputmode="numeric" placeholder="5000" aria-label="Precio del combo" style="flex:0 1 130px" />
+          <button type="button" class="secondary small" id="btnGuardarCombo">Guardar combo</button>
+        </div>
         <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
       </div>
 
@@ -1288,7 +1304,10 @@
         <button class="secondary" id="btnGenerarCalendario" style="margin-top:8px">2. Generar calendario de prueba (asignar cancha y horario)</button>
         <button class="secondary" id="btnPublicarCalendario" style="margin-top:8px">3. Publicar calendario (recién ahí lo ven los jugadores)</button>
         <button class="secondary" id="btnGenerarSiguienteFase" style="margin-top:8px">Generar siguiente fase (con los ganadores)</button>
-        <button class="secondary" id="btnExportarHorarios" style="margin-top:8px">Exportar horarios para Instagram (una imagen por categoría)</button>
+        <div class="row" style="gap:8px;margin-top:8px;align-items:center">
+          <select id="exportarHorariosDia" aria-label="Día de los partidos a exportar" style="flex:0 1 220px"><option value="">Todos los días</option></select>
+          <button class="secondary" id="btnExportarHorarios">Exportar horarios para Instagram (una imagen por categoría)</button>
+        </div>
         <button class="secondary" id="btnEditarCuadro" style="margin-top:8px">Editar cuadro de la categoría (fases y cruces)</button>
         <dialog id="dlgCuadro" class="dlg-intercambio dlg-cuadro" aria-labelledby="dlgCuadroTitulo">
           <h3 id="dlgCuadroTitulo">Editar cuadro</h3>
