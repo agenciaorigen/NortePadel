@@ -608,8 +608,7 @@ document.getElementById("btnGuardarPerfil").addEventListener("click", async () =
 
   const archivoFoto = document.getElementById("jFoto").files[0];
   if (archivoFoto) {
-    const path = `${currentUser.id}-${Date.now()}-${archivoFoto.name}`;
-    const { error: upErr } = await sb.storage.from("fotos").upload(path, archivoFoto);
+    const { error: upErr, path } = await subirImagen("fotos", `${currentUser.id}-`, archivoFoto, 600);
     if (upErr) { toast("Error subiendo la foto: " + upErr.message); return; }
     const { data: pub } = sb.storage.from("fotos").getPublicUrl(path);
     datos.foto_url = pub.publicUrl;
@@ -2960,6 +2959,39 @@ async function cargarJugadoresAdmin() {
   renderSolicitudesCategoria(cacheJugadoresAdmin);
 }
 
+// Fotos de perfil subidas antes de que la página las achicara (de 1 a 9 MB cada una, y
+// se ven en el ranking en cada visita): se bajan una vez, se guardan de nuevo en 600 px
+// con caché larga y la ficha pasa a usar la liviana. Las que ya están achicadas se saltean.
+document.getElementById("btnAchicarFotosPerfil")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  if (!cacheJugadoresAdmin.length) await cargarJugadoresAdmin();
+  const pendientes = cacheJugadoresAdmin.filter((j) => /\/storage\/v1\/object\/public\/fotos\//.test(j.foto_url || "") && !/\/fotos\/opt-/.test(j.foto_url));
+  if (!pendientes.length) { toast("Todas las fotos de perfil ya están livianas"); return; }
+  if (!confirm(`Se van a achicar ${pendientes.length} fotos de perfil. Tarda un ratito; no cierres la página. ¿Seguir?`)) return;
+  btn.disabled = true;
+  const texto = btn.textContent;
+  let listas = 0;
+  try {
+    for (const [i, j] of pendientes.entries()) {
+      btn.textContent = `Achicando ${i + 1}/${pendientes.length}...`;
+      try {
+        const blob = await (await fetch(j.foto_url)).blob();
+        const { error, path } = await subirImagen("fotos", `opt-${j.id}-`, new File([blob], "perfil.jpg", { type: blob.type || "image/jpeg" }), 600);
+        if (error) continue;
+        const { data: pub } = sb.storage.from("fotos").getPublicUrl(path);
+        const { error: errUpd } = await sb.from("jugadores").update({ foto_url: pub.publicUrl }).eq("id", j.id);
+        if (!errUpd) listas++;
+      } catch (err) { /* si una falla, sigue con las demás */ }
+    }
+    toast(`Listo: ${listas} de ${pendientes.length} fotos achicadas`);
+    cargarJugadoresAdmin();
+    cargarRanking();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = texto;
+  }
+});
 document.getElementById("btnMostrarNuevoJugador")?.addEventListener("click", async () => {
   const form = document.getElementById("nuevoJugadorForm");
   form.hidden = !form.hidden;
@@ -3146,8 +3178,7 @@ function renderListaJugadoresAdmin() {
       const datos = { nombre, apellido, categoria, puntos_ranking, etiqueta_id };
       const archivoFoto = div.querySelector(".jaFoto").files[0];
       if (archivoFoto) {
-        const path = `admin-${j.id}-${Date.now()}-${archivoFoto.name}`;
-        const { error: upErr } = await sb.storage.from("fotos").upload(path, archivoFoto);
+        const { error: upErr, path } = await subirImagen("fotos", `admin-${j.id}-`, archivoFoto, 600);
         if (upErr) { toast("Error subiendo la foto: " + upErr.message); return; }
         const { data: pub } = sb.storage.from("fotos").getPublicUrl(path);
         datos.foto_url = pub.publicUrl;
@@ -3597,8 +3628,7 @@ document.getElementById("btnCrearTorneo").addEventListener("click", async () => 
   let flyerUrl = null;
   const archivo = document.getElementById("tFlyerArchivo").files[0];
   if (archivo) {
-    const path = `${Date.now()}-${archivo.name}`;
-    const { error: upErr } = await sb.storage.from("flyers").upload(path, archivo);
+    const { error: upErr, path } = await subirImagen("flyers", "", archivo, 1600);
     if (upErr) { toast("Error subiendo el flyer: " + upErr.message); return; }
     const { data: pub } = sb.storage.from("flyers").getPublicUrl(path);
     flyerUrl = pub.publicUrl;
@@ -5188,8 +5218,7 @@ document.getElementById("btnGuardarTorneo").addEventListener("click", async () =
   let flyerUrl = torneoGestionData?.flyer_url || null;
   const archivo = document.getElementById("teFlyerArchivo").files[0];
   if (archivo) {
-    const path = `${Date.now()}-${archivo.name}`;
-    const { error: upErr } = await sb.storage.from("flyers").upload(path, archivo);
+    const { error: upErr, path } = await subirImagen("flyers", "", archivo, 1600);
     if (upErr) { toast("Error subiendo el flyer: " + upErr.message); return; }
     const { data: pub } = sb.storage.from("flyers").getPublicUrl(path);
     flyerUrl = pub.publicUrl;
@@ -8147,8 +8176,7 @@ document.getElementById("btnSubirSponsor").addEventListener("click", async () =>
   const archivo = document.getElementById("spArchivo").files[0];
   if (!nombre || !archivo) { toast("Poné un nombre y elegí un logo"); return; }
 
-  const path = `${Date.now()}-${archivo.name}`;
-  const { error: upErr } = await sb.storage.from("sponsors").upload(path, archivo);
+  const { error: upErr, path } = await subirImagen("sponsors", "", archivo, 600, true);
   if (upErr) { toast("Error subiendo logo: " + upErr.message); return; }
 
   const { data: pub } = sb.storage.from("sponsors").getPublicUrl(path);
@@ -8375,7 +8403,7 @@ async function cargarFotosTorneoAdmin() {
 // nativo del navegador -- sin librerías, y sin pérdida de calidad visible.
 // Si por lo que sea el navegador no puede procesarla, sube el archivo
 // original antes que no subir nada.
-function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82, marca = false) {
+function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82, marca = false, tipo = "image/jpeg") {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(archivo);
     const img = new Image();
@@ -8408,7 +8436,7 @@ function comprimirFoto(archivo, maxLado = 1920, calidad = 0.82, marca = false) {
         ctx.textAlign = "right";
         ctx.fillText("Vista previa · elnortepadel.com", width - 14, height - 14);
       }
-      canvas.toBlob((blob) => resolve(blob || archivo), "image/jpeg", calidad);
+      canvas.toBlob((blob) => resolve(blob || archivo), tipo, calidad);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
     img.src = url;
@@ -8425,6 +8453,19 @@ document.getElementById("btnGuardarCombo")?.addEventListener("click", conBotonOc
   configApp.foto_combo_cantidad = cantidad; configApp.foto_combo_precio = precio;
   toast(cantidad ? `Combo guardado: ${cantidad} fotos por ${precioTexto(precio)}` : "Combo desactivado");
 }));
+// Toda imagen que se sube se achica antes (las fotos de celular pesan 3-8 MB y cada
+// visita las vuelve a descargar: eso consume la cuota de tráfico de Supabase) y se
+// guarda con caché larga, así el navegador no la vuelve a pedir. Logos: PNG (conservan
+// el fondo transparente) salvo que ya vengan en JPG. SVG/GIF se suben tal cual.
+async function subirImagen(bucket, carpeta, archivo, maxLado, logo = false) {
+  const tal = /svg|gif/.test(archivo.type);
+  const tipo = tal ? archivo.type : logo && archivo.type !== "image/jpeg" ? "image/png" : "image/jpeg";
+  const cuerpo = tal ? archivo : await comprimirFoto(archivo, maxLado, 0.82, false, tipo);
+  const ext = tal ? archivo.name.split(".").pop() : tipo === "image/png" ? "png" : "jpg";
+  const path = `${carpeta}${Date.now()}-${archivo.name.replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "_").slice(0, 60)}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(path, cuerpo, { contentType: tipo, cacheControl: "31536000" });
+  return { error, path };
+}
 document.getElementById("btnSubirFotosTorneo").addEventListener("click", async () => {
   const btn = document.getElementById("btnSubirFotosTorneo");
   if (btn.disabled || !torneoGestionId) return;
@@ -8450,12 +8491,12 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
       let original_path = null;
       if (precio != null) {
         const original = await comprimirFoto(archivo, 4000, 0.92);
-        const { error: upOrig } = await sb.storage.from("fotos-venta").upload(path, original, { contentType: "image/jpeg" });
+        const { error: upOrig } = await sb.storage.from("fotos-venta").upload(path, original, { contentType: "image/jpeg", cacheControl: "31536000" });
         if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); continue; }
         original_path = path;
       }
       const comprimida = precio != null ? await comprimirFoto(archivo, 900, 0.7, true) : await comprimirFoto(archivo);
-      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg" });
+      const { error: upErr } = await sb.storage.from("fotos-torneos").upload(path, comprimida, { contentType: "image/jpeg", cacheControl: "31536000" });
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
       const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, original_path, precio });
@@ -8607,7 +8648,7 @@ document.getElementById("listaEventosAdmin").addEventListener("click", async (e)
         btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
         const comprimida = await comprimirFoto(archivos[i]);
         const path = `${id}/${Date.now()}-${archivos[i].name.replace(/\.[^.]+$/, "")}.jpg`;
-        const { error: upErr } = await sb.storage.from("fotos-eventos").upload(path, comprimida, { contentType: "image/jpeg" });
+        const { error: upErr } = await sb.storage.from("fotos-eventos").upload(path, comprimida, { contentType: "image/jpeg", cacheControl: "31536000" });
         if (upErr) { toast("Error subiendo " + archivos[i].name + ": " + upErr.message); continue; }
         const { data: pub } = sb.storage.from("fotos-eventos").getPublicUrl(path);
         const { error } = await sb.from("evento_fotos").insert({ evento_id: id, url: pub.publicUrl });
@@ -8772,8 +8813,7 @@ document.getElementById("btnSubirNoticia").addEventListener("click", async () =>
   let imagenUrl = null;
   const archivo = document.getElementById("ntArchivo").files[0];
   if (archivo) {
-    const path = `${Date.now()}-${archivo.name}`;
-    const { error: upErr } = await sb.storage.from("noticias").upload(path, archivo);
+    const { error: upErr, path } = await subirImagen("noticias", "", archivo, 1600);
     if (upErr) { toast("Error subiendo la imagen: " + upErr.message); return; }
     const { data: pub } = sb.storage.from("noticias").getPublicUrl(path);
     imagenUrl = pub.publicUrl;
