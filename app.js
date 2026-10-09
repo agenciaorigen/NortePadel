@@ -2992,6 +2992,43 @@ document.getElementById("btnAchicarFotosPerfil")?.addEventListener("click", asyn
     btn.textContent = texto;
   }
 });
+// Borra del bucket "fotos" las fotos de perfil que ninguna ficha usa (las viejas que se
+// reemplazaron, las repetidas de subir varias veces, las originales ya achicadas).
+// Se fija en TODOS los jugadores (también los inactivos) antes de borrar nada.
+document.getElementById("btnBorrarFotosSinUso")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const texto = btn.textContent;
+  try {
+    btn.textContent = "Revisando...";
+    const { data: jugadores, error: errJ } = await sb.from("jugadores").select("foto_url").not("foto_url", "is", null);
+    if (errJ) { toast("Error: " + errJ.message); return; }
+    const enUso = new Set(jugadores.map((j) => rutaFotoTorneo(j.foto_url, "fotos")).filter(Boolean));
+    const archivos = [];
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await sb.storage.from("fotos").list("", { limit: 1000, offset: desde });
+      if (error) { toast("Error: " + error.message); return; }
+      archivos.push(...data.filter((f) => f.id)); // sin id = carpeta
+      if (data.length < 1000) break;
+    }
+    const sinUso = archivos.filter((f) => !enUso.has(f.name));
+    if (!sinUso.length) { toast("No hay fotos sin usar"); return; }
+    const mb = sinUso.reduce((a, f) => a + (f.metadata?.size || 0), 0) / 1048576;
+    if (!confirm(`Hay ${sinUso.length} fotos de perfil que ningún jugador usa (${mb.toFixed(1)} MB). Se borran para siempre. ¿Borrarlas?`)) return;
+    let borradas = 0;
+    for (let i = 0; i < sinUso.length; i += 100) {
+      btn.textContent = `Borrando ${Math.min(i + 100, sinUso.length)}/${sinUso.length}...`;
+      const { data, error } = await sb.storage.from("fotos").remove(sinUso.slice(i, i + 100).map((f) => f.name));
+      if (error) { toast("Error: " + error.message); break; }
+      borradas += (data || []).length;
+    }
+    toast(borradas ? `Listo: ${borradas} fotos borradas` : "No se pudo borrar ninguna: falta correr el SQL que le da permiso al admin");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = texto;
+  }
+});
 document.getElementById("btnMostrarNuevoJugador")?.addEventListener("click", async () => {
   const form = document.getElementById("nuevoJugadorForm");
   form.hidden = !form.hidden;
