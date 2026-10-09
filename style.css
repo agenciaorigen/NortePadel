@@ -2463,3 +2463,17 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 #fotoGrandePedido { width: auto; margin: 0; text-transform: none; letter-spacing: 0; }
 @media (max-width: 600px) { .fotogrande-acciones { flex-wrap: wrap; justify-content: flex-end; } .fotogrande-acciones > * { white-space: normal; } }
 .fotos-carrito[hidden] { display: none; }
+
+/* Inicio: aviso de fotos nuevas del torneo */
+.aviso-fotos {
+  width: 100%; display: flex; align-items: center; gap: 14px; margin: 16px 0; padding: 14px 18px; text-align: left; cursor: pointer;
+  border-radius: var(--radius); border: 1px solid rgba(var(--accent-rgb),.45); color: var(--text);
+  background: linear-gradient(100deg, rgba(var(--accent-rgb),.16), rgba(var(--accent-rgb),.03) 60%), var(--card);
+}
+.aviso-fotos[hidden] { display: none; }
+.aviso-fotos:hover, .aviso-fotos:focus-visible { border-color: var(--accent); }
+.aviso-fotos-icono { font-size: 28px; }
+.aviso-fotos-texto { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.aviso-fotos-texto strong { font-family: var(--font-display); font-size: 20px; font-style: italic; text-transform: uppercase; letter-spacing: .02em; }
+.aviso-fotos-texto small { color: var(--muted); font-size: 13px; }
+.aviso-fotos-cta { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-bright); white-space: nowrap; }
