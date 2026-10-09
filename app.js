@@ -7141,13 +7141,21 @@ async function exportarHorariosInstagram() {
     return [c, lista[cuenta[damas ? "Damas" : "otras"]++ % lista.length]];
   }));
   const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
-  // primero las fotos del propio torneo (una distinta por imagen, mezcladas); las que están
-  // a la venta no, porque su vista tiene marca de agua. Si se acaban, las fijas de arriba.
-  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).is("precio", null);
-  const banco = vistasFotosTorneo(delTorneo || []).map((f) => f.urlVista).filter(Boolean).sort(() => Math.random() - 0.5);
+  // primero las fotos del propio torneo; si se acaban, las fijas de arriba
+  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId);
+  // fotos a la venta: el original en alta calidad (sin marca de agua; el admin puede
+  // bajarlo); las gratis, su vista. Mezcladas, una distinta por imagen.
+  const banco = (delTorneo || []).sort(() => Math.random() - 0.5);
   const fondoSiguiente = async (categoria) => {
     while (banco.length) {
-      const img = await cargarImagenParaCanvas(banco.shift());
+      const f = banco.shift();
+      let url = f.url;
+      if (f.original_path) {
+        const { data } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: f.id } });
+        if (!data?.url) continue;
+        url = data.url;
+      }
+      const img = await cargarImagenParaCanvas(url);
       if (img && imagenUsableEnCanvas(img)) return img;
     }
     return fotos[fotoDe[categoria]];
