@@ -2478,3 +2478,5 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .aviso-fotos-texto small { color: var(--muted); font-size: 13px; }
 .aviso-fotos-cta { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-bright); white-space: nowrap; }
 .fotos-ver-mas { grid-column: 1 / -1; }
+.foto-item .foto-genero { position: absolute; right: 40px; top: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; cursor: pointer; background: rgba(var(--bg-rgb),.8); color: var(--text); border: 1px solid var(--border); }
+.foto-item .foto-genero:hover, .foto-item .foto-genero:focus-visible { border-color: var(--accent); }

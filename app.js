@@ -7147,8 +7147,14 @@ async function exportarHorariosInstagram() {
   // bajarlo); las gratis, su vista. Mezcladas, una distinta por imagen.
   const banco = (delTorneo || []).sort(() => Math.random() - 0.5);
   const fondoSiguiente = async (categoria) => {
-    while (banco.length) {
-      const f = banco.shift();
+    // Damas usa fotos marcadas Damas, Caballeros las de Caballeros; si se acaban, las sin marcar
+    const genero = generoDeCategoria(categoria) === "Damas" ? "Damas" : "Caballeros";
+    const tomar = () => {
+      const i = banco.findIndex((f) => f.genero === genero);
+      const j = i !== -1 ? i : banco.findIndex((f) => !f.genero);
+      return j === -1 ? null : banco.splice(j, 1)[0];
+    };
+    for (let f = tomar(); f; f = tomar()) {
       let url = f.url;
       if (f.original_path) {
         const { data } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: f.id } });
@@ -8285,7 +8291,8 @@ function fotoTorneoItemHtml(foto, admin) {
   const url = urlSegura(foto.urlVista);
   if (!url) return "";
   const mini = urlSegura(foto.urlMini) || url;
-  const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>` : "";
+  const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>
+    <button type="button" class="foto-genero" data-genero-foto="${foto.id}" title="Damas / Caballeros / sin indicar: se usa para elegir el fondo de las historias">${foto.genero === "Damas" ? "Damas" : foto.genero === "Caballeros" ? "Caballeros" : "¿D/C?"}</button>` : "";
   // a la venta: la vista es chica y con marca de agua; el original se baja pagando
   // (sin precio a la vista: al tocarla se elige entre la descarga con marca de agua y el original)
   if (foto.precio != null && foto.original_path) {
@@ -8422,6 +8429,19 @@ async function cargarFotosTorneoAdmin() {
   cont.innerHTML = fotos.length
     ? fotos.map((f) => fotoTorneoItemHtml(f, true)).join("")
     : '<p class="empty">Todavía no subiste ninguna foto de este torneo.</p>';
+  // tocar el chip cambia: sin indicar → Damas → Caballeros → sin indicar
+  cont.querySelectorAll("[data-genero-foto]").forEach((btn) => btn.addEventListener("click", async () => {
+    const foto = (data || []).find((f) => f.id === btn.dataset.generoFoto);
+    if (!foto || btn.disabled) return;
+    const orden = [null, "Damas", "Caballeros"];
+    const sig = orden[(orden.indexOf(foto.genero || null) + 1) % orden.length];
+    btn.disabled = true;
+    const { error } = await sb.from("torneo_fotos").update({ genero: sig }).eq("id", foto.id);
+    btn.disabled = false;
+    if (error) { toast("Error: " + error.message); return; }
+    foto.genero = sig;
+    btn.textContent = sig || "¿D/C?";
+  }));
   cont.querySelectorAll(".btnQuitarFoto").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
@@ -8556,7 +8576,7 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
       const thumb_url = upMini ? null : sb.storage.from("fotos-torneos").getPublicUrl(pathMini).data.publicUrl;
-      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio });
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio, genero: document.getElementById("admFotosGenero")?.value || null });
       if (error) toast("Error guardando " + archivo.name + ": " + error.message);
     }
     toast("Fotos subidas");
