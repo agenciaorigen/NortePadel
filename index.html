@@ -160,15 +160,8 @@
       <div class="hero-carousel-dots" id="heroCarouselDots"></div>
     </div>
 
-    <button type="button" class="aviso-fotos" id="inicioAvisoFotos" hidden>
-      <span class="aviso-fotos-texto">
-        <span class="aviso-fotos-eyebrow">📸 <span id="inicioAvisoFotosTexto">Fotos nuevas</span></span>
-        <strong>Mirá las fotos del torneo</strong>
-        <small>Buscate y descargalas en alta calidad</small>
-        <span class="aviso-fotos-cta">Ver fotos <span aria-hidden="true">→</span></span>
-      </span>
-      <span class="aviso-fotos-minis" id="inicioAvisoFotosMinis" aria-hidden="true"></span>
-    </button>
+    <div class="sp-banner-slot" id="inicioSponsorPrincipal" hidden></div>
+    <div class="sp-franja" id="inicioSponsorsFrente" hidden></div>
 
     <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
       <div class="marquee-track" aria-hidden="true">
@@ -187,8 +180,15 @@
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </section>
 
-    <div class="sp-banner-slot" id="inicioSponsorPrincipal" hidden></div>
-    <div class="sp-franja" id="inicioSponsorsFrente" hidden></div>
+    <button type="button" class="aviso-fotos" id="inicioAvisoFotos" hidden>
+      <span class="aviso-fotos-texto">
+        <span class="aviso-fotos-eyebrow">📸 <span id="inicioAvisoFotosTexto">Fotos nuevas</span></span>
+        <strong>Mirá las fotos del torneo</strong>
+        <small>Buscate y descargalas en alta calidad</small>
+        <span class="aviso-fotos-cta">Ver fotos <span aria-hidden="true">→</span></span>
+      </span>
+      <span class="aviso-fotos-minis" id="inicioAvisoFotosMinis" aria-hidden="true"></span>
+    </button>
 
     <!-- EVENTOS: lo que no es un torneo (inauguraciones, viajes...). Muestra
          el más reciente con fotos como tira deslizable; cada foto se abre en
