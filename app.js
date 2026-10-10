@@ -11,6 +11,7 @@ const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 let currentUser = null;   // usuario de Supabase Auth, o null si no hay sesión
 let miJugador = null;     // fila de "jugadores" ligada al usuario logueado
 let isAdmin = false;
+let rankingCargado = false; // el ranking completo se carga recién al entrar a Ranking
 let editandoPerfil = false;
 let torneoActualId = null;
 let torneoActualData = null; // torneo completo cargado en refrescarDetalleTorneo, para prefill de "Editar torneo"
@@ -44,6 +45,9 @@ let configApp = {}; // clave/valor de la tabla "config" (whatsapp_numero, instag
 const FEATURE_JUGAR_HABILITADA = false;
 
 // ---------- utilidades UI ----------
+// a los admins se les avisa si algo falla en la página (en vez de que quede trabado sin decir nada)
+window.addEventListener("unhandledrejection", (e) => { if (typeof isAdmin !== "undefined" && isAdmin) toast("Algo falló: " + (e.reason?.message || e.reason || "error desconocido")); });
+window.addEventListener("error", (e) => { if (typeof isAdmin !== "undefined" && isAdmin && e.message) toast("Algo falló: " + e.message); });
 function toast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -116,6 +120,8 @@ function cambiarVista(nombre, ruta) {
   document.getElementById("tabMas")?.classList.toggle("active", enMas);
   document.querySelectorAll("#menuMas [data-ir]").forEach((b) => b.classList.toggle("active", b.dataset.ir === nombre));
   if (nombre === "fotos") cargarVistaFotos();
+  // el ranking completo se pide recién la primera vez que se entra (la portada carga más rápido)
+  if (nombre === "ranking" && !rankingCargado) { rankingCargado = true; cargarRanking(); }
   if (!syncingDesdeHash) navegarA(ruta || (nombre === "inicio" ? "/" : "/" + nombre));
   contarVisita(nombre);
 }
@@ -180,7 +186,7 @@ async function despacharRuta() {
       cambiarVista("admin");
       return;
     }
-    if (raiz === "torneo" && a) { await abrirTorneo(a, sub); return; }
+    if (raiz === "torneo" && a) { carpetaPedidaEnLink = parsearHash().params.get("carpeta"); await abrirTorneo(a, sub); return; }
     if (raiz === "perfil-jugador" && a) { await abrirPerfilJugador(a); return; }
     if (raiz === "evento" && a) { await abrirEvento(a); return; }
     if (raiz === "sponsors") { cambiarVista("sponsors"); return; }
@@ -765,6 +771,7 @@ sb.auth.onAuthStateChange((_event, session) => manejarCambioSesion(session));
 // ============================================================
 let generoRankingActual = localStorage.getItem("np_genero_ranking") || null;
 async function cargarRanking() {
+  rankingCargado = true;
   // ranking_categoria_publico() (no jugadores_publicos()): devuelve una fila por cada
   // categoría en la que el jugador tiene puntos, así el mismo jugador puede aparecer
   // en el ranking de más de una categoría a la vez.
@@ -6997,7 +7004,64 @@ let ultimasCanchasTorneoGestion = [];
 let ultimasParejasGestion = [];
 let vistaPartidosAdmin = "lista"; // lista | planilla | planilla-grande | llave | tabla
 
+// Revisa la planilla y lista lo que hay que acomodar: dos partidos en la misma cancha
+// a la vez, un jugador con dos partidos a la vez, partidos en canchas que no son del
+// torneo y partidos sin horario. Cada aviso tiene "Ver" para ir directo al partido.
+function problemasDeHorarios(partidos, canchasTorneo) {
+  const dur = ((torneoGestionData?.duracion_minutos) || 90) * 60000;
+  const habilitadas = new Set(canchasTorneo.map((c) => c.cancha_id || c.canchas?.id));
+  const hora = (p) => new Date(p.horario).toLocaleString("es-AR", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const nombre = (p) => `${p.categoria || ""} ${p.slot_cuadro || ""}`.trim() || "Partido";
+  const jugadores = (p) => [[p.j1a_nombre, p.j1a_apellido], [p.j1b_nombre, p.j1b_apellido], [p.j2a_nombre, p.j2a_apellido], [p.j2b_nombre, p.j2b_apellido]]
+    .filter(([n, a]) => n || a).map(([n, a]) => `${n || ""} ${a || ""}`.trim());
+  const pendientes = partidos.filter((p) => p.estado !== "jugado");
+  const conHorario = pendientes.filter((p) => p.horario);
+  const lista = [];
+  for (let i = 0; i < conHorario.length; i++) {
+    const a = conHorario[i], aDesde = new Date(a.horario).getTime();
+    for (let j = i + 1; j < conHorario.length; j++) {
+      const b = conHorario[j], bDesde = new Date(b.horario).getTime();
+      if (!(aDesde < bDesde + dur && bDesde < aDesde + dur)) continue; // no se pisan
+      if (a.cancha_id && a.cancha_id === b.cancha_id) {
+        lista.push({ id: b.id, txt: `${nombre(a)} y ${nombre(b)} en la misma cancha (${a.complejo_nombre ? a.complejo_nombre + " · " : ""}${a.cancha_nombre || ""}, ${hora(a)})` });
+        continue;
+      }
+      const repetido = jugadores(a).find((x) => jugadores(b).includes(x));
+      if (repetido) lista.push({ id: b.id, txt: `${repetido} juega dos partidos a la vez: ${nombre(a)} y ${nombre(b)} (${hora(a)})` });
+    }
+  }
+  conHorario.filter((p) => p.cancha_id && !habilitadas.has(p.cancha_id))
+    .forEach((p) => lista.push({ id: p.id, txt: `${nombre(p)} está en una cancha que no está habilitada en el torneo (${p.cancha_nombre || ""}): no se ve en la planilla` }));
+  const sinHorario = pendientes.filter((p) => !p.horario);
+  if (sinHorario.length) lista.push({ id: sinHorario[0].id, txt: `${sinHorario.length} ${sinHorario.length === 1 ? "partido sin horario" : "partidos sin horario"}: ${sinHorario.slice(0, 6).map(nombre).join(", ")}${sinHorario.length > 6 ? "…" : ""}` });
+  return lista;
+}
+function renderProblemasPlanilla(partidos, canchasTorneo) {
+  const cont = document.getElementById("admProblemasPlanilla");
+  if (!cont) return;
+  if (!partidos.length) { cont.innerHTML = ""; return; }
+  const lista = problemasDeHorarios(partidos, canchasTorneo);
+  cont.innerHTML = lista.length
+    ? `<details class="planilla-problemas-aviso"${lista.length <= 5 ? " open" : ""}><summary>⚠ ${lista.length} ${lista.length === 1 ? "cosa" : "cosas"} para revisar en los horarios</summary><ul>${lista.map((x) =>
+        `<li><span>${escapeHtml(x.txt)}</span> <button type="button" class="secondary small" data-ver-partido="${x.id}">Ver</button></li>`).join("")}</ul></details>`
+    : '<p class="planilla-problemas-ok">✓ Horarios en orden: sin choques de canchas ni de jugadores, y todos los partidos tienen horario.</p>';
+}
+// "Ver": abre la planilla en el día del partido con ese partido elegido (tocá el hueco adonde va)
+document.getElementById("admProblemasPlanilla")?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-ver-partido]");
+  if (!btn) return;
+  const p = ultimosPartidosGestion.find((x) => x.id === btn.dataset.verPartido);
+  if (!p) return;
+  if (p.horario) planillaDiaFiltro = jornadaDe(p.horario);
+  partidoSeleccionadoPlanilla = p.id;
+  if (vistaPartidosAdmin !== "planilla-grande") vistaPartidosAdmin = "planilla";
+  document.querySelectorAll("#partidosVistaPills .pill").forEach((b) => b.classList.toggle("active", b.dataset.vista === vistaPartidosAdmin));
+  renderPartidosAdmin(ultimosPartidosGestion, ultimasCanchasTorneoGestion);
+  document.getElementById("admPartidosLista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 function renderPartidosAdmin(partidos, canchasTorneo, parejasTorneo) {
+  renderProblemasPlanilla(partidos, canchasTorneo);
   // días con partidos, para exportar las historias de un solo día
   const selDia = document.getElementById("exportarHorariosDia");
   if (selDia) {
@@ -8298,7 +8362,10 @@ function vistasFotosTorneo(fotos) {
 }
 
 const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
-let carpetaFotosTorneo = ""; // carpeta elegida en la galería del torneo ("" = todas)
+let carpetaFotosTorneo = "";
+let carpetaPedidaEnLink = null; // ?carpeta=... del link que se compartió (se usa una vez)
+const linkFotosTorneo = (torneoId, carpeta) =>
+  `${location.origin}${location.pathname}#/torneo/${torneoId}/fotos${carpeta ? "?carpeta=" + encodeURIComponent(carpeta) : ""}`; // carpeta elegida en la galería del torneo ("" = todas)
 let fotosCompradas = new Set(); // ids de fotos que el jugador ya pagó
 // compras sin cuenta: este navegador recuerda sus números de orden para volver a bajar las fotos
 function ordenesFotos() {
@@ -8326,7 +8393,8 @@ function fotoTorneoItemHtml(foto, admin) {
     return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
       <img src="${mini}" alt="Foto del torneo (vista previa)" loading="lazy" decoding="async" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
       ${borrar}${marca}
-      ${admin ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>` : ""}
+      ${admin ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>`
+        : comprada ? "" : `<button type="button" class="foto-sumar" data-sumar-foto="${foto.id}" aria-pressed="${fotosElegidas.has(foto.id)}" aria-label="Sumar esta foto al pedido">${fotosElegidas.has(foto.id) ? "✓" : "+"}</button>`}
     </div>`;
   }
   // se pide por nombre de archivo (el mismo que tiene el original en la cámara), no por link
@@ -8356,7 +8424,14 @@ async function cargarFotosTorneo() {
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
   // carpetas (ej. "Día 1", "Día 2"): la más nueva primero; "Todas" las muestra juntas
   const carpetas = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))];
+  if (carpetaPedidaEnLink) { carpetaFotosTorneo = carpetaPedidaEnLink; carpetaPedidaEnLink = null; }
   if (!carpetas.includes(carpetaFotosTorneo)) carpetaFotosTorneo = "";
+  // promo bien a la vista arriba de la galería
+  const promo = document.getElementById("dtFotosPromo"), { cantidad: comboCant, precio: comboPrecio } = comboFotos();
+  if (promo) {
+    promo.hidden = !(comboCant > 1 && comboPrecio > 0 && fotos.some((f) => f.precio != null && f.original_path));
+    promo.innerHTML = `<strong>🔥 Promo: ${comboCant} fotos por ${precioTexto(comboPrecio)}</strong><span>Tocá <b>+</b> en las fotos donde salís y armá tu pedido</span>`;
+  }
   const pills = document.getElementById("dtFotosCarpetas");
   const visibles = () => carpetaFotosTorneo ? fotos.filter((f) => f.carpeta === carpetaFotosTorneo) : fotos;
   if (pills) {
@@ -8406,6 +8481,8 @@ function renderCarritoFotos() {
 }
 // elegir/sacar del carrito y descargar originales (galería del torneo y de Gestión)
 document.addEventListener("click", async (e) => {
+  const sumar = e.target.closest("[data-sumar-foto]");
+  if (sumar) { alternarEnPedido(sumar.closest(".foto-item")?.querySelector("[data-foto-id]")); return; }
   const bajar = e.target.closest("[data-descargar-foto]");
   if (bajar && !bajar.disabled) {
     bajar.disabled = true;
@@ -8431,6 +8508,43 @@ function ofrecerPromo(ids) {
   dlg.showModal();
   return new Promise((listo) => dlg.addEventListener("close", () => listo(dlg.returnValue), { once: true }));
 }
+// ---------- Jugadores repetidos: buscarlos y unificarlos desde la página ----------
+async function cargarRepetidos() {
+  const cont = document.getElementById("repetidosWrap");
+  cont.hidden = false;
+  cont.innerHTML = '<p class="match-meta">Buscando…</p>';
+  const { data, error } = await sb.rpc("admin_posibles_repetidos");
+  if (error) {
+    cont.innerHTML = `<p class="chequeo-aviso match-meta">No se pudo buscar (${escapeHtml(error.message)}). ¿Corriste el SQL "jugadores_repetidos_admin.sql"?</p>`;
+    return;
+  }
+  const pares = Object.values((data || []).reduce((acc, r) => ((acc[r.par] ||= []).push(r), acc), {}));
+  if (!pares.length) { cont.innerHTML = '<p class="chequeo-ok match-meta">✓ No hay jugadores repetidos.</p>'; return; }
+  const ficha = (j, otro) => `<div class="repetido-ficha">
+      <strong>${escapeHtml(j.jugador)}</strong>
+      <span class="match-meta">${escapeHtml(j.categoria || "sin categoría")} · ${Number(j.pts_por_categoria || j.pts || 0)} pts · ${Number(j.pj || 0)} PJ · ${Number(j.inscripciones)} inscr. · ${escapeHtml(j.cuenta)}</span>
+      ${j.usuario ? `<span class="match-meta">${escapeHtml(j.usuario)}</span>` : ""}
+      <button type="button" class="secondary small" data-mantener="${j.id}" data-eliminar="${otro.id}" data-nombres="${escapeHtml(j.jugador)}|${escapeHtml(otro.jugador)}">Quedarse con este</button>
+    </div>`;
+  cont.innerHTML = `<p class="match-meta">${pares.length} ${pares.length === 1 ? "posible repetido" : "posibles repetidos"}. Elegí con qué perfil quedarte: se suman puntos, partidos e inscripciones, y el otro se borra.</p>` +
+    pares.filter((p) => p.length === 2).map(([a, b]) => `<div class="repetido-par"><span class="badge">${a.tipo === "MISMO NOMBRE" ? "Mismo nombre" : "Parecido"}</span>${ficha(a, b)}${ficha(b, a)}</div>`).join("");
+}
+document.getElementById("btnBuscarRepetidos")?.addEventListener("click", conBotonOcupado(cargarRepetidos));
+document.getElementById("repetidosWrap")?.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-mantener]");
+  if (!btn || btn.disabled) return;
+  const [queda, sale] = btn.dataset.nombres.split("|");
+  if (!confirm(`¿Unificar? Queda "${queda}" con todo sumado, y se borra "${sale}". No se puede deshacer.`)) return;
+  btn.disabled = true;
+  const { data, error } = await sb.rpc("admin_fusionar_jugadores", { p_mantener: btn.dataset.mantener, p_eliminar: btn.dataset.eliminar });
+  btn.disabled = false;
+  if (error) { toast("No se pudo unificar: " + error.message); return; }
+  toast(data || "Unificado");
+  cargarRepetidos();
+  cargarJugadoresAdmin();
+  if (rankingCargado) cargarRanking();
+});
+
 document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget, ids = [...fotosElegidas.keys()];
   if (await ofrecerPromo(ids) === "pagar") pagarFotos(ids, btn);
@@ -8516,6 +8630,14 @@ async function cargarFotosTorneoAdmin() {
   if (!cont || !torneoGestionId) return;
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
   const fotos = vistasFotosTorneo(data || []);
+  const avisar = document.getElementById("admFotosAvisar");
+  if (avisar) {
+    const ultima = fotos.find((f) => f.carpeta)?.carpeta || "";
+    const promoTxt = comboFotos().cantidad > 1 && comboFotos().precio > 0 ? `\n🔥 Promo: ${comboFotos().cantidad} fotos por ${precioTexto(comboFotos().precio)}` : "";
+    const msg = `📸 ¡Ya están las fotos de ${torneoGestionData?.nombre || "el torneo"}${ultima ? " · " + ultima : ""}!\nBuscate y descargalas en alta calidad 👇\n${linkFotosTorneo(torneoGestionId, ultima)}${promoTxt}`;
+    avisar.href = "https://wa.me/?text=" + encodeURIComponent(msg);
+    avisar.hidden = !fotos.length;
+  }
   const sugeridas = document.getElementById("admFotosCarpetasLista");
   if (sugeridas) sugeridas.innerHTML = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))].map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
   cont.innerHTML = fotos.length
@@ -9115,6 +9237,8 @@ function mostrarFotoGrande(el) {
   const id = el.dataset.fotoId, aLaVenta = !!id;
   const btnOriginal = document.getElementById("fotoGrandeOriginal"), btnPedido = document.getElementById("fotoGrandePedido");
   document.getElementById("fotoGrandeDescargar").textContent = aLaVenta ? "Descargar con marca de agua" : "Descargar";
+  const compartir = document.getElementById("fotoGrandeCompartir");
+  if (compartir) compartir.hidden = !el.closest("#dtFotosGaleria"); // solo en la galería del torneo
   if (btnOriginal && btnPedido) btnOriginal.hidden = !aLaVenta, btnPedido.hidden = !aLaVenta || !!el.dataset.comprada;
   if (aLaVenta && btnOriginal && btnPedido) {
     btnOriginal.dataset.fotoId = id;
@@ -9160,17 +9284,30 @@ document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (
     cerrarFotoGrande();
   }
 });
+// suma o saca una foto del pedido y actualiza su recuadro en la galería
+function alternarEnPedido(img) {
+  const id = img?.dataset.fotoId;
+  if (!id) return;
+  if (fotosElegidas.has(id)) fotosElegidas.delete(id); else fotosElegidas.set(id, Number(img.dataset.precio));
+  const elegida = fotosElegidas.has(id), item = img.closest(".foto-item");
+  item.classList.toggle("elegida", elegida);
+  item.querySelector(".foto-precio")?.remove();
+  if (elegida) item.insertAdjacentHTML("beforeend", '<span class="foto-precio">✓ En tu pedido</span>');
+  const mas = item.querySelector("[data-sumar-foto]");
+  if (mas) { mas.textContent = elegida ? "✓" : "+"; mas.setAttribute("aria-pressed", elegida); }
+  renderCarritoFotos();
+}
 document.getElementById("fotoGrandePedido")?.addEventListener("click", () => {
   const el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;
-  const id = el?.dataset.fotoId;
-  if (!id) return;
-  if (fotosElegidas.has(id)) fotosElegidas.delete(id); else fotosElegidas.set(id, Number(el.dataset.precio));
-  const item = el.closest(".foto-item");
-  item.classList.toggle("elegida", fotosElegidas.has(id));
-  item.querySelector(".foto-precio")?.remove();
-  if (fotosElegidas.has(id)) item.insertAdjacentHTML("beforeend", '<span class="foto-precio">✓ En tu pedido</span>');
-  mostrarFotoGrande(el);
-  renderCarritoFotos();
+  alternarEnPedido(el);
+  if (el) mostrarFotoGrande(el);
+});
+// compartir: link a la galería (y carpeta) del torneo, para avisarle al compañero
+document.getElementById("fotoGrandeCompartir")?.addEventListener("click", async () => {
+  const url = linkFotosTorneo(torneoActualId, carpetaFotosTorneo);
+  const texto = "📸 ¡Mirá, salimos en las fotos del torneo! Buscate acá:";
+  if (navigator.share) { try { await navigator.share({ text: texto, url }); } catch (e) { /* canceló */ } return; }
+  window.open("https://wa.me/?text=" + encodeURIComponent(texto + " " + url), "_blank", "noopener");
 });
 // La foto vive en Supabase Storage (otro origen), así que el atributo
 // download del <a> no alcanza para forzar la descarga en la mayoría de los
@@ -9328,8 +9465,9 @@ actualizarBotonInstalar();
 // (con la sesión que haya en ese momento), y manejarCambioSesion() ya llama a
 // calcularTorneoDestacado(); pedirla de nuevo acá solo duplicaba esas llamadas en cada carga.
 async function init() {
-  await Promise.all([cargarCategorias(), cargarTorneos()]);
-  await Promise.all([
+  // allSettled: si una parte falla (ej. se cortó internet un segundo), el resto de la página igual carga
+  await Promise.allSettled([cargarCategorias(), cargarTorneos()]);
+  await Promise.allSettled([
     cargarComplejos(),
     cargarInicio(),
     cargarUltimosProximos(),
@@ -9337,7 +9475,6 @@ async function init() {
     cargarCampeones(),
     cargarAscendidos(),
     cargarSponsors(),
-    cargarRanking(),
     cargarConfig(),
     cargarNoticias(),
     cargarEventos()

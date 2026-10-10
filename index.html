@@ -69,6 +69,7 @@
     <span id="fotoGrandeContador" class="fotogrande-contador" aria-live="polite"></span>
     <button type="button" class="primary small" id="fotoGrandePedir" hidden>Pedir original</button>
     <button type="button" class="secondary small" id="fotoGrandePedido" hidden>Sumar al pedido</button>
+    <button type="button" class="secondary small" id="fotoGrandeCompartir">Compartir</button>
     <button type="button" class="primary small" id="fotoGrandeOriginal" hidden>Original en alta calidad</button>
     <a href="" download id="fotoGrandeDescargar" class="secondary small">Descargar</a>
     <button type="button" class="secondary small" id="btnCerrarFotoGrande" aria-label="Cerrar foto">Cerrar</button>
@@ -402,6 +403,7 @@
   <section id="view-torneo-fotos" class="view">
     <div class="card">
       <h3>Fotos del torneo</h3>
+      <p class="fotos-promo" id="dtFotosPromo" hidden></p>
       <div class="pill-row fotos-carpetas" id="dtFotosCarpetas" role="group" aria-label="Carpetas de fotos" hidden></div>
       <div id="dtFotosGaleria" class="fotos-galeria"></div>
       <div class="fotos-login" id="dtFotosLogin" style="display:none">
@@ -1206,6 +1208,7 @@
           <button type="button" class="secondary small" id="btnGuardarCombo">Guardar combo</button>
         </div>
         <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
+        <a class="secondary small btn-wsp-avisar" id="admFotosAvisar" href="#" target="_blank" rel="noopener" hidden>Avisar por WhatsApp que hay fotos nuevas</a>
       </div>
 
       <!-- AJUSTES: los mismos campos de siempre ("Editar torneo", puntaje,
@@ -1353,6 +1356,7 @@
         <input type="text" id="partidosBusqueda" placeholder="Ej: Rodríguez, o Gómez / Pérez" autocomplete="off" />
         <label style="margin-top:8px" for="partidosCategoriaFiltro">Categoría</label>
         <select id="partidosCategoriaFiltro"><option value="">Todas</option></select>
+        <div id="admProblemasPlanilla" class="planilla-problemas" aria-live="polite"></div>
         <div class="pill-row" id="partidosVistaPills" style="margin-top:12px">
           <button class="pill active" data-vista="lista">Lista</button>
           <button class="pill" data-vista="planilla">Planilla (arrastrar y soltar — solo PC)</button>
@@ -1536,6 +1540,7 @@
         <span class="row" style="gap:8px">
           <button type="button" class="secondary small" id="btnMostrarNuevoJugador">+ Jugador nuevo</button>
           <button type="button" class="secondary small" id="btnMostrarBuscarJugador">Buscar jugador</button>
+          <button type="button" class="secondary small" id="btnBuscarRepetidos">Buscar repetidos</button>
           <button type="button" class="secondary small" id="btnAchicarFotosPerfil" title="Vuelve a guardar las fotos de perfil pesadas en tamaño liviano">Achicar fotos de perfil</button>
           <button type="button" class="secondary small" id="btnBorrarFotosSinUso" title="Borra del almacenamiento las fotos de perfil que ningún jugador usa">Borrar fotos sin usar</button>
         </span>
@@ -1553,6 +1558,7 @@
         <input id="njEmail" type="email" maxlength="120" placeholder="Email (opcional: si ya intentó registrarse, el mismo que usó)" aria-label="Email (opcional)" autocomplete="off" />
         <button type="submit" class="primary" id="btnCrearJugador" style="width:100%">Crear jugador y usuario</button>
       </form>
+      <div id="repetidosWrap" class="repetidos-wrap" hidden aria-live="polite"></div>
       <div id="buscarJugadorWrap" style="display:none;margin-top:10px">
         <p class="match-meta" style="margin-bottom:6px">Buscá un jugador para corregir nombre, apellido, categoría o puntos, o para eliminar un perfil repetido/erróneo.</p>
         <input id="buscarJugadorAdmin" placeholder="Escribí nombre o apellido..." autocomplete="off" style="margin-bottom:10px" />
