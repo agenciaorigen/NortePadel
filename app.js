@@ -111,13 +111,18 @@ function cambiarVista(nombre, ruta) {
   } else if (nombre !== "admin") {
     adminFocoTorneoActivo = false;
   }
+  // "Más" (celu) queda marcado cuando se está en una de las secciones que tiene adentro
+  const enMas = ["en-vivo", "sponsors", "perfil", "admin"].includes(nombre);
+  document.getElementById("tabMas")?.classList.toggle("active", enMas);
+  document.querySelectorAll("#menuMas [data-ir]").forEach((b) => b.classList.toggle("active", b.dataset.ir === nombre));
+  if (nombre === "fotos") cargarVistaFotos();
   if (!syncingDesdeHash) navegarA(ruta || (nombre === "inicio" ? "/" : "/" + nombre));
   contarVisita(nombre);
 }
 
 // Contador de visitas: cuenta una sesión por navegador y cada sección una vez
 // por sesión. Solo guarda cantidades por día; nada de quién entró.
-const SECCIONES_VISITA = new Set(["inicio", "torneos", "ranking", "en-vivo", "sponsors", "evento", "perfil-jugador", "perfil"]);
+const SECCIONES_VISITA = new Set(["inicio", "torneos", "fotos", "ranking", "en-vivo", "sponsors", "evento", "perfil-jugador", "perfil"]);
 function contarVisita(vista) {
   if (isAdmin) return;
   const seccion = VISTAS_DE_TORNEO.has(vista) ? "torneo" : SECCIONES_VISITA.has(vista) ? vista : null;
@@ -166,6 +171,7 @@ async function despacharRuta() {
     if (!raiz) { cambiarVista("inicio"); return; }
     if (raiz === "torneos") { cambiarVista("torneos"); return; }
     if (raiz === "ranking") { cambiarVista("ranking"); return; }
+    if (raiz === "fotos") { cambiarVista("fotos"); return; }
     if (raiz === "en-vivo") { cambiarVista("en-vivo"); return; }
     if (raiz === "perfil") { cambiarVista("perfil"); return; }
     if (raiz === "jugar" && FEATURE_JUGAR_HABILITADA) { cambiarVista("jugar"); return; }
@@ -193,6 +199,17 @@ document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => cambiarVista(btn.dataset.view));
 });
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
+// celu: menú "Más" (ventana nativa <dialog>: foco, Esc y lector de pantalla los maneja el navegador)
+const menuMas = document.getElementById("menuMas");
+document.getElementById("tabMas").addEventListener("click", () => menuMas.showModal());
+document.getElementById("menuMasCerrar").addEventListener("click", () => menuMas.close());
+menuMas.addEventListener("click", (e) => {
+  if (e.target === menuMas) { menuMas.close(); return; } // tocar afuera cierra
+  const ir = e.target.closest("[data-ir]");
+  if (!ir) return;
+  menuMas.close();
+  cambiarVista(ir.dataset.ir);
+});
 document.getElementById("btnHeroTorneos").addEventListener("click", () => cambiarVista("torneos"));
 document.getElementById("btnHeroTorneos2").addEventListener("click", () => cambiarVista("torneos"));
 document.getElementById("btnHeroRanking").addEventListener("click", () => cambiarVista("ranking"));
@@ -6079,7 +6096,7 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
     const dia = desde.getDay();
     const minutosDelDia = desde.getHours() * 60 + desde.getMinutes();
     const celdas = canchas.map((c) => {
-      const partido = conHorario.find((p) => p.horario === horarioISO && p.cancha_id === c.id);
+      const partido = conHorario.find((p) => new Date(p.horario).getTime() === desde.getTime() && p.cancha_id === c.id); // por instante, no por texto (el mismo horario puede venir escrito distinto)
       if (partido) return { cancha: c, estado: "ocupado", partido };
       const bloqueo = (bloqueos[c.id] || []).find((b) => desde < b.hasta && hasta > b.desde);
       if (bloqueo) return { cancha: c, estado: "bloqueado", bloqueo };
@@ -8406,6 +8423,31 @@ async function cargarAvisoFotos() {
   aviso.hidden = false;
   aviso.onclick = () => abrirTorneo(ultimo.torneo_id, "fotos");
 }
+// vista Fotos: un recuadro por torneo con fotos (portada = la última miniatura), el más reciente primero
+async function cargarVistaFotos() {
+  const grid = document.getElementById("fotosTorneosGrid");
+  const { data } = await sb.from("torneo_fotos").select("torneo_id, thumb_url, url").order("created_at", { ascending: false }).limit(5000);
+  const porTorneo = new Map();
+  (data || []).forEach((f) => {
+    const t = porTorneo.get(f.torneo_id) || { cuantas: 0, portada: urlSegura(f.thumb_url || f.url) };
+    t.cuantas++;
+    porTorneo.set(f.torneo_id, t);
+  });
+  const { data: torneos } = porTorneo.size
+    ? await sb.from("torneos").select("id, nombre, fecha_inicio, fecha_fin, estado").in("id", [...porTorneo.keys()])
+    : { data: [] };
+  const lista = [...porTorneo].map(([id, t]) => ({ id, ...t, torneo: (torneos || []).find((x) => x.id === id) })).filter((t) => t.torneo);
+  document.getElementById("fotosTorneosVacio").hidden = lista.length > 0;
+  grid.innerHTML = lista.map((t) => `<button type="button" class="foto-torneo-card" data-fotos-torneo="${t.id}" aria-label="Ver las ${t.cuantas} fotos de ${escapeHtml(t.torneo.nombre)}">
+      ${t.portada ? `<img src="${t.portada}" alt="" loading="lazy" decoding="async" />` : ""}
+      ${estaEnVivo(t.torneo) ? '<span class="foto-torneo-card-badge">En vivo</span>' : ""}
+      <span class="foto-torneo-card-info"><strong>${escapeHtml(t.torneo.nombre)}</strong><small>${t.cuantas} ${t.cuantas === 1 ? "foto" : "fotos"} · ${rangoFechasTorneo(t.torneo)}</small></span>
+    </button>`).join("");
+}
+document.getElementById("fotosTorneosGrid").addEventListener("click", (e) => {
+  const card = e.target.closest("[data-fotos-torneo]");
+  if (card) abrirTorneo(card.dataset.fotosTorneo, "fotos");
+});
 // al volver de Mercado Pago: confirma el pago y lleva a las fotos del torneo
 async function volverDeMercadoPago() {
   const q = new URLSearchParams(location.search);
