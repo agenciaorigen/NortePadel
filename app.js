@@ -201,9 +201,9 @@ document.querySelectorAll(".tab").forEach((btn) => {
 document.getElementById("btnPerfil").addEventListener("click", () => cambiarVista("perfil"));
 // celu: menú "Más" (ventana nativa <dialog>: foco, Esc y lector de pantalla los maneja el navegador)
 const menuMas = document.getElementById("menuMas");
-document.getElementById("tabMas").addEventListener("click", () => menuMas.showModal());
-document.getElementById("menuMasCerrar").addEventListener("click", () => menuMas.close());
-menuMas.addEventListener("click", (e) => {
+document.getElementById("tabMas")?.addEventListener("click", () => menuMas?.showModal());
+document.getElementById("menuMasCerrar")?.addEventListener("click", () => menuMas.close());
+menuMas?.addEventListener("click", (e) => {
   if (e.target === menuMas) { menuMas.close(); return; } // tocar afuera cierra
   const ir = e.target.closest("[data-ir]");
   if (!ir) return;
@@ -8418,7 +8418,8 @@ async function cargarAvisoFotos() {
   const cuantas = data.filter((f) => f.torneo_id === ultimo.torneo_id).length;
   document.getElementById("inicioAvisoFotosTexto").textContent = `${cuantas} ${cuantas === 1 ? "foto nueva" : "fotos nuevas"}${torneo ? " de " + torneo.nombre : " del torneo"}`;
   // 4 miniaturas (las chicas, ya cacheadas) para que se vea que hay fotos
-  document.getElementById("inicioAvisoFotosMinis").innerHTML = data.filter((f) => f.torneo_id === ultimo.torneo_id).slice(0, 4)
+  const minis = document.getElementById("inicioAvisoFotosMinis");
+  if (minis) minis.innerHTML = data.filter((f) => f.torneo_id === ultimo.torneo_id).slice(0, 4)
     .map((f) => urlSegura(f.thumb_url || f.url)).filter(Boolean).map((u) => `<img src="${u}" alt="" loading="lazy" decoding="async" />`).join("");
   aviso.hidden = false;
   aviso.onclick = () => abrirTorneo(ultimo.torneo_id, "fotos");
@@ -8426,6 +8427,7 @@ async function cargarAvisoFotos() {
 // vista Fotos: un recuadro por torneo con fotos (portada = la última miniatura), el más reciente primero
 async function cargarVistaFotos() {
   const grid = document.getElementById("fotosTorneosGrid");
+  if (!grid) return;
   const { data } = await sb.from("torneo_fotos").select("torneo_id, thumb_url, url").order("created_at", { ascending: false }).limit(5000);
   const porTorneo = new Map();
   (data || []).forEach((f) => {
@@ -8444,7 +8446,7 @@ async function cargarVistaFotos() {
       <span class="foto-torneo-card-info"><strong>${escapeHtml(t.torneo.nombre)}</strong><small>${t.cuantas} ${t.cuantas === 1 ? "foto" : "fotos"} · ${rangoFechasTorneo(t.torneo)}</small></span>
     </button>`).join("");
 }
-document.getElementById("fotosTorneosGrid").addEventListener("click", (e) => {
+document.getElementById("fotosTorneosGrid")?.addEventListener("click", (e) => {
   const card = e.target.closest("[data-fotos-torneo]");
   if (card) abrirTorneo(card.dataset.fotosTorneo, "fotos");
 });

@@ -160,8 +160,15 @@
       <div class="hero-carousel-dots" id="heroCarouselDots"></div>
     </div>
 
-    <div class="sp-banner-slot" id="inicioSponsorPrincipal" hidden></div>
-    <div class="sp-franja" id="inicioSponsorsFrente" hidden></div>
+    <button type="button" class="aviso-fotos" id="inicioAvisoFotos" hidden>
+      <span class="aviso-fotos-texto">
+        <span class="aviso-fotos-eyebrow">📸 <span id="inicioAvisoFotosTexto">Fotos nuevas</span></span>
+        <strong>Mirá las fotos del torneo</strong>
+        <small>Buscate y descargalas en alta calidad</small>
+        <span class="aviso-fotos-cta">Ver fotos <span aria-hidden="true">→</span></span>
+      </span>
+      <span class="aviso-fotos-minis" id="inicioAvisoFotosMinis" aria-hidden="true"></span>
+    </button>
 
     <button type="button" class="marquee-banda" id="marqueeBanda" aria-label="Ver el próximo torneo e inscribirte">
       <div class="marquee-track" aria-hidden="true">
@@ -180,15 +187,8 @@
       <p class="empty" id="inicioSinTorneos" style="display:none">Todavía no hay torneos publicados.</p>
     </section>
 
-    <button type="button" class="aviso-fotos" id="inicioAvisoFotos" hidden>
-      <span class="aviso-fotos-texto">
-        <span class="aviso-fotos-eyebrow">📸 <span id="inicioAvisoFotosTexto">Fotos nuevas</span></span>
-        <strong>Mirá las fotos del torneo</strong>
-        <small>Buscate y descargalas en alta calidad</small>
-        <span class="aviso-fotos-cta">Ver fotos <span aria-hidden="true">→</span></span>
-      </span>
-      <span class="aviso-fotos-minis" id="inicioAvisoFotosMinis" aria-hidden="true"></span>
-    </button>
+    <div class="sp-banner-slot" id="inicioSponsorPrincipal" hidden></div>
+    <div class="sp-franja" id="inicioSponsorsFrente" hidden></div>
 
     <!-- EVENTOS: lo que no es un torneo (inauguraciones, viajes...). Muestra
          el más reciente con fotos como tira deslizable; cada foto se abre en
@@ -308,6 +308,14 @@
       <div id="listaTorneos"></div>
     </div>
 
+  </section>
+
+  <!-- FOTOS: todos los torneos con fotos; cada uno abre su galería -->
+  <section id="view-fotos" class="view">
+    <div class="pagina-head"><h2>Fotos</h2></div>
+    <p class="fotos-torneos-intro">Elegí el torneo, buscate y descargá tus fotos en alta calidad.</p>
+    <div class="fotos-torneos-grid" id="fotosTorneosGrid"></div>
+    <p class="empty" id="fotosTorneosVacio" hidden>Todavía no hay fotos subidas.</p>
   </section>
 
   <!-- JUGAR (reservar cancha para entrenar / jugar con amigos, fuera de los torneos) -->
@@ -1575,15 +1583,19 @@
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16"/></svg></span>
     Torneos
   </button>
+  <button data-view="fotos" class="tab">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg></span>
+    Fotos
+  </button>
   <button data-view="ranking" class="tab">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20v-4"/><path d="M12 20v-9"/><path d="M19 20V7"/></svg></span>
     Ranking
   </button>
-  <button data-view="en-vivo" class="tab">
+  <button data-view="en-vivo" class="tab tab-compu">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9L17 14"/></svg></span>
     En vivo
   </button>
-  <button data-view="sponsors" class="tab">
+  <button data-view="sponsors" class="tab tab-compu">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="m8.6 13.4-1.6 7.1 5-2.6 5 2.6-1.6-7.1"/></svg></span>
     Sponsors
   </button>
@@ -1592,11 +1604,25 @@
        en mobile Y desktop, pero solo para admins (ver body.is-admin en style.css)
        — antes en mobile vivía escondido adentro de "Más", que se sacó por no
        tener nada más adentro para el resto de la gente. -->
-  <button id="btnAdminPanel" data-view="admin" class="tab" title="Gestión del club" aria-label="Gestión">
+  <button id="btnAdminPanel" data-view="admin" class="tab tab-compu" title="Gestión del club" aria-label="Gestión">
     <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 19a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.6a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.36.1.68.3.94.56"/></svg></span>
     Gestión
   </button>
+  <!-- celular: En vivo, Sponsors y Gestión van adentro de "Más" (abajo quedan 4 secciones) -->
+  <button type="button" id="tabMas" class="tab tab-celu" aria-haspopup="dialog" aria-controls="menuMas">
+    <span class="icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></span>
+    Más
+  </button>
 </nav>
+
+<dialog id="menuMas" class="menu-mas" aria-labelledby="menuMasTitulo">
+  <p class="menu-mas-titulo" id="menuMasTitulo">Más</p>
+  <button type="button" data-ir="en-vivo"><span class="menu-mas-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="m17 10 4-2.5v9L17 14"/></svg></span><span><strong>En vivo</strong><small>Transmisión, marcadores y próximos partidos</small></span></button>
+  <button type="button" data-ir="sponsors"><span class="menu-mas-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="m8.6 13.4-1.6 7.1 5-2.6 5 2.6-1.6-7.1"/></svg></span><span><strong>Sponsors</strong><small>Las marcas del circuito · Sumá la tuya</small></span></button>
+  <button type="button" data-ir="perfil"><span class="menu-mas-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.3"/><path d="M5 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5"/></svg></span><span><strong>Mi cuenta</strong><small>Tu perfil, inscripciones y clave</small></span></button>
+  <button type="button" data-ir="admin" class="menu-mas-admin"><span class="menu-mas-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span><span><strong>Gestión</strong><small>Administración del club</small></span></button>
+  <button type="button" class="secondary menu-mas-cerrar" id="menuMasCerrar">Cerrar</button>
+</dialog>
 
 <div id="toast" class="toast" style="display:none"></div>
 

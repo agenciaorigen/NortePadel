@@ -2490,3 +2490,47 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 .fotos-ver-mas { grid-column: 1 / -1; }
 .foto-item .foto-genero { position: absolute; right: 40px; top: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; cursor: pointer; background: rgba(var(--bg-rgb),.8); color: var(--text); border: 1px solid var(--border); }
 .foto-item .foto-genero:hover, .foto-item .foto-genero:focus-visible { border-color: var(--accent); }
+
+/* ---------- Menú: en celu 4 secciones + "Más"; en compu todo en la barra ---------- */
+.tab-celu { display: none !important; }
+@media (max-width: 959px) {
+  nav.tabbar .tab-compu { display: none !important; }
+  nav.tabbar .tab-celu { display: flex !important; }
+}
+.menu-mas {
+  margin: auto auto 0; width: 100%; max-width: 520px; border: 1px solid var(--border); border-bottom: none;
+  border-radius: 22px 22px 0 0; padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg-elev); color: var(--text);
+}
+.menu-mas::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(3px); }
+.menu-mas[open] { display: flex; flex-direction: column; gap: 8px; animation: menuMasSube .2s ease-out; }
+@keyframes menuMasSube { from { transform: translateY(30px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .menu-mas[open] { animation: none; } }
+.menu-mas-titulo { margin: 0 4px 6px; font-family: var(--font-display); font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.menu-mas [data-ir] {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px; text-align: left; cursor: pointer;
+  background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
+}
+.menu-mas [data-ir]:hover, .menu-mas [data-ir]:focus-visible, .menu-mas [data-ir].active { border-color: var(--accent); }
+.menu-mas [data-ir] strong { display: block; font-family: var(--font-display); font-size: 18px; text-transform: uppercase; letter-spacing: .03em; }
+.menu-mas [data-ir] small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.menu-mas-icono { flex-shrink: 0; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: rgba(var(--accent-rgb),.12); color: var(--accent-bright); }
+.menu-mas-icono svg { width: 22px; height: 22px; }
+body:not(.is-admin) .menu-mas-admin { display: none; }
+.menu-mas-cerrar { margin-top: 4px; }
+
+/* ---------- Vista Fotos: un recuadro por torneo ---------- */
+.fotos-torneos-intro { color: var(--muted); margin: -6px 0 18px; }
+.fotos-torneos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.foto-torneo-card {
+  position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; padding: 0; overflow: hidden; cursor: pointer; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: #fff;
+}
+.foto-torneo-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.foto-torneo-card:hover img, .foto-torneo-card:focus-visible img { transform: scale(1.04); }
+.foto-torneo-card:hover, .foto-torneo-card:focus-visible { border-color: var(--accent); }
+.foto-torneo-card-info { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 14px; display: flex; flex-direction: column; gap: 4px; background: linear-gradient(transparent, rgba(0,0,0,.85)); }
+.foto-torneo-card-info strong { font-family: var(--font-display); font-size: 26px; line-height: 1; font-style: italic; text-transform: uppercase; text-wrap: balance; }
+.foto-torneo-card-info small { font-size: 13px; color: rgba(255,255,255,.8); }
+.foto-torneo-card-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+@media (prefers-reduced-motion: reduce) { .foto-torneo-card img { transition: none; } }
