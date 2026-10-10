@@ -3457,23 +3457,18 @@ async function cargarTorneos() {
   }
   data.forEach((t) => {
     const div = document.createElement("div");
-    // con flyer propio, la tarjeta se agranda para que se vea como un póster de
-    // verdad (no solo de fondo detrás del texto, como con la imagen genérica)
-    div.className = "match-card torneo-card-poster" + (t.flyer_url ? " torneo-card-flyer" : "");
+    // tarjeta compacta: el flyer chico a la izquierda, con sus colores reales (sin velo oscuro)
+    div.className = "match-card torneo-card-lista";
     div.style.cursor = "pointer";
-    if (t.flyer_url) {
-      // velo parejo en TODA la tarjeta (no solo una franja abajo): el afiche del club
-      // sigue viéndose y reconociéndose, pero su propia tipografía/color pasan a
-      // "textura de fondo" en vez de competir con el nombre/sede que pone la app encima
-      // -- ver mockup-tarjeta-torneo (opción B, la elegida) para el porqué.
-      div.style.backgroundImage = `linear-gradient(0deg, rgba(5,7,10,.86), rgba(5,7,10,.86)), url('${urlSegura(t.flyer_url)}')`;
-    }
+    const flyer = urlSegura(t.flyer_url);
     const catList = (t.torneo_categorias || []).map((c) => c.categoria);
     const categorias = catList.length === 0 ? "todas las categorías"
       : catList.length > 3 ? `${catList.slice(0, 3).join(", ")} +${catList.length - 3} más`
       : catList.join(", ");
     const maps = linkMapsComplejo(t.complejos);
     div.innerHTML = `
+      ${flyer ? `<img class="torneo-card-thumb" src="${flyer}" alt="" loading="lazy" decoding="async" />` : ""}
+      <div class="torneo-card-cuerpo">
       <div class="torneo-card-header">
         <span class="torneo-nombre">${escapeHtml(t.nombre)}</span>
         ${badgeEstadoTorneo(t)}
@@ -3482,7 +3477,8 @@ async function cargarTorneos() {
         ${iconoPin()} <span>${escapeHtml(t.complejos?.nombre || "sin complejo")}</span>
         ${maps ? `<a href="${maps}" target="_blank" rel="noopener" class="torneo-maps-link">Ver ubicación ↗</a>` : ""}
       </div>
-      <div class="match-meta meta-caption">${categorias} · desde ${t.fecha_inicio}</div>
+      <div class="match-meta meta-caption">${categorias} · ${rangoFechasTorneo(t)}</div>
+      </div>
     `;
     div.addEventListener("click", () => abrirTorneo(t.id));
     const linkMaps = div.querySelector(".torneo-maps-link");
@@ -8302,6 +8298,7 @@ function vistasFotosTorneo(fotos) {
 }
 
 const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
+let carpetaFotosTorneo = ""; // carpeta elegida en la galería del torneo ("" = todas)
 let fotosCompradas = new Set(); // ids de fotos que el jugador ya pagó
 // compras sin cuenta: este navegador recuerda sus números de orden para volver a bajar las fotos
 function ordenesFotos() {
@@ -8357,11 +8354,30 @@ async function cargarFotosTorneo() {
     ordenes.length ? sb.functions.invoke("mp-fotos", { body: { accion: "compradas", ordenes } }) : { data: null }
   ]);
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
+  // carpetas (ej. "Día 1", "Día 2"): la más nueva primero; "Todas" las muestra juntas
+  const carpetas = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))];
+  if (!carpetas.includes(carpetaFotosTorneo)) carpetaFotosTorneo = "";
+  const pills = document.getElementById("dtFotosCarpetas");
+  const visibles = () => carpetaFotosTorneo ? fotos.filter((f) => f.carpeta === carpetaFotosTorneo) : fotos;
+  if (pills) {
+    pills.hidden = !carpetas.length;
+    pills.innerHTML = [["", "Todas", fotos.length], ...carpetas.map((c) => [c, c, fotos.filter((f) => f.carpeta === c).length])]
+      .map(([v, t, n]) => `<button type="button" class="pill${v === carpetaFotosTorneo ? " active" : ""}" data-carpeta="${escapeHtml(v)}" aria-pressed="${v === carpetaFotosTorneo}">${escapeHtml(t)} <span class="pill-cuenta">${n}</span></button>`).join("");
+    pills.onclick = (e) => {
+      const b = e.target.closest("[data-carpeta]");
+      if (!b) return;
+      carpetaFotosTorneo = b.dataset.carpeta;
+      pills.querySelectorAll("[data-carpeta]").forEach((x) => { x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", x === b); });
+      mostradas = 24;
+      pintar();
+    };
+  }
   // de a 24: así quien entra no baja todas las fotos del torneo de una
   let mostradas = 24;
   const pintar = () => {
-    cont.innerHTML = fotos.slice(0, mostradas).map((f) => fotoTorneoItemHtml(f, false)).join("") +
-      (fotos.length > mostradas ? `<button type="button" class="secondary fotos-ver-mas" id="btnVerMasFotos">Ver más fotos (${fotos.length - mostradas})</button>` : "");
+    const lista = visibles();
+    cont.innerHTML = lista.slice(0, mostradas).map((f) => fotoTorneoItemHtml(f, false)).join("") +
+      (lista.length > mostradas ? `<button type="button" class="secondary fotos-ver-mas" id="btnVerMasFotos">Ver más fotos (${lista.length - mostradas})</button>` : "");
     document.getElementById("btnVerMasFotos")?.addEventListener("click", () => { mostradas += 24; pintar(); });
   };
   pintar();
@@ -8400,7 +8416,25 @@ document.addEventListener("click", async (e) => {
     } finally { bajar.disabled = false; }
   }
 });
-document.getElementById("btnPagarFotos")?.addEventListener("click", (e) => pagarFotos([...fotosElegidas.keys()], e.currentTarget));
+// antes de cobrar, si no completa el combo, le recuerda la promo. Devuelve "pagar", "elegir" o "" (cerró)
+function ofrecerPromo(ids) {
+  const dlg = document.getElementById("promoFotos");
+  const { cantidad, precio } = comboFotos();
+  const n = ids.length;
+  if (!dlg?.showModal || !(cantidad > 1) || !(precio > 0) || n % cantidad === 0) return Promise.resolve("pagar");
+  const precios = ids.map((id) => fotosElegidas.get(id) ?? Number(document.querySelector(`[data-foto-id="${id}"]`)?.dataset.precio || 0));
+  const total = precioTexto(totalFotos(precios)), meta = Math.ceil(n / cantidad) * cantidad;
+  document.getElementById("promoFotosTitulo").textContent = `${cantidad} fotos por ${precioTexto(precio)}`;
+  document.getElementById("promoFotosTexto").textContent = `Llevás ${n} ${n === 1 ? "foto" : "fotos"} (${total}). Sumá ${meta - n} más y te llevás las ${meta} por ${precioTexto((meta / cantidad) * precio)}.`;
+  document.getElementById("promoFotosPagar").textContent = `Pagar igual ${total}`;
+  dlg.returnValue = "";
+  dlg.showModal();
+  return new Promise((listo) => dlg.addEventListener("close", () => listo(dlg.returnValue), { once: true }));
+}
+document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget, ids = [...fotosElegidas.keys()];
+  if (await ofrecerPromo(ids) === "pagar") pagarFotos(ids, btn);
+});
 async function pagarFotos(ids, btn) {
   if (btn.disabled || !ids.length) return;
   btn.disabled = true;
@@ -8482,6 +8516,8 @@ async function cargarFotosTorneoAdmin() {
   if (!cont || !torneoGestionId) return;
   const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
   const fotos = vistasFotosTorneo(data || []);
+  const sugeridas = document.getElementById("admFotosCarpetasLista");
+  if (sugeridas) sugeridas.innerHTML = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))].map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
   cont.innerHTML = fotos.length
     ? fotos.map((f) => fotoTorneoItemHtml(f, true)).join("")
     : '<p class="empty">Todavía no subiste ninguna foto de este torneo.</p>';
@@ -8604,9 +8640,11 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
   btn.disabled = true;
   const textoOriginal = btn.textContent;
   try {
-    for (let i = 0; i < archivos.length; i++) {
-      const archivo = archivos[i];
-      btn.textContent = archivos.length > 1 ? `Subiendo ${i + 1}/${archivos.length}...` : "Subiendo...";
+    const carpeta = document.getElementById("admFotosCarpeta")?.value.trim().slice(0, 40) || null;
+    const genero = document.getElementById("admFotosGenero")?.value || null;
+    let listas = 0;
+    btn.textContent = `Subiendo 0/${archivos.length}...`;
+    const subirUna = async (archivo) => {
       const nombreBase = archivo.name.replace(/\.[^.]+$/, "");
       const path = `${torneoGestionId}/${Date.now()}-${nombreBase}.jpg`;
       // a la venta: vista chica con marca de agua + original aparte (bucket privado)
@@ -8614,14 +8652,15 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
       if (precio != null) {
         const original = await comprimirFoto(archivo, 4000, 0.92);
         const { error: upOrig } = await sb.storage.from("fotos-venta").upload(path, original, { contentType: "image/jpeg", cacheControl: "31536000" });
-        if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); continue; }
+        if (upOrig) { toast("Error subiendo el original de " + archivo.name + ": " + upOrig.message); return; }
         original_path = path;
       }
       // vista (al abrirla) + miniatura chiquita para la grilla: la galería entera pesa poco
       const aLaVenta = precio != null;
       const [comprimida, mini] = await Promise.all([
-        comprimirFoto(archivo, aLaVenta ? 900 : 1280, aLaVenta ? 0.7 : 0.78, aLaVenta),
-        comprimirFoto(archivo, 400, 0.7, aLaVenta)
+        // vista previa más nítida (para que se reconozcan) y miniatura que no se vea borrosa en el celu
+        comprimirFoto(archivo, 1400, 0.8, aLaVenta),
+        comprimirFoto(archivo, 600, 0.74, aLaVenta)
       ]);
       const pathMini = path.replace(/\/([^/]+)$/, "/mini-$1");
       const opciones = { contentType: "image/jpeg", cacheControl: "31536000" };
@@ -8629,12 +8668,20 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
         sb.storage.from("fotos-torneos").upload(path, comprimida, opciones),
         sb.storage.from("fotos-torneos").upload(pathMini, mini, opciones)
       ]);
-      if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); continue; }
+      if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); return; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
       const thumb_url = upMini ? null : sb.storage.from("fotos-torneos").getPublicUrl(pathMini).data.publicUrl;
-      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio, genero: document.getElementById("admFotosGenero")?.value || null });
+      const { error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio, genero, carpeta });
       if (error) toast("Error guardando " + archivo.name + ": " + error.message);
-    }
+    };
+    // de a 3 a la vez: con muchas fotos tarda bastante menos
+    const cola = [...archivos];
+    await Promise.all([1, 2, 3].map(async () => {
+      for (let archivo = cola.shift(); archivo; archivo = cola.shift()) {
+        await subirUna(archivo).catch((e) => toast("Error con " + archivo.name + ": " + e.message));
+        btn.textContent = `Subiendo ${++listas}/${archivos.length}...`;
+      }
+    }));
     toast("Fotos subidas");
     input.value = "";
     cargarFotosTorneoAdmin();
@@ -9106,7 +9153,12 @@ document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (
     } finally { btn.disabled = false; }
     return;
   }
-  pagarFotos([btn.dataset.fotoId], btn); // recién acá se cobra
+  const eleccion = await ofrecerPromo([btn.dataset.fotoId]);
+  if (eleccion === "pagar") pagarFotos([btn.dataset.fotoId], btn); // recién acá se cobra
+  else if (eleccion === "elegir") { // la suma al pedido y vuelve a la galería para elegir más
+    if (!fotosElegidas.has(btn.dataset.fotoId)) document.getElementById("fotoGrandePedido").click();
+    cerrarFotoGrande();
+  }
 });
 document.getElementById("fotoGrandePedido")?.addEventListener("click", () => {
   const el = galeriaFotos[galeriaPos] || fotoGrandeOrigen;

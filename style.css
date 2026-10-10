@@ -2538,3 +2538,25 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 /* planilla: dos partidos en la misma cancha y hora — se ven los dos, marcados */
 .calendario-choque { display: flex; flex-direction: column; gap: 4px; padding: 3px; border-radius: 10px; outline: 2px solid var(--state-warn); }
 .calendario-choque-aviso { font-size: 11px; font-weight: 700; color: var(--state-warn); line-height: 1.2; }
+
+/* Torneos (lista): tarjeta compacta con el flyer chico y a todo color */
+.torneo-card-lista { display: flex; gap: 14px; align-items: center; padding: 12px; }
+.torneo-card-lista:hover, .torneo-card-lista:focus-within { border-color: var(--accent); }
+.torneo-card-thumb { width: 84px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; flex-shrink: 0; background: var(--bg-elev); }
+.torneo-card-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.torneo-card-lista .torneo-card-header { margin: 0; gap: 8px; flex-wrap: wrap; }
+.torneo-card-lista .torneo-nombre { font-size: 19px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
+
+/* recordatorio de la promo antes de pagar */
+.promo-fotos { width: min(420px, calc(100% - 32px)); padding: 24px 22px 20px; border: 1px solid rgba(var(--accent-rgb),.5); border-radius: 20px; color: var(--text);
+  background: radial-gradient(120% 120% at 0% 0%, rgba(var(--accent-rgb),.2), transparent 60%), var(--bg-elev); }
+.promo-fotos::backdrop { background: rgba(0,0,0,.65); backdrop-filter: blur(3px); }
+.promo-fotos form { display: flex; flex-direction: column; gap: 10px; }
+.promo-fotos-eyebrow { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-bright); }
+.promo-fotos h3 { margin: 0; color: var(--text); font-family: var(--font-display); font-size: 40px; line-height: .95; font-style: italic; text-transform: uppercase; }
+.promo-fotos p:not(.promo-fotos-eyebrow) { margin: 0 0 6px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+
+/* galería del torneo: carpetas (Día 1, Día 2...) */
+.fotos-carpetas { margin: 0 0 12px; }
+.fotos-carpetas[hidden] { display: none; }
+.pill-cuenta { opacity: .65; font-weight: 600; margin-left: 2px; }
