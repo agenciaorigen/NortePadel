@@ -6096,8 +6096,10 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
     const dia = desde.getDay();
     const minutosDelDia = desde.getHours() * 60 + desde.getMinutes();
     const celdas = canchas.map((c) => {
-      const partido = conHorario.find((p) => new Date(p.horario).getTime() === desde.getTime() && p.cancha_id === c.id); // por instante, no por texto (el mismo horario puede venir escrito distinto)
-      if (partido) return { cancha: c, estado: "ocupado", partido };
+      // por instante, no por texto (el mismo horario puede venir escrito distinto); si hay más
+      // de uno en la misma cancha y hora se muestran todos (marcados), nunca se esconde ninguno
+      const enCelda = conHorario.filter((p) => new Date(p.horario).getTime() === desde.getTime() && p.cancha_id === c.id);
+      if (enCelda.length) return { cancha: c, estado: "ocupado", partido: enCelda[0], encimados: enCelda.slice(1) };
       const bloqueo = (bloqueos[c.id] || []).find((b) => desde < b.hasta && hasta > b.desde);
       if (bloqueo) return { cancha: c, estado: "bloqueado", bloqueo };
       // "cerrado": fuera de la ventana propia de ESTA cancha (o directamente no
@@ -6112,7 +6114,9 @@ function calcularSlots(partidos, canchas, torneo, sintetizarVacios) {
     });
     return { horarioISO, celdas };
   });
-  return { horarios, filas, sinHorario: partidos.filter((p) => !p.horario) };
+  // con horario pero en una cancha que no es columna de la planilla: van a la bandeja para que no se pierdan
+  const idsCanchas = new Set(canchas.map((c) => c.id));
+  return { horarios, filas, sinHorario: partidos.filter((p) => !p.horario || (sintetizarVacios && !idsCanchas.has(p.cancha_id))) };
 }
 
 // re-renderiza el/los calendario(s) actualmente montados si el viewport
@@ -6260,6 +6264,9 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   const tarjetaHtml = (p, extraClase = "") => editable ? tarjetaCompactaHtml(p, extraClase) : tarjetaDetalladaHtml(p, extraClase);
   const bloqueadaHtml = (celda) => `<div class="calendario-bloqueada" title="${escapeHtml(celda.bloqueo.motivo || "Cancha bloqueada")}">Bloqueada${celda.bloqueo.motivo ? `<br>${escapeHtml(celda.bloqueo.motivo)}` : ""}</div>`;
   const vaciaHtml = (fila, celda) => `<div class="calendario-vacia" ${editable ? `data-horario="${fila.horarioISO}" data-cancha="${celda.cancha.id}"${partidoSeleccionadoPlanilla ? ` tabindex="0" role="button" aria-label="Mover acá: ${escapeHtml(celda.cancha.nombre)}, ${new Date(fila.horarioISO).toLocaleString("es-AR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}"` : ""}` : ""}></div>`;
+  const ocupadaHtml = (celda) => celda.encimados?.length
+    ? `<div class="calendario-choque">${[celda.partido, ...celda.encimados].map((p) => tarjetaHtml(p)).join("")}<span class="calendario-choque-aviso">⚠ ${celda.encimados.length + 1} partidos en la misma cancha: mové uno</span></div>`
+    : tarjetaHtml(celda.partido);
   const cerradaHtml = () => `<div class="calendario-cerrada" title="Esta cancha no juega en este horario">Cerrada</div>`;
 
   let html = grande
@@ -6282,7 +6289,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
   }
   const bandeja = resaltar ? sinHorario.filter((p) => resaltar.has(p.id)) : sinHorario;
   if (editable && bandeja.length > 0) {
-    html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario a un hueco libre (en el celular, asignalo desde su tarjeta en la vista Lista):</p>
+    html += `<p class="match-meta" style="margin-bottom:6px">Arrastrá un partido sin horario (o en una cancha que no está en el torneo) a un hueco libre (en el celular, asignalo desde su tarjeta en la vista Lista):</p>
       <div class="planilla-bandeja" id="planillaBandeja">${bandeja.map((p) => tarjetaHtml(p, "pendiente")).join("")}</div>`;
   }
   if (editable && dias.length > 1) {
@@ -6304,7 +6311,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
       fila.celdas.forEach((celda) => {
         if ((celda.estado === "disponible" || celda.estado === "cerrado") && !editable) return; // en la agenda pública no hace falta mostrar huecos vacíos ni cerrados
         html += `<div class="calendario-agenda-item"><p class="match-meta meta-caption" style="margin-bottom:2px">${celda.cancha.nombre}</p>`;
-        if (celda.estado === "ocupado") html += tarjetaHtml(celda.partido);
+        if (celda.estado === "ocupado") html += ocupadaHtml(celda);
         else if (celda.estado === "bloqueado") html += bloqueadaHtml(celda);
         else if (celda.estado === "cerrado") html += cerradaHtml();
         else html += vaciaHtml(fila, celda);
@@ -6332,7 +6339,7 @@ function renderPartidosCalendario(containerId, partidos, canchasTorneo, editable
         : new Date(fila.horarioISO).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
       html += `<div class="calendario-hora">${fecha}</div>`;
       fila.celdas.forEach((celda) => {
-        if (celda.estado === "ocupado") html += tarjetaHtml(celda.partido);
+        if (celda.estado === "ocupado") html += ocupadaHtml(celda);
         else if (celda.estado === "bloqueado") html += bloqueadaHtml(celda);
         else if (celda.estado === "cerrado") html += cerradaHtml();
         else html += vaciaHtml(fila, celda);

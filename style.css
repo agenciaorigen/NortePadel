@@ -2534,3 +2534,7 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 .foto-torneo-card-info small { font-size: 13px; color: rgba(255,255,255,.8); }
 .foto-torneo-card-badge { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
 @media (prefers-reduced-motion: reduce) { .foto-torneo-card img { transition: none; } }
+
+/* planilla: dos partidos en la misma cancha y hora — se ven los dos, marcados */
+.calendario-choque { display: flex; flex-direction: column; gap: 4px; padding: 3px; border-radius: 10px; outline: 2px solid var(--state-warn); }
+.calendario-choque-aviso { font-size: 11px; font-weight: 700; color: var(--state-warn); line-height: 1.2; }
