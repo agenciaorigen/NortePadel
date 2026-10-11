@@ -8414,7 +8414,13 @@ async function cargarFotosTorneo() {
   if (!cont || !torneoActualId) return;
   // las fotos se ven sin iniciar sesión (así cualquiera puede comprarlas)
   document.getElementById("dtFotosLogin").style.display = "none";
-  const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
+  const { data, error: errorFotos } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
+  if (errorFotos) { // no confundir "no hay fotos" con "no se pudieron traer"
+    cont.innerHTML = `<p class="empty">No se pudieron cargar las fotos (${escapeHtml(errorFotos.message || "sin conexión")}). Revisá tu conexión y <button type="button" class="link-mas" id="btnReintentarFotos">probá de nuevo</button>.</p>`;
+    document.getElementById("btnReintentarFotos")?.addEventListener("click", cargarFotosTorneo);
+    if (vacio) vacio.style.display = "none";
+    return;
+  }
   const ordenes = ordenesFotos();
   const [fotos, { data: compras }, { data: deOrdenes }] = await Promise.all([
     vistasFotosTorneo(data || []),
