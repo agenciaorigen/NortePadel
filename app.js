@@ -8466,8 +8466,8 @@ async function cargarFotosTorneo() {
     const precioSuelta = Number(aLaVenta[0]?.precio) || Number(configApp.foto_precio) || 0;
     const hasta = configApp.foto_promo_hasta ? new Date(configApp.foto_promo_hasta + "T12:00:00") : null;
     const lineas = [
-      comboCant > 1 && comboPrecio > 0 ? `<strong>🔥 ${comboCant} fotos por ${precioTexto(comboPrecio)}</strong>${precioSuelta * comboCant > comboPrecio ? ` <s>${precioTexto(precioSuelta * comboCant)}</s>` : ""}` : "",
-      pack.cantidad > 0 && pack.precio > 0 ? `<strong>📦 Todas tus fotos (hasta ${pack.cantidad}) por ${precioTexto(pack.precio)}</strong>` : ""
+      comboCant > 1 && comboPrecio > 0 ? `<strong>${comboCant} fotos por ${precioTexto(comboPrecio)}</strong>${precioSuelta * comboCant > comboPrecio ? ` <s>${precioTexto(precioSuelta * comboCant)}</s>` : ""}` : "",
+      pack.cantidad > 0 && pack.precio > 0 ? `<strong>Todas tus fotos (hasta ${pack.cantidad}) por ${precioTexto(pack.precio)}</strong>` : ""
     ].filter(Boolean);
     promo.hidden = !lineas.length || !aLaVenta.length;
     promo.innerHTML = lineas.join("") +
@@ -8476,7 +8476,7 @@ async function cargarFotosTorneo() {
     // prueba social: cuántos ya compraron (si la función todavía no existe, no se muestra)
     sb.rpc("fotos_compradores", { p_torneo: torneoActualId }).then(({ data: n }) => {
       const el = document.getElementById("dtFotosSocial");
-      if (el && n >= 3) el.textContent = `🛒 ${n} jugadores ya compraron sus fotos`;
+      if (el && n >= 3) el.textContent = `${n} jugadores ya compraron sus fotos`;
     });
   }
   // selfie: se ofrece si el torneo tiene fotos preparadas para la búsqueda
@@ -8486,7 +8486,7 @@ async function cargarFotosTorneo() {
   const visibles = () => carpetaFotosTorneo === SELFIE ? delSelfie : carpetaFotosTorneo === MIS_FOTOS ? mias : carpetaFotosTorneo ? fotos.filter((f) => f.carpeta === carpetaFotosTorneo) : fotos;
   if (pills) {
     pills.hidden = !carpetas.length && !mias.length && !delSelfie;
-    pills.innerHTML = [...(delSelfie ? [[SELFIE, "🤳 Donde salís", delSelfie.length]] : []), ...(mias.length ? [[MIS_FOTOS, "✓ Mis fotos", mias.length]] : []), ["", "Todas", fotos.length], ...carpetas.map((c) => [c, c, fotos.filter((f) => f.carpeta === c).length])]
+    pills.innerHTML = [...(delSelfie ? [[SELFIE, "Donde salís", delSelfie.length]] : []), ...(mias.length ? [[MIS_FOTOS, "✓ Mis fotos", mias.length]] : []), ["", "Todas", fotos.length], ...carpetas.map((c) => [c, c, fotos.filter((f) => f.carpeta === c).length])]
       .map(([v, t, n]) => `<button type="button" class="pill${v === carpetaFotosTorneo ? " active" : ""}" data-carpeta="${escapeHtml(v)}" aria-pressed="${v === carpetaFotosTorneo}">${escapeHtml(t)} <span class="pill-cuenta">${n}</span></button>`).join("");
     pills.onclick = (e) => {
       const b = e.target.closest("[data-carpeta]");
