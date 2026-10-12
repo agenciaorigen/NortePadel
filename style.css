@@ -2604,3 +2604,24 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 .adm-carpeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
 .adm-carpeta-acciones { margin-left: auto; display: flex; gap: 6px; }
 .secondary.btn-peligro, .btn-peligro { color: #ff8a80; border-color: rgba(255,138,128,.45); }
+
+.wo-acciones { align-items: center; flex-wrap: wrap; border-top: 1px dashed var(--border); padding-top: 8px; }
+
+/* fotos: buscarse con una selfie */
+.fotos-selfie { margin: 0 0 12px; padding: 14px; border-radius: 14px; border: 1px solid rgba(var(--accent-rgb),.5);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(var(--accent-rgb),.18), transparent 60%), var(--bg-elev); }
+.fotos-selfie[hidden] { display: none; }
+.fotos-selfie-cta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fotos-selfie-cta > div { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; }
+.fotos-selfie-cta strong { font-family: var(--font-display); font-size: 22px; font-style: italic; text-transform: uppercase; }
+.fotos-selfie-cta span { color: var(--muted); font-size: 13.5px; }
+.fotos-selfie-cta button { width: auto; flex: 0 0 auto; }
+.fotos-selfie-estado { margin: 8px 0 0; font-size: 14px; }
+.fotos-selfie-estado:empty { display: none; }
+.fotos-selfie-estado button { width: auto; margin-left: 6px; }
+.fotos-promo s { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.fotos-promo strong + strong { margin-left: 0; }
+.fotos-promo-social { color: var(--accent-bright) !important; font-weight: 700; }
+.fotos-promo-social:empty { display: none; }
+.check-linea { display: flex; align-items: center; gap: 8px; font-weight: 500; margin-top: 8px; }
+.check-linea input { width: auto; }
