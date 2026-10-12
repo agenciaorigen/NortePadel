@@ -2589,3 +2589,12 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 .repetido-ficha { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: 10px; background: var(--bg-elev); }
 .repetido-ficha button { margin-top: auto; align-self: flex-start; }
 @media (max-width: 600px) { .repetido-par { grid-template-columns: 1fr; } }
+
+/* fotos compradas: cartel con "Descargar mis fotos" */
+.fotos-mias { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--accent); background: rgba(var(--accent-rgb),.14); }
+.fotos-mias[hidden] { display: none; }
+.fotos-mias span { font-size: 14px; }
+.fotos-mias .listo { animation: listoLate 1s ease-in-out 2; }
+@keyframes listoLate { 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .fotos-mias .listo { animation: none; } }
+.fotos-mias button { width: auto; flex: 0 0 auto; }

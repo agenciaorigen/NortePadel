@@ -8363,6 +8363,7 @@ function vistasFotosTorneo(fotos) {
 
 const precioTexto = (n) => "$" + Number(n).toLocaleString("es-AR");
 let carpetaFotosTorneo = "";
+const MIS_FOTOS = "__mias"; // "carpeta" especial: las fotos que compró
 let carpetaPedidaEnLink = null; // ?carpeta=... del link que se compartió (se usa una vez)
 const linkFotosTorneo = (torneoId, carpeta) =>
   `${location.origin}${location.pathname}#/torneo/${torneoId}/fotos${carpeta ? "?carpeta=" + encodeURIComponent(carpeta) : ""}`; // carpeta elegida en la galería del torneo ("" = todas)
@@ -8430,8 +8431,10 @@ async function cargarFotosTorneo() {
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
   // carpetas (ej. "Día 1", "Día 2"): la más nueva primero; "Todas" las muestra juntas
   const carpetas = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))];
+  const mias = fotos.filter((f) => fotosCompradas.has(f.id)); // las que compró (no cuenta lo de admin)
   if (carpetaPedidaEnLink) { carpetaFotosTorneo = carpetaPedidaEnLink; carpetaPedidaEnLink = null; }
-  if (!carpetas.includes(carpetaFotosTorneo)) carpetaFotosTorneo = "";
+  if (!carpetas.includes(carpetaFotosTorneo) && !(carpetaFotosTorneo === MIS_FOTOS && mias.length)) carpetaFotosTorneo = "";
+  renderMisFotos(mias);
   // promo bien a la vista arriba de la galería
   const promo = document.getElementById("dtFotosPromo"), { cantidad: comboCant, precio: comboPrecio } = comboFotos();
   if (promo) {
@@ -8439,10 +8442,10 @@ async function cargarFotosTorneo() {
     promo.innerHTML = `<strong>🔥 Promo: ${comboCant} fotos por ${precioTexto(comboPrecio)}</strong><span>Tocá <b>+</b> en las fotos donde salís y armá tu pedido</span>`;
   }
   const pills = document.getElementById("dtFotosCarpetas");
-  const visibles = () => carpetaFotosTorneo ? fotos.filter((f) => f.carpeta === carpetaFotosTorneo) : fotos;
+  const visibles = () => carpetaFotosTorneo === MIS_FOTOS ? mias : carpetaFotosTorneo ? fotos.filter((f) => f.carpeta === carpetaFotosTorneo) : fotos;
   if (pills) {
-    pills.hidden = !carpetas.length;
-    pills.innerHTML = [["", "Todas", fotos.length], ...carpetas.map((c) => [c, c, fotos.filter((f) => f.carpeta === c).length])]
+    pills.hidden = !carpetas.length && !mias.length;
+    pills.innerHTML = [...(mias.length ? [[MIS_FOTOS, "✓ Mis fotos", mias.length]] : []), ["", "Todas", fotos.length], ...carpetas.map((c) => [c, c, fotos.filter((f) => f.carpeta === c).length])]
       .map(([v, t, n]) => `<button type="button" class="pill${v === carpetaFotosTorneo ? " active" : ""}" data-carpeta="${escapeHtml(v)}" aria-pressed="${v === carpetaFotosTorneo}">${escapeHtml(t)} <span class="pill-cuenta">${n}</span></button>`).join("");
     pills.onclick = (e) => {
       const b = e.target.closest("[data-carpeta]");
@@ -8467,6 +8470,48 @@ async function cargarFotosTorneo() {
 }
 // combo (Gestión › Fotos): cada grupo completo paga el precio del combo y las que sobran
 // pagan su precio, sin pasarse de un combo más. La Edge Function cobra con esta misma cuenta.
+// cartel "Tenés N fotos compradas" con un botón para bajarlas todas juntas
+let archivosListos = null; // fotos ya bajadas, esperando que toque "Guardar" (compartir pide un toque nuevo)
+function renderMisFotos(mias) {
+  const caja = document.getElementById("dtFotosMias");
+  if (!caja) return;
+  archivosListos = null;
+  caja.hidden = !mias.length;
+  if (!mias.length) return;
+  caja.innerHTML = `<span>✓ Tenés <strong>${mias.length} ${mias.length === 1 ? "foto comprada" : "fotos compradas"}</strong> en este torneo. Podés bajarlas cuando quieras desde este celu.</span>
+    <button type="button" class="primary small" id="btnBajarMisFotos">Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}</button>`;
+  document.getElementById("btnBajarMisFotos").onclick = (e) => bajarMisFotos(e.currentTarget, mias.map((f) => f.id));
+}
+async function bajarMisFotos(btn, ids) {
+  if (btn.disabled) return;
+  // segundo toque en el celu: abre "Guardar imágenes" con todas juntas
+  if (archivosListos) {
+    try { await navigator.share({ files: archivosListos }); } catch (e) { if (e.name !== "AbortError") archivosListos.forEach((f) => guardarBlob(f, f.name)); }
+    return;
+  }
+  btn.disabled = true;
+  const archivos = [], fallaron = [];
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      btn.textContent = `Preparando ${i + 1} de ${ids.length}…`;
+      try {
+        const r = await fetch(await urlOriginal(ids[i]));
+        if (!r.ok) throw new Error();
+        archivos.push(new File([await r.blob()], nombreOriginal(ids[i]), { type: "image/jpeg" }));
+      } catch (e) { fallaron.push(ids[i]); }
+    }
+    if (fallaron.length) toast(`${fallaron.length} no se pudieron bajar: tocá cada una y "Descargar original"`);
+    if (!archivos.length) return;
+    if (navigator.canShare?.({ files: archivos })) { // celu: se guardan todas en la galería de una
+      archivosListos = archivos;
+      btn.textContent = `Guardar las ${archivos.length} en el celu`;
+      btn.classList.add("listo");
+    } else { // compu: se descargan una atrás de otra
+      for (const f of archivos) { guardarBlob(f, f.name); await new Promise((ok) => setTimeout(ok, 350)); }
+      btn.textContent = "✓ Descargadas";
+    }
+  } finally { btn.disabled = false; }
+}
 const comboFotos = () => ({ cantidad: Number(configApp.foto_combo_cantidad) || 0, precio: Number(configApp.foto_combo_precio) || 0 });
 function totalFotos(precios) {
   const { cantidad, precio } = comboFotos();
@@ -8485,6 +8530,29 @@ function renderCarritoFotos() {
   document.getElementById("fotosCarritoTexto").textContent = `${n} ${n === 1 ? "foto" : "fotos"} · ${precioTexto(totalFotos([...fotosElegidas.values()]))}` +
     (falta && falta < cantidad ? ` · combo ${cantidad} por ${precioTexto(precio)}: sumá ${falta} más` : "");
 }
+// ---------- descarga de originales comprados ----------
+async function urlOriginal(fotoId) {
+  const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId, ordenes: ordenesFotos() } });
+  if (error || !data?.url) throw new Error(data?.error || "No se pudo descargar la foto");
+  return data.url;
+}
+const nombreOriginal = (fotoId) => `norte-padel-${fotoId.slice(0, 8)}.jpg`;
+function guardarBlob(blob, nombre) {
+  const u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 60000); // si se libera al toque, algunos navegadores cortan la descarga
+}
+// una foto: la baja sin salir de la página (si el navegador no deja, la abre)
+async function bajarOriginal(fotoId) {
+  const url = await urlOriginal(fotoId);
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error();
+    guardarBlob(await r.blob(), nombreOriginal(fotoId));
+  } catch (e) { location.assign(url); }
+}
+
 // elegir/sacar del carrito y descargar originales (galería del torneo y de Gestión)
 document.addEventListener("click", async (e) => {
   const sumar = e.target.closest("[data-sumar-foto]");
@@ -8493,10 +8561,8 @@ document.addEventListener("click", async (e) => {
   if (bajar && !bajar.disabled) {
     bajar.disabled = true;
     try {
-      const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: bajar.dataset.descargarFoto, ordenes: ordenesFotos() } });
-      if (error || !data?.url) { toast(data?.error || "No se pudo descargar la foto"); return; }
-      location.assign(data.url);
-    } finally { bajar.disabled = false; }
+      await bajarOriginal(bajar.dataset.descargarFoto);
+    } catch (err) { toast(err.message); } finally { bajar.disabled = false; }
   }
 });
 // antes de cobrar, si no completa el combo, le recuerda la promo. Devuelve "pagar", "elegir" o "" (cerró)
@@ -8628,6 +8694,7 @@ async function volverDeMercadoPago() {
       : estado === "pending" || estado === "in_process" ? "Tu pago está pendiente: cuando se acredite, vas a poder descargar las fotos"
       : "El pago no se completó");
   }
+  if (estado === "approved") carpetaPedidaEnLink = MIS_FOTOS;
   abrirTorneo(torneo, "fotos");
 }
 
@@ -9277,10 +9344,10 @@ document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (
     if (btn.disabled) return;
     btn.disabled = true;
     try {
-      const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId: btn.dataset.fotoId, ordenes: ordenesFotos() } });
-      if (error || !data?.url) { toast(data?.error || "No se pudo descargar la foto"); return; }
-      location.assign(data.url);
-    } finally { btn.disabled = false; }
+      const texto = btn.textContent;
+      btn.textContent = "Descargando…";
+      await bajarOriginal(btn.dataset.fotoId).finally(() => { btn.textContent = texto; });
+    } catch (err) { toast(err.message); } finally { btn.disabled = false; }
     return;
   }
   const eleccion = await ofrecerPromo([btn.dataset.fotoId]);
@@ -9321,23 +9388,18 @@ document.getElementById("fotoGrandeCompartir")?.addEventListener("click", async 
 // todo con APIs nativas del navegador, sin librerías nuevas.
 document.getElementById("fotoGrandeDescargar").addEventListener("click", async (e) => {
   e.preventDefault();
-  const url = e.currentTarget.href;
+  const link = e.currentTarget, url = link.href;
   if (!url) return;
-  const textoOriginal = e.currentTarget.textContent;
-  e.currentTarget.textContent = "Descargando...";
+  const textoOriginal = link.textContent;
+  link.textContent = "Descargando...";
   try {
     const resp = await fetch(url);
-    const blob = await resp.blob();
-    const objUrl = URL.createObjectURL(blob);
-    const tmp = document.createElement("a");
-    tmp.href = objUrl;
-    tmp.download = url.split("/").pop().split("?")[0] || "foto.jpg";
-    tmp.click();
-    URL.revokeObjectURL(objUrl);
+    if (!resp.ok) throw new Error();
+    guardarBlob(await resp.blob(), url.split("/").pop().split("?")[0] || "foto.jpg");
   } catch {
     window.open(url, "_blank");
   } finally {
-    e.currentTarget.textContent = textoOriginal;
+    link.textContent = textoOriginal;
   }
 });
 document.addEventListener("click", (e) => {
