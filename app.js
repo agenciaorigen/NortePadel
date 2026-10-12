@@ -120,8 +120,8 @@ function cambiarVista(nombre, ruta) {
   document.getElementById("tabMas")?.classList.toggle("active", enMas);
   document.querySelectorAll("#menuMas [data-ir]").forEach((b) => b.classList.toggle("active", b.dataset.ir === nombre));
   if (nombre === "fotos") cargarVistaFotos();
-  // el ranking completo se pide recién la primera vez que se entra (la portada carga más rápido)
-  if (nombre === "ranking" && !rankingCargado) { rankingCargado = true; cargarRanking(); }
+  // el ranking completo se pide al entrar a Ranking, no al abrir la portada (carga más rápido)
+  if (nombre === "ranking") cargarRanking(); // siempre fresco al entrar (así se ven los resultados recién cargados)
   if (!syncingDesdeHash) navegarA(ruta || (nombre === "inicio" ? "/" : "/" + nombre));
   contarVisita(nombre);
 }
@@ -8711,6 +8711,7 @@ async function cargarFotosTorneoAdmin() {
     avisar.href = "https://wa.me/?text=" + encodeURIComponent(msg);
     avisar.hidden = !fotos.length;
   }
+  renderCarpetasAdmin(fotos);
   const sugeridas = document.getElementById("admFotosCarpetasLista");
   if (sugeridas) sugeridas.innerHTML = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))].map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
   cont.innerHTML = fotos.length
@@ -8747,6 +8748,77 @@ async function cargarFotosTorneoAdmin() {
     });
   });
 }
+
+// ---------- Gestión › Fotos: carpetas (renombrar o borrar todas sus fotos de una) ----------
+let fotosAdminCache = [];
+function renderCarpetasAdmin(fotos) {
+  fotosAdminCache = fotos;
+  const cont = document.getElementById("admFotosCarpetas");
+  if (!cont) return;
+  const grupos = new Map();
+  fotos.forEach((f) => { const c = f.carpeta || ""; grupos.set(c, (grupos.get(c) || 0) + 1); });
+  cont.innerHTML = grupos.size ? `<p class="match-meta">Carpetas de este torneo:</p>` + [...grupos].map(([c, n]) => `<div class="adm-carpeta">
+      <strong>${escapeHtml(c || "Sin carpeta")}</strong> <span class="match-meta">${n} ${n === 1 ? "foto" : "fotos"}</span>
+      <span class="adm-carpeta-acciones">
+        <button type="button" class="secondary small" data-renombrar-carpeta="${escapeHtml(c)}">Renombrar</button>
+        <button type="button" class="secondary small btn-peligro" data-borrar-carpeta="${escapeHtml(c)}">Borrar carpeta</button>
+      </span>
+    </div>`).join("") : "";
+}
+const fotosDeCarpeta = (c) => fotosAdminCache.filter((f) => (f.carpeta || "") === c);
+const enTandas = (lista, n) => Array.from({ length: Math.ceil(lista.length / n) }, (_, i) => lista.slice(i * n, i * n + n));
+document.getElementById("admFotosCarpetas")?.addEventListener("click", async (e) => {
+  const ren = e.target.closest("[data-renombrar-carpeta]"), bor = e.target.closest("[data-borrar-carpeta]");
+  const btn = ren || bor;
+  if (!btn || btn.disabled) return;
+  const carpeta = btn.dataset.renombrarCarpeta ?? btn.dataset.borrarCarpeta;
+  const fotos = fotosDeCarpeta(carpeta);
+  const ids = fotos.map((f) => f.id);
+  if (!ids.length) return;
+  if (ren) {
+    const nuevo = prompt(`Nuevo nombre para "${carpeta || "Sin carpeta"}" (vacío = sin carpeta):`, carpeta);
+    if (nuevo === null) return;
+    btn.disabled = true;
+    try {
+      for (const tanda of enTandas(ids, 100)) {
+        const { error } = await sb.from("torneo_fotos").update({ carpeta: nuevo.trim().slice(0, 40) || null }).in("id", tanda);
+        if (error) { toast("Error: " + error.message); return; }
+      }
+      toast("Carpeta renombrada");
+    } finally { btn.disabled = false; }
+  } else {
+    // las fotos ya vendidas: avisar, porque al borrarlas el comprador ya no las puede bajar
+    let vendidas = 0;
+    for (const tanda of enTandas(ids, 100)) {
+      const { count } = await sb.from("compras_fotos").select("id", { count: "exact", head: true }).eq("estado", "pagada").in("foto_id", tanda);
+      vendidas += count || 0;
+    }
+    const aviso = `¿Borrar la carpeta "${carpeta || "Sin carpeta"}" con sus ${ids.length} fotos? No se puede deshacer.` +
+      (vendidas ? `\n\n⚠ ${vendidas} ${vendidas === 1 ? "foto ya fue comprada" : "fotos ya fueron compradas"}: esa gente ya no las va a poder descargar.` : "");
+    if (!confirm(aviso)) return;
+    btn.disabled = true;
+    const texto = btn.textContent;
+    try {
+      let hechas = 0;
+      for (const tanda of enTandas(fotos, 100)) {
+        const { error } = await sb.from("torneo_fotos").delete().in("id", tanda.map((f) => f.id));
+        if (error) { toast("Error: " + error.message); return; }
+        // archivos: originales (privados) + vista y miniatura; si alguno no se puede borrar, la foto igual ya no se ve
+        const originales = tanda.map((f) => f.original_path).filter(Boolean);
+        const vistas = tanda.flatMap((f) => [rutaFotoTorneo(f.url), rutaFotoTorneo(f.thumb_url)]).filter(Boolean);
+        await Promise.all([
+          originales.length && sb.storage.from("fotos-venta").remove(originales),
+          vistas.length && sb.storage.from("fotos-torneos").remove(vistas)
+        ]).catch(() => {});
+        hechas += tanda.length;
+        btn.textContent = `Borrando ${hechas}/${fotos.length}…`;
+      }
+      toast(`Carpeta borrada (${fotos.length} fotos)`);
+    } finally { btn.disabled = false; btn.textContent = texto; }
+  }
+  cargarFotosTorneoAdmin();
+  if (torneoActualId === torneoGestionId) cargarFotosTorneo();
+});
 
 // Una foto de celular puede pesar 5-8MB a resolución completa -- eso ni hace
 // falta para verla en pantalla ni para descargarla, y multiplicado por

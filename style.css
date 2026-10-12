@@ -2598,3 +2598,9 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 @keyframes listoLate { 50% { transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .fotos-mias .listo { animation: none; } }
 .fotos-mias button { width: auto; flex: 0 0 auto; }
+
+/* Gestión › Fotos: carpetas */
+.adm-carpetas { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; }
+.adm-carpeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
+.adm-carpeta-acciones { margin-left: auto; display: flex; gap: 6px; }
+.secondary.btn-peligro, .btn-peligro { color: #ff8a80; border-color: rgba(255,138,128,.45); }
