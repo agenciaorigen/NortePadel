@@ -8548,12 +8548,16 @@ function lienzoDe(blob, maxLado) {
     return c;
   });
 }
-// huellas de todas las caras de una foto del torneo (detector preciso: en las fotos las caras salen chicas)
+// huellas de las caras de una foto del torneo. Solo caras nítidas y de buen tamaño:
+// las chiquitas (gente de fondo, jugadores lejos) dan huellas "promedio" que se parecen
+// a cualquiera y llenaban la búsqueda de fotos equivocadas.
+const CARA_MIN_PX = 64; // ancho mínimo de la cara en el lienzo de 2400
 async function huellasDeFoto(blob) {
   await cargarFaceApi(true);
-  const lienzo = await lienzoDe(blob, 1600);
-  const caras = await faceapi.detectAllFaces(lienzo, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 })).withFaceLandmarks().withFaceDescriptors();
-  return caras.map((c) => Array.from(c.descriptor, (x) => Math.round(x * 1e5) / 1e5));
+  const lienzo = await lienzoDe(blob, 2400);
+  const caras = await faceapi.detectAllFaces(lienzo, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 })).withFaceLandmarks().withFaceDescriptors();
+  return caras.filter((c) => c.detection.box.width >= CARA_MIN_PX)
+    .map((c) => Array.from(c.descriptor, (x) => Math.round(x * 1e5) / 1e5));
 }
 // guarda las huellas de una foto (admin)
 async function indexarFoto(fotoId, blob) {
@@ -8576,17 +8580,25 @@ document.getElementById("dtSelfieInput")?.addEventListener("change", async (e) =
   const texto = btn.textContent;
   try {
     estado.textContent = "Preparando el reconocimiento (la primera vez tarda unos segundos)…";
-    await cargarFaceApi(false);
+    await cargarFaceApi(true); // el mismo detector que se usó en las fotos: huellas comparables
     estado.textContent = "Buscándote en las fotos…";
-    const lienzo = await lienzoDe(archivo, 800);
-    const cara = await faceapi.detectSingleFace(lienzo, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 })).withFaceLandmarks().withFaceDescriptor();
+    const lienzo = await lienzoDe(archivo, 1024);
+    const cara = await faceapi.detectSingleFace(lienzo, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptor();
     if (!cara) { estado.textContent = "No encontramos una cara clara en la selfie. Probá de nuevo de frente, con buena luz y sin anteojos de sol."; return; }
     const { data, error } = await sb.rpc("buscar_fotos_por_cara", { p_torneo: torneoActualId, p_desc: Array.from(cara.descriptor) });
     if (error) { estado.textContent = "No se pudo buscar ahora (" + error.message + "). Probá de nuevo en un rato."; return; }
-    const ids = (data || []).map((r) => r.foto_id);
-    if (!ids.length) { estado.textContent = "No te encontramos en las fotos preparadas. Probá con otra selfie, o mirá las carpetas: puede que estés de perfil o lejos."; return; }
+    // vienen ordenadas de la más parecida a la menos. Seguras: < 0.5. Si no hay seguras,
+    // se muestran las más parecidas (pocas) para que la persona mire si está.
+    const filas = data || [];
+    const seguras = filas.filter((r) => r.distancia < 0.5);
+    const ids = (seguras.length ? seguras : filas.slice(0, 12)).map((r) => r.foto_id);
+    if (!ids.length) { estado.textContent = "No te encontramos en las fotos preparadas. Probá con otra selfie de frente y con buena luz, o mirá las carpetas: puede que estés de perfil o lejos."; return; }
     fotosSelfie = { torneo: torneoActualId, ids };
-    estado.innerHTML = `<b>¡Te encontramos en ${ids.length} ${ids.length === 1 ? "foto" : "fotos"}!</b> Revisalas: si alguna no sos vos, no la sumes. <button type="button" class="primary small" id="btnSelfieSumarTodas">Sumar las ${ids.length} al pedido</button>`;
+    const n = ids.length, fotosTxt = n === 1 ? "foto" : "fotos";
+    estado.innerHTML = (seguras.length
+      ? `<b>¡Te encontramos en ${n} ${fotosTxt}!</b> Revisalas: si alguna no sos vos, no la sumes. `
+      : `<b>No te encontramos seguro.</b> Estas ${n === 1 ? "es la más parecida" : `son las ${n} más parecidas`}: fijate si estás. `) +
+      `<button type="button" class="primary small" id="btnSelfieSumarTodas">Sumar ${n === 1 ? "la foto" : `las ${n}`} al pedido</button>`;
     carpetaPedidaEnLink = SELFIE;
     await cargarFotosTorneo();
     document.getElementById("dtFotosCarpetas")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -8624,8 +8636,9 @@ document.getElementById("btnPrepararSelfie")?.addEventListener("click", async (e
       btn.textContent = `Preparando ${hechas + 1}/${pendientes.length}… (no cierres la página)`;
       try {
         // del original (sin marca de agua), si no, la foto publicada
-        const url = f.original_path ? await urlOriginal(f.id) : f.url;
-        const r = await fetch(url);
+        // solo del original: la marca de agua cruza las caras y arruina la huella
+        if (!f.original_path) { await sb.from("torneo_fotos").update({ caras: 0 }).eq("id", f.id); hechas++; continue; }
+        const r = await fetch(await urlOriginal(f.id));
         if (r.ok && (await indexarFoto(f.id, await r.blob())) > 0) conCara++;
       } catch (err) { /* sigue con la próxima */ }
       hechas++;
