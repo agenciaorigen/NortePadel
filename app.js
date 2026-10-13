@@ -8471,13 +8471,7 @@ async function cargarFotosTorneo() {
     ].filter(Boolean);
     promo.hidden = !lineas.length || !aLaVenta.length;
     promo.innerHTML = lineas.join("") +
-      `<span>Tocá <b>+</b> en las fotos donde salís y armá tu pedido${hasta && hasta >= new Date(new Date().toDateString()) ? ` · <b>promo hasta el ${hasta.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" })}</b>` : ""}</span>` +
-      `<span class="fotos-promo-social" id="dtFotosSocial"></span>`;
-    // prueba social: cuántos ya compraron (si la función todavía no existe, no se muestra)
-    sb.rpc("fotos_compradores", { p_torneo: torneoActualId }).then(({ data: n }) => {
-      const el = document.getElementById("dtFotosSocial");
-      if (el && n >= 3) el.textContent = `${n} jugadores ya compraron sus fotos`;
-    });
+      `<span>Tocá <b>+</b> en las fotos donde salís y armá tu pedido${hasta && hasta >= new Date(new Date().toDateString()) ? ` · <b>promo hasta el ${hasta.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" })}</b>` : ""}</span>`;
   }
   // selfie: se ofrece si el torneo tiene fotos preparadas para la búsqueda
   const cajaSelfie = document.getElementById("dtFotosSelfie");
