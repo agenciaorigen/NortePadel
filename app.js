@@ -7238,7 +7238,19 @@ async function exportarHorariosInstagram() {
   }));
   const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
   // primero las fotos del propio torneo; si se acaban, las fijas de arriba
-  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId);
+  // Usar las fotos de Fecha Puntuable 8 como fondos de Instagram,
+  // aunque los horarios correspondan al torneo actualmente seleccionado.
+  const TORNEO_FOTOS_FONDO_INSTAGRAM = "a860d96d-08b2-4b3b-a270-d0e676821aee";
+  const { data: delTorneo, error: errorFotosFondo } = await sb
+    .from("torneo_fotos")
+    .select("*")
+    .eq("torneo_id", TORNEO_FOTOS_FONDO_INSTAGRAM);
+
+  if (errorFotosFondo) {
+    console.error("Error cargando fotos de fondo:", errorFotosFondo);
+    toast("Error cargando fotos de fondo: " + errorFotosFondo.message);
+    return;
+  }
   // fotos a la venta: el original en alta calidad (sin marca de agua; el admin puede
   // bajarlo); las gratis, su vista. Mezcladas, una distinta por imagen.
   const banco = (delTorneo || []).sort(() => Math.random() - 0.5);
