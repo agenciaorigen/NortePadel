@@ -2598,6 +2598,8 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 @keyframes listoLate { 50% { transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .fotos-mias .listo { animation: none; } }
 .fotos-mias button { width: auto; flex: 0 0 auto; }
+.fotos-mias .fotos-credito { flex-basis: 100%; }
+.fotos-mias .link-mas { font: inherit; text-transform: none; letter-spacing: 0; padding: 0; }
 
 /* Gestión › Fotos: carpetas */
 .adm-carpetas { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; }

@@ -93,7 +93,13 @@ const VISTAS_DE_TORNEO = new Set([
 ]);
 
 let adminFocoTorneoActivo = false; // true mientras se administra UN torneo puntual (ver cambiarVista)
+// fotos: declaradas acá arriba porque cambiarVista() y el cambio de sesión las usan desde el arranque
+let creditosFotos = 0; // fotos de crédito del jugador logueado en este torneo (pagó el combo y eligió menos)
+let comprasVinculadas = false; // las compras sin cuenta de este celu ya se pasaron a la cuenta
+let torneoDelPedido = null; // torneo de las fotos del pedido (un pedido no mezcla torneos)
+let volverTrasLogin = null; // pantalla a la que se vuelve después de entrar (ej. para guardar créditos)
 function cambiarVista(nombre, ruta) {
+  if (nombre !== "perfil") volverTrasLogin = null; // si fue a otro lado, después de entrar no lo mandamos a las fotos
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
   const view = document.getElementById("view-" + nombre);
@@ -719,6 +725,7 @@ document.getElementById("btnGuardarClaveNueva").addEventListener("click", async 
 
 async function manejarCambioSesion(session) {
   currentUser = session?.user || null;
+  comprasVinculadas = false; // con cada cuenta que entra se vuelven a pasar las compras de este celu
   miJugador = null;
   isAdmin = false;
 
@@ -751,6 +758,11 @@ async function manejarCambioSesion(session) {
   // si este celular ya dio permiso, se re-registra solo (sin preguntar)
   if (miJugador) suscribirAvisos(false).catch(() => {}).then(renderAvisos);
   if (isAdmin) { cargarJugadoresAdmin(); if (FEATURE_JUGAR_HABILITADA) cargarReservasPendientesAdmin(); }
+  if (currentUser && volverTrasLogin) { // entró para guardar sus fotos/créditos: vuelve a la galería
+    const volver = volverTrasLogin;
+    volverTrasLogin = null;
+    if (Date.now() < volver.hasta) location.hash = volver.hash;
+  }
   if (torneoActualId) cargarFotosTorneo(); // compradas / admin: cambian las opciones de cada foto
   calcularTorneoDestacado();
   cargarHeroPosicion();
@@ -7238,19 +7250,7 @@ async function exportarHorariosInstagram() {
   }));
   const fotos = Object.fromEntries(await Promise.all([...new Set(Object.values(fotoDe))].map(async (f) => [f, await cargarImagenParaCanvas(f)])));
   // primero las fotos del propio torneo; si se acaban, las fijas de arriba
-  // Usar las fotos de Fecha Puntuable 8 como fondos de Instagram,
-  // aunque los horarios correspondan al torneo actualmente seleccionado.
-  const TORNEO_FOTOS_FONDO_INSTAGRAM = "a860d96d-08b2-4b3b-a270-d0e676821aee";
-  const { data: delTorneo, error: errorFotosFondo } = await sb
-    .from("torneo_fotos")
-    .select("*")
-    .eq("torneo_id", TORNEO_FOTOS_FONDO_INSTAGRAM);
-
-  if (errorFotosFondo) {
-    console.error("Error cargando fotos de fondo:", errorFotosFondo);
-    toast("Error cargando fotos de fondo: " + errorFotosFondo.message);
-    return;
-  }
+  const { data: delTorneo } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId);
   // fotos a la venta: el original en alta calidad (sin marca de agua; el admin puede
   // bajarlo); las gratis, su vista. Mezcladas, una distinta por imagen.
   const banco = (delTorneo || []).sort(() => Math.random() - 0.5);
@@ -8407,6 +8407,7 @@ function ordenesFotos() {
 }
 function guardarOrdenFotos(orden) {
   if (!/^[0-9a-f-]{36}$/i.test(orden || "")) return;
+  comprasVinculadas = false;
   try { localStorage.setItem("ordenesFotos", JSON.stringify([orden, ...ordenesFotos().filter((o) => o !== orden)].slice(0, 50))); } catch (e) { /* sin almacenamiento: queda la compra con cuenta */ }
 }
 const fotosElegidas = new Map(); // id -> precio (carrito)
@@ -8455,13 +8456,24 @@ async function cargarFotosTorneo() {
     if (vacio) vacio.style.display = "none";
     return;
   }
+  const torneo = torneoActualId; // si mientras carga se cambia de torneo, esta carga se descarta
+  if (torneoDelPedido !== torneo) { fotosElegidas.clear(); torneoDelPedido = torneo; } // el pedido es de un solo torneo
   const ordenes = ordenesFotos();
-  const [fotos, { data: compras }, { data: deOrdenes }] = await Promise.all([
+  // lo que compró sin cuenta en este celu queda guardado en su cuenta (una vez por visita)
+  if (currentUser && ordenes.length && !comprasVinculadas) {
+    comprasVinculadas = true;
+    await sb.rpc("vincular_compras_fotos", { p_ordenes: ordenes });
+  }
+  const [fotos, { data: compras }, { data: deOrdenes }, { data: saldo }] = await Promise.all([
     vistasFotosTorneo(data || []),
     currentUser ? sb.from("compras_fotos").select("foto_id").eq("estado", "pagada") : { data: [] },
-    ordenes.length ? sb.functions.invoke("mp-fotos", { body: { accion: "compradas", ordenes } }) : { data: null }
+    ordenes.length ? sb.functions.invoke("mp-fotos", { body: { accion: "compradas", ordenes } }) : { data: null },
+    currentUser ? sb.rpc("creditos_fotos", { p_torneo: torneo }) : { data: 0 }
   ]);
+  if (torneo !== torneoActualId) return;
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
+  fotosCompradas.forEach((id) => fotosElegidas.delete(id)); // lo que ya es suyo no se cobra ni se canjea de nuevo
+  creditosFotos = Math.max(0, Number(saldo) || 0);
   // carpetas (ej. "Día 1", "Día 2"): la más nueva primero; "Todas" las muestra juntas
   const carpetas = [...new Set(fotos.map((f) => f.carpeta).filter(Boolean))];
   fotosTorneoCache = fotos;
@@ -8666,11 +8678,20 @@ function renderMisFotos(mias) {
   const caja = document.getElementById("dtFotosMias");
   if (!caja) return;
   archivosListos = null;
-  caja.hidden = !mias.length;
-  if (!mias.length) return;
-  caja.innerHTML = `<span>✓ Tenés <strong>${mias.length} ${mias.length === 1 ? "foto comprada" : "fotos compradas"}</strong> en este torneo. Podés bajarlas cuando quieras desde este celu.</span>
-    <button type="button" class="primary small" id="btnBajarMisFotos">Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}</button>`;
-  document.getElementById("btnBajarMisFotos").onclick = (e) => bajarMisFotos(e.currentTarget, mias.map((f) => f.id));
+  caja.hidden = !mias.length && !creditosFotos;
+  if (caja.hidden) return;
+  const guardadas = currentUser
+    ? "Quedan guardadas en tu cuenta: las bajás cuando quieras, desde cualquier celu."
+    : 'Quedan guardadas en este celu. <button type="button" class="link-mas" data-entrar-fotos>Entrá con tu cuenta</button> para tenerlas en cualquier celu.';
+  const credito = creditosFotos
+    ? `<span class="fotos-credito">Te ${creditosFotos === 1 ? "queda <strong>1 foto" : `quedan <strong>${creditosFotos} fotos`} de crédito</strong> en este torneo: tocá <b>+</b> en las que quieras y canjealas sin pagar.</span>`
+    : "";
+  caja.innerHTML = (mias.length
+    ? `<span>✓ Tenés <strong>${mias.length} ${mias.length === 1 ? "foto comprada" : "fotos compradas"}</strong> en este torneo. ${guardadas}</span>
+    <button type="button" class="primary small" id="btnBajarMisFotos">Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}</button>`
+    : "") + credito;
+  const bajar = document.getElementById("btnBajarMisFotos");
+  if (bajar) bajar.onclick = (e) => bajarMisFotos(e.currentTarget, mias.map((f) => f.id));
 }
 async function bajarMisFotos(btn, ids) {
   if (btn.disabled) return;
@@ -8722,12 +8743,62 @@ function renderCarritoFotos() {
   if (!barra) return;
   const n = fotosElegidas.size, { cantidad, precio } = comboFotos();
   barra.hidden = !n;
-  const falta = cantidad > 1 && precio > 0 ? cantidad - (n % cantidad) : 0;
-  const precios = [...fotosElegidas.values()], total = totalFotos(precios), sinDescuento = precios.reduce((a, b) => a + b, 0);
-  document.getElementById("fotosCarritoTexto").textContent = `${n} ${n === 1 ? "foto" : "fotos"} · ${precioTexto(total)}` +
-    (sinDescuento > total ? ` (ahorrás ${precioTexto(sinDescuento - total)})` : "") +
-    (falta && falta < cantidad ? ` · combo ${cantidad} por ${precioTexto(precio)}: sumá ${falta} más` : "");
+  // las primeras van con crédito (si tiene); se paga solo el resto
+  const conCredito = Math.min(n, creditosFotos), aPagar = n - conCredito;
+  const precios = [...fotosElegidas.values()].slice(conCredito), total = totalFotos(precios), sinDescuento = precios.reduce((a, b) => a + b, 0);
+  const falta = cantidad > 1 && precio > 0 ? cantidad - (aPagar % cantidad) : 0;
+  const canjear = document.getElementById("btnCanjearFotos");
+  if (canjear) {
+    canjear.hidden = !conCredito || aPagar > 0; // si además hay que pagar, el botón de pagar usa el crédito primero
+    canjear.textContent = `Usar ${conCredito} ${conCredito === 1 ? "crédito" : "créditos"} (sin pagar)`;
+  }
+  const pagar = document.getElementById("btnPagarFotos");
+  pagar.hidden = n > 0 && !aPagar;
+  pagar.textContent = conCredito ? `Usar ${conCredito} de crédito y pagar ${precioTexto(total)}` : "Pagar con Mercado Pago";
+  const fotos = (k) => `${k} ${k === 1 ? "foto" : "fotos"}`;
+  document.getElementById("fotosCarritoTexto").textContent = !aPagar
+    ? `${fotos(n)} con tu crédito · después te ${creditosFotos - n === 1 ? "queda 1" : `quedan ${creditosFotos - n}`}`
+    : (conCredito ? `${fotos(conCredito)} con crédito + ${fotos(aPagar)} · ${precioTexto(total)}` : `${fotos(n)} · ${precioTexto(total)}`) +
+      (sinDescuento > total ? ` (ahorrás ${precioTexto(sinDescuento - total)})` : "") +
+      (falta && falta < cantidad ? ` · combo ${cantidad} por ${precioTexto(precio)}: sumá ${falta} más` : "");
 }
+// cuántas fotos más "entran" en lo que va a pagar (misma cuenta que la Edge Function):
+// si las que sobran del último combo ya cuestan lo mismo que el combo entero, el resto es crédito
+function creditosDeCompra(precios) {
+  const { cantidad, precio } = comboFotos(), pack = packFotos();
+  if (!(cantidad > 1 && precio > 0)) return 0;
+  if (pack.cantidad > 0 && pack.precio > 0 && precios.length <= pack.cantidad) return 0; // con el pack no hay crédito
+  const p = [...precios].sort((a, b) => b - a), resto = p.slice(Math.floor(p.length / cantidad) * cantidad);
+  return resto.length && resto.reduce((a, b) => a + b, 0) >= precio ? cantidad - resto.length : 0;
+}
+// canjear créditos: las primeras elegidas (hasta lo que alcance) pasan a ser suyas, sin pagar
+// devuelve false si no se pudo (y ya avisó)
+async function canjearCreditos(ids = [...fotosElegidas.keys()].slice(0, creditosFotos)) {
+  if (!ids.length) return true;
+  const { data: n, error } = await sb.rpc("canjear_creditos_fotos", { p_fotos: ids });
+  if (error) { toast(error.message); await cargarFotosTorneo(); return false; }
+  toast(`Listo: ${n} ${n === 1 ? "foto ya es tuya" : "fotos ya son tuyas"}. Bajalas desde "Mis fotos".`);
+  await cargarFotosTorneo(); // crédito y "Mis fotos" al día; del pedido sale solo lo que ya es suyo
+  return true;
+}
+// saldo fresco justo antes de cobrar (ej. un pago que se aprobó mientras tenía la página abierta)
+async function actualizarCreditos() {
+  if (!currentUser || !torneoActualId) return;
+  const { data, error } = await sb.rpc("creditos_fotos", { p_torneo: torneoActualId });
+  if (!error) { creditosFotos = Math.max(0, Number(data) || 0); renderCarritoFotos(); }
+}
+document.getElementById("btnCanjearFotos")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try { await canjearCreditos(); } finally { btn.disabled = false; }
+});
+// "Entrá con tu cuenta" desde fotos: al entrar vuelve a la galería (con el pedido armado)
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-entrar-fotos]")) return;
+  volverTrasLogin = { hash: location.hash, hasta: Date.now() + 15 * 60000 };
+  cambiarVista("perfil");
+});
 // ---------- W.O.: una pareja no se presentó ----------
 // El rival pasa de ronda como "pasa directo" (sin puntos ni partido jugado para nadie),
 // el cuadro avanza solo, y la que faltó no sigue (si tenía "segunda chance", ese cruce
@@ -8766,15 +8837,18 @@ async function urlOriginal(fotoId) {
   return data.url;
 }
 const nombreOriginal = (fotoId) => `norte-padel-${fotoId.slice(0, 8)}.jpg`;
+// iPhone/iPad: Safari no descarga blobs, abre la pestaña en "blob:..." y al volver o
+// recargar muestra "Error de WebKitBlobResource 1". Ahí se va directo al link real.
 function guardarBlob(blob, nombre) {
   const u = URL.createObjectURL(blob), a = document.createElement("a");
   a.href = u; a.download = nombre;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(u), 60000); // si se libera al toque, algunos navegadores cortan la descarga
+  if (!esIOS) setTimeout(() => URL.revokeObjectURL(u), 60000); // si se libera al toque, algunos navegadores cortan la descarga
 }
 // una foto: la baja sin salir de la página (si el navegador no deja, la abre)
 async function bajarOriginal(fotoId) {
   const url = await urlOriginal(fotoId);
+  if (esIOS) { location.assign(url); return; } // el link ya viene como descarga: Safari pregunta y no sale de la página
   try {
     const r = await fetch(url);
     if (!r.ok) throw new Error();
@@ -8801,10 +8875,20 @@ function ofrecerPromo(ids) {
   const n = ids.length;
   if (!dlg?.showModal || !(cantidad > 1) || !(precio > 0) || n % cantidad === 0) return Promise.resolve("pagar");
   const precios = ids.map((id) => fotosElegidas.get(id) ?? Number(document.querySelector(`[data-foto-id="${id}"]`)?.dataset.precio || 0));
-  const total = precioTexto(totalFotos(precios)), meta = Math.ceil(n / cantidad) * cantidad;
-  document.getElementById("promoFotosTitulo").textContent = `${cantidad} fotos por ${precioTexto(precio)}`;
-  document.getElementById("promoFotosTexto").textContent = `Llevás ${n} ${n === 1 ? "foto" : "fotos"} (${total}). Sumá ${meta - n} más y te llevás las ${meta} por ${precioTexto((meta / cantidad) * precio)}.`;
-  document.getElementById("promoFotosPagar").textContent = `Pagar igual ${total}`;
+  const total = precioTexto(totalFotos(precios)), meta = Math.ceil(n / cantidad) * cantidad, extra = creditosDeCompra(precios);
+  const entrar = document.getElementById("promoFotosEntrar");
+  if (entrar) entrar.hidden = !extra || !!currentUser;
+  if (extra) { // ya paga lo mismo que el combo entero: lo que le falta elegir queda como crédito
+    document.getElementById("promoFotosTitulo").textContent = `Con ${total} te llevás ${meta} fotos`;
+    document.getElementById("promoFotosTexto").textContent = currentUser
+      ? `Elegiste ${n}. Sumá ${extra} más ahora, o pagá y las ${extra} que faltan te quedan como crédito para elegirlas después en este torneo.`
+      : `Elegiste ${n}. Sumá ${extra} más ahora, o entrá con tu cuenta de jugador antes de pagar y las ${extra} que faltan te quedan como crédito para elegirlas después.`;
+    document.getElementById("promoFotosPagar").textContent = currentUser ? `Pagar ${total} y guardar ${extra} de crédito` : `Pagar ${total} sin crédito`;
+  } else {
+    document.getElementById("promoFotosTitulo").textContent = `${cantidad} fotos por ${precioTexto(precio)}`;
+    document.getElementById("promoFotosTexto").textContent = `Llevás ${n} ${n === 1 ? "foto" : "fotos"} (${total}). Sumá ${meta - n} más y te llevás las ${meta} por ${precioTexto((meta / cantidad) * precio)}.`;
+    document.getElementById("promoFotosPagar").textContent = `Pagar igual ${total}`;
+  }
   dlg.returnValue = "";
   dlg.showModal();
   return new Promise((listo) => dlg.addEventListener("close", () => listo(dlg.returnValue), { once: true }));
@@ -8847,8 +8931,16 @@ document.getElementById("repetidosWrap")?.addEventListener("click", async (e) =>
 });
 
 document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) => {
-  const btn = e.currentTarget, ids = [...fotosElegidas.keys()];
-  if (await ofrecerPromo(ids) === "pagar") pagarFotos(ids, btn);
+  const btn = e.currentTarget;
+  await actualizarCreditos();
+  if (!fotosElegidas.size) return;
+  if (fotosElegidas.size <= creditosFotos) { await canjearCreditos(); return; } // le alcanza con el crédito
+  const ids = [...fotosElegidas.keys()].slice(creditosFotos); // las que no cubre el crédito
+  const eleccion = await ofrecerPromo(ids);
+  if (eleccion === "entrar") { volverTrasLogin = { hash: location.hash, hasta: Date.now() + 15 * 60000 }; cambiarVista("perfil"); return; }
+  if (eleccion !== "pagar") return;
+  if (creditosFotos && !(await canjearCreditos())) return; // primero el crédito, después se cobra el resto
+  pagarFotos([...fotosElegidas.keys()], btn);
 });
 async function pagarFotos(ids, btn) {
   if (btn.disabled || !ids.length) return;
@@ -9630,7 +9722,8 @@ function mostrarFotoGrande(el) {
   if (btnOriginal && btnPedido) btnOriginal.hidden = !aLaVenta, btnPedido.hidden = !aLaVenta || !!el.dataset.comprada;
   if (aLaVenta && btnOriginal && btnPedido) {
     btnOriginal.dataset.fotoId = id;
-    btnOriginal.textContent = el.dataset.comprada ? "Descargar original" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
+    const conCredito = !el.dataset.comprada && creditosFotos > 0 && !!el.closest("#dtFotosGaleria");
+    btnOriginal.textContent = el.dataset.comprada ? "Descargar original" : conCredito ? "Original con 1 crédito (sin pagar)" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
     btnPedido.textContent = fotosElegidas.has(id) ? "✓ En tu pedido (quitar)" : "Sumar al pedido";
     btnPedido.setAttribute("aria-pressed", fotosElegidas.has(id));
   }
@@ -9665,7 +9758,14 @@ document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (
     } catch (err) { toast(err.message); } finally { btn.disabled = false; }
     return;
   }
+  if (creditosFotos > 0 && el?.closest("#dtFotosGaleria")) { // tiene crédito: la canjea sin pagar
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try { if (await canjearCreditos([btn.dataset.fotoId])) cerrarFotoGrande(); } finally { btn.disabled = false; }
+    return;
+  }
   const eleccion = await ofrecerPromo([btn.dataset.fotoId]);
+  if (eleccion === "entrar") { volverTrasLogin = { hash: location.hash, hasta: Date.now() + 15 * 60000 }; cerrarFotoGrande(); cambiarVista("perfil"); return; }
   if (eleccion === "pagar") pagarFotos([btn.dataset.fotoId], btn); // recién acá se cobra
   else if (eleccion === "elegir") { // la suma al pedido y vuelve a la galería para elegir más
     if (!fotosElegidas.has(btn.dataset.fotoId)) document.getElementById("fotoGrandePedido").click();
@@ -9705,6 +9805,7 @@ document.getElementById("fotoGrandeDescargar").addEventListener("click", async (
   e.preventDefault();
   const link = e.currentTarget, url = link.href;
   if (!url) return;
+  if (esIOS) { window.open(url, "_blank"); return; } // en el toque, sin blob (ver guardarBlob)
   const textoOriginal = link.textContent;
   link.textContent = "Descargando...";
   try {
