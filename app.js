@@ -4441,7 +4441,7 @@ async function refrescarDetalleTorneo() {
   document.getElementById("dtInscripcionCard").style.display = inscripcionYaCerrada ? "none" : "block";
 
   // inscripción, sponsors y fotos en paralelo con el resto (las fotos no frenan el cuadro)
-  const extras = Promise.allSettled([actualizarAccesoInscripcion(), cargarSponsorsTorneo(), cargarFotosTorneo()]);
+  const extras = Promise.allSettled([actualizarAccesoInscripcion(), cargarSponsorsTorneo(), cargarFotosTorneo({ suave: true })]);
 
   const [{ data: tc }, { data: insc }, { data: parejas }, { data: partidos }] = await datos;
   ultimasCanchasTorneo = tc || [];
@@ -4702,8 +4702,13 @@ const SECCIONES_CONFIG_GENERAL = {
   noticias: { id: "admCfgNoticias", label: "Noticias", grupo: "contenido" },
   auspiciantes: { id: "auspiciantesWrap", label: "Auspiciantes", grupo: "contenido" },
   jugadorDelMes: { id: "admCfgJugadorDelMes", label: "Jugador del mes", grupo: "contenido" },
-  club: { id: "admCfgClub", label: "Contacto y redes", grupo: "contenido" }
+  club: { id: "admCfgClub", label: "Contacto y redes", grupo: "contenido" },
+  promosFotos: { id: "admCfgPromosFotos", label: "Promos de fotos", grupo: "contenido" }
 };
+// desde la card de fotos de un torneo: atajo a las promos (son generales, no del torneo)
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-ir-promos-fotos]")) mostrarSeccionConfigGeneral("promosFotos");
+});
 const ultimaSeccionDeGrupo = { club: "jugadores", contenido: "noticias" };
 const seccionesDeGrupo = (grupo) =>
   Object.fromEntries(Object.entries(SECCIONES_CONFIG_GENERAL).filter(([, info]) => info.grupo === grupo));
@@ -8411,10 +8416,23 @@ function guardarOrdenFotos(orden) {
   try { localStorage.setItem("ordenesFotos", JSON.stringify([orden, ...ordenesFotos().filter((o) => o !== orden)].slice(0, 50))); } catch (e) { /* sin almacenamiento: queda la compra con cuenta */ }
 }
 const fotosElegidas = new Map(); // id -> precio (carrito)
+// galería del torneo: se dibuja de a LOTE_FOTOS; galeriaTorneo deja que el visor siga de largo
+const LOTE_FOTOS = 30;
+let galeriaTorneo = null; // { agregar(): cuántas sumó, total(): cuántas hay en la carpeta }
+const observadorVerMas = "IntersectionObserver" in window
+  ? new IntersectionObserver((entradas) => entradas.forEach((en) => {
+    if (en.isIntersecting) { observadorVerMas.unobserve(en.target); en.target.click(); }
+  }), { rootMargin: "900px 0px" })
+  : null; // sin soporte: queda el botón "Ver más fotos"
+// galería del torneo: fotos "chicas" (muchas por fila) o "grandes" (enteras, de a una o dos).
+// Se recuerda en este navegador; si no se puede guardar, arranca en chicas.
+let fotosGrandes = false;
+try { fotosGrandes = localStorage.getItem("np_fotos_grandes") === "1"; } catch (e) { /* sin almacenamiento */ }
 function fotoTorneoItemHtml(foto, admin) {
   const url = urlSegura(foto.urlVista);
   if (!url) return "";
   const mini = urlSegura(foto.urlMini) || url;
+  const src = fotosGrandes && !admin ? url : mini; // en grande, la vista de más calidad (no la miniatura)
   const borrar = admin ? `<button type="button" class="secondary small btnQuitarFoto" data-id="${foto.id}" aria-label="Borrar esta foto">✕</button>
     <button type="button" class="foto-genero" data-genero-foto="${foto.id}" title="Damas / Caballeros / sin indicar: se usa para elegir el fondo de las historias">${foto.genero === "Damas" ? "Damas" : foto.genero === "Caballeros" ? "Caballeros" : "¿D/C?"}</button>` : "";
   // a la venta: la vista es chica y con marca de agua; el original se baja pagando
@@ -8426,7 +8444,7 @@ function fotoTorneoItemHtml(foto, admin) {
       : isAdmin ? "" : comprada ? '<span class="foto-precio">✓ Comprada</span>'
       : fotosElegidas.has(foto.id) ? '<span class="foto-precio">✓ En tu pedido</span>' : "";
     return `<div class="foto-item${fotosElegidas.has(foto.id) ? " elegida" : ""}">
-      <img src="${mini}" alt="Foto del torneo (vista previa)" loading="lazy" decoding="async" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
+      <img src="${src}" alt="Foto del torneo (vista previa)" loading="lazy" decoding="async" data-mini="${mini}" data-foto-grande="${url}" data-foto-id="${foto.id}" data-precio="${Number(foto.precio)}"${admin || comprada ? ' data-comprada="1"' : ""} tabindex="0" role="button" aria-label="Ver foto en grande y opciones de descarga" />
       ${borrar}${marca}
       ${admin ? `<button type="button" class="foto-accion foto-descargar" data-descargar-foto="${foto.id}">Descargar original</button>`
         : comprada ? "" : `<button type="button" class="foto-sumar" data-sumar-foto="${foto.id}" aria-pressed="${fotosElegidas.has(foto.id)}" aria-label="Sumar esta foto al pedido">${fotosElegidas.has(foto.id) ? "✓" : "+"}</button>`}
@@ -8437,27 +8455,50 @@ function fotoTorneoItemHtml(foto, admin) {
     ? `<button type="button" class="btnPedirFotoOriginal" data-pedir-foto="${escapeHtml(foto.archivo)}" aria-label="Pedir esta foto en calidad original">Pedir original</button>`
     : "";
   return `<div class="foto-item">
-    <img src="${mini}" alt="Foto del torneo" loading="lazy" decoding="async" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
+    <img src="${src}" alt="Foto del torneo" loading="lazy" decoding="async" data-mini="${mini}" data-foto-grande="${url}" tabindex="0" role="button" aria-label="Ver foto en grande" />
     ${borrar}
     ${pedirOriginal}
   </div>`;
 }
 
-async function cargarFotosTorneo() {
+// Supabase devuelve como máximo 1000 filas por consulta: esto las trae todas, de a 1000
+// (armar() tiene que crear la consulta de nuevo cada vez)
+async function todasLasFilas(armar) {
+  const filas = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await armar().range(i, i + 999);
+    if (error) return { data: null, error };
+    filas.push(...(data || []));
+    if (!data || data.length < 1000) return { data: filas, error: null };
+  }
+}
+const fotosCargadas = { torneo: null, hora: 0 }; // última carga de la galería (para no recargarla de más)
+async function cargarFotosTorneo(opciones = {}) {
   const cont = document.getElementById("dtFotosGaleria");
   const vacio = document.getElementById("dtFotosVacio");
   if (!cont || !torneoActualId) return;
+  const torneo = torneoActualId; // si mientras carga se cambia de torneo, esta carga se descarta
+  // recargas automáticas (resultado en vivo, renovación de sesión): no con el visor abierto ni si recién se cargó
+  if (opciones.suave && torneo === fotosCargadas.torneo &&
+    (document.getElementById("fotoGrandeOverlay").style.display !== "none" || Date.now() - fotosCargadas.hora < 120000)) return;
+  // mismo torneo: se vuelven a mostrar tantas fotos como había, así no se pierde el lugar
+  const yaMostradas = torneo === fotosCargadas.torneo ? cont.querySelectorAll(".foto-item").length : 0;
   // las fotos se ven sin iniciar sesión (así cualquiera puede comprarlas)
   document.getElementById("dtFotosLogin").style.display = "none";
-  const { data, error: errorFotos } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoActualId).order("created_at", { ascending: false });
+  const { data, error: errorFotos } = await todasLasFilas(() => sb.from("torneo_fotos").select("*").eq("torneo_id", torneo).order("created_at", { ascending: false }).order("id"));
+  if (torneo !== torneoActualId) return;
   if (errorFotos) { // no confundir "no hay fotos" con "no se pudieron traer"
     cont.innerHTML = `<p class="empty">No se pudieron cargar las fotos (${escapeHtml(errorFotos.message || "sin conexión")}). Revisá tu conexión y <button type="button" class="link-mas" id="btnReintentarFotos">probá de nuevo</button>.</p>`;
     document.getElementById("btnReintentarFotos")?.addEventListener("click", cargarFotosTorneo);
     if (vacio) vacio.style.display = "none";
     return;
   }
-  const torneo = torneoActualId; // si mientras carga se cambia de torneo, esta carga se descarta
-  if (torneoDelPedido !== torneo) { fotosElegidas.clear(); torneoDelPedido = torneo; } // el pedido es de un solo torneo
+  if (torneoDelPedido !== torneo) { // el pedido es de un solo torneo; la búsqueda por selfie también
+    fotosElegidas.clear(); torneoDelPedido = torneo;
+    const estadoSelfie = document.getElementById("dtSelfieEstado");
+    if (estadoSelfie) estadoSelfie.textContent = "";
+  }
+  fotosCargadas.torneo = torneo; fotosCargadas.hora = Date.now();
   const ordenes = ordenesFotos();
   // lo que compró sin cuenta en este celu queda guardado en su cuenta (una vez por visita)
   if (currentUser && ordenes.length && !comprasVinculadas) {
@@ -8466,12 +8507,13 @@ async function cargarFotosTorneo() {
   }
   const [fotos, { data: compras }, { data: deOrdenes }, { data: saldo }] = await Promise.all([
     vistasFotosTorneo(data || []),
-    currentUser ? sb.from("compras_fotos").select("foto_id").eq("estado", "pagada") : { data: [] },
+    currentUser ? sb.from("compras_fotos").select("foto_id").eq("estado", "pagada").eq("user_id", currentUser.id) : { data: [] },
     ordenes.length ? sb.functions.invoke("mp-fotos", { body: { accion: "compradas", ordenes } }) : { data: null },
     currentUser ? sb.rpc("creditos_fotos", { p_torneo: torneo }) : { data: 0 }
   ]);
   if (torneo !== torneoActualId) return;
   fotosCompradas = new Set([...(compras || []).map((c) => c.foto_id), ...(deOrdenes?.fotos || [])]);
+  ordenesPagadas = deOrdenes?.ordenes || ordenesPagadas; // para el link "mis fotos" (solo las que se pagaron)
   fotosCompradas.forEach((id) => fotosElegidas.delete(id)); // lo que ya es suyo no se cobra ni se canjea de nuevo
   creditosFotos = Math.max(0, Number(saldo) || 0);
   // carpetas (ej. "Día 1", "Día 2"): la más nueva primero; "Todas" las muestra juntas
@@ -8511,22 +8553,61 @@ async function cargarFotosTorneo() {
       if (!b) return;
       carpetaFotosTorneo = b.dataset.carpeta;
       pills.querySelectorAll("[data-carpeta]").forEach((x) => { x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", x === b); });
-      mostradas = 24;
       pintar();
+      // la carpeta nueva arranca desde su primera foto
+      const barra = document.getElementById("dtFotosBarra");
+      if (barra && barra.getBoundingClientRect().top < 0) window.scrollTo({ top: scrollY + cont.getBoundingClientRect().top - 200 });
     };
   }
-  // de a 24: así quien entra no baja todas las fotos del torneo de una
-  let mostradas = 24;
-  const pintar = () => {
+  // de a tandas (no las 500 de una): al llegar cerca del final se suman solas las siguientes
+  let mostradas = 0;
+  const agregar = () => {
     const lista = visibles();
-    cont.innerHTML = lista.slice(0, mostradas).map((f) => fotoTorneoItemHtml(f, false)).join("") +
-      (lista.length > mostradas ? `<button type="button" class="secondary fotos-ver-mas" id="btnVerMasFotos">Ver más fotos (${lista.length - mostradas})</button>` : "");
-    document.getElementById("btnVerMasFotos")?.addEventListener("click", () => { mostradas += 24; pintar(); });
+    const nuevas = lista.slice(mostradas, mostradas + LOTE_FOTOS);
+    cont.querySelector(".fotos-ver-mas")?.remove();
+    cont.insertAdjacentHTML("beforeend", nuevas.map((f) => fotoTorneoItemHtml(f, false)).join("") +
+      (lista.length > mostradas + nuevas.length ? `<button type="button" class="secondary fotos-ver-mas" id="btnVerMasFotos">Ver más fotos (${lista.length - mostradas - nuevas.length})</button>` : ""));
+    mostradas += nuevas.length;
+    const mas = document.getElementById("btnVerMasFotos");
+    if (mas) { mas.onclick = agregar; observadorVerMas?.observe(mas); }
+    const cuenta = document.getElementById("dtFotosCuenta");
+    if (cuenta) cuenta.textContent = lista.length ? `${lista.length} ${lista.length === 1 ? "foto" : "fotos"}` : "";
+    return nuevas.length;
   };
+  const pintar = () => { observadorVerMas?.disconnect(); cont.innerHTML = ""; mostradas = 0; agregar(); };
+  galeriaTorneo = { agregar, total: () => visibles().length };
   pintar();
+  while (mostradas < yaMostradas && agregar()) { /* vuelve a mostrar las que ya estaban a la vista */ }
   if (vacio) vacio.style.display = fotos.length ? "none" : "block";
+  const tamano = document.getElementById("dtFotosTamano"), barra = document.getElementById("dtFotosBarra");
+  if (tamano) tamano.hidden = !fotos.length;
+  if (barra) barra.hidden = !fotos.length;
+  const selfieBarra = document.getElementById("btnSelfieBarra");
+  if (selfieBarra) selfieBarra.hidden = !cajaSelfie || cajaSelfie.hidden;
+  aplicarTamanoFotos(false);
   renderCarritoFotos();
 }
+// Chicas / Grandes: cambia la grilla sin volver a cargar nada y deja a la vista la misma foto
+function aplicarTamanoFotos(mantenerLugar) {
+  const cont = document.getElementById("dtFotosGaleria");
+  if (!cont) return;
+  const imgs = [...cont.querySelectorAll("img[data-mini]")];
+  const ancla = mantenerLugar ? imgs.find((img) => img.getBoundingClientRect().bottom > 80) : null;
+  cont.classList.toggle("grandes", fotosGrandes);
+  imgs.forEach((img) => {
+    const quiero = fotosGrandes ? img.dataset.fotoGrande : img.dataset.mini;
+    if (quiero && img.getAttribute("src") !== quiero) img.src = quiero;
+  });
+  document.querySelectorAll("[data-tamano-fotos]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.tamanoFotos === "grande") === fotosGrandes)));
+  ancla?.closest(".foto-item")?.scrollIntoView({ block: "start" });
+}
+document.getElementById("dtFotosTamano")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tamano-fotos]");
+  if (!b) return;
+  fotosGrandes = b.dataset.tamanoFotos === "grande";
+  try { localStorage.setItem("np_fotos_grandes", fotosGrandes ? "1" : "0"); } catch (err) { /* sin almacenamiento */ }
+  aplicarTamanoFotos(true);
+});
 // ---------- Buscarse con una selfie ----------
 // Todo el reconocimiento corre en el navegador (face-api, guardado en vendor/): la selfie
 // nunca se sube. De cada foto del torneo se guarda solo una "huella" de 128 números por
@@ -8578,10 +8659,10 @@ async function huellasDeFoto(blob) {
     .map((c) => Array.from(c.descriptor, (x) => Math.round(x * 1e5) / 1e5));
 }
 // guarda las huellas de una foto (admin)
-async function indexarFoto(fotoId, blob) {
+async function indexarFoto(fotoId, blob, torneo = torneoGestionId) {
   const huellas = await huellasDeFoto(blob);
   if (huellas.length) {
-    const { error } = await sb.from("foto_caras").insert(huellas.map((d) => ({ foto_id: fotoId, torneo_id: torneoGestionId, descriptor: d })));
+    const { error } = await sb.from("foto_caras").insert(huellas.map((d) => ({ foto_id: fotoId, torneo_id: torneo, descriptor: d })));
     if (error) throw new Error(error.message);
   }
   await sb.from("torneo_fotos").update({ caras: huellas.length }).eq("id", fotoId);
@@ -8589,6 +8670,11 @@ async function indexarFoto(fotoId, blob) {
 }
 // el jugador: selfie -> su huella -> fotos donde aparece
 document.getElementById("btnSelfieBuscar")?.addEventListener("click", () => document.getElementById("dtSelfieInput").click());
+// atajo en la barra fija de la galería: con cientos de fotos, buscarse siempre está a mano
+document.getElementById("btnSelfieBarra")?.addEventListener("click", () => {
+  document.getElementById("dtFotosSelfie")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById("dtSelfieInput").click();
+});
 document.getElementById("dtSelfieInput")?.addEventListener("change", async (e) => {
   const archivo = e.target.files?.[0];
   e.target.value = "";
@@ -8674,50 +8760,65 @@ document.getElementById("btnPrepararSelfie")?.addEventListener("click", async (e
 // pagan su precio, sin pasarse de un combo más. La Edge Function cobra con esta misma cuenta.
 // cartel "Tenés N fotos compradas" con un botón para bajarlas todas juntas
 let archivosListos = null; // fotos ya bajadas, esperando que toque "Guardar" (compartir pide un toque nuevo)
+let clavePreparadas = "", bajarDesde = 0; // de qué fotos son y desde cuál sigue (en el celu se guardan de a 10)
+let ordenesPagadas = []; // órdenes sin cuenta de este celu que tienen fotos pagadas
 function renderMisFotos(mias) {
   const caja = document.getElementById("dtFotosMias");
   if (!caja) return;
-  archivosListos = null;
+  const clave = mias.map((f) => f.id).join();
+  if (clave !== clavePreparadas) { archivosListos = null; bajarDesde = 0; clavePreparadas = clave; } // una recarga no tira lo ya preparado
   caja.hidden = !mias.length && !creditosFotos;
   if (caja.hidden) return;
   const guardadas = currentUser
     ? "Quedan guardadas en tu cuenta: las bajás cuando quieras, desde cualquier celu."
-    : 'Quedan guardadas en este celu. <button type="button" class="link-mas" data-entrar-fotos>Entrá con tu cuenta</button> para tenerlas en cualquier celu.';
+    : 'Quedan guardadas en este celu. Para no perderlas, <button type="button" class="link-mas" data-guardar-link="wsp">mandate el link por WhatsApp</button>, <button type="button" class="link-mas" data-guardar-link="copiar">copialo</button> o <button type="button" class="link-mas" data-entrar-fotos>entrá con tu cuenta</button>.';
   const credito = creditosFotos
     ? `<span class="fotos-credito">Te ${creditosFotos === 1 ? "queda <strong>1 foto" : `quedan <strong>${creditosFotos} fotos`} de crédito</strong> en este torneo: tocá <b>+</b> en las que quieras y canjealas sin pagar.</span>`
     : "";
   caja.innerHTML = (mias.length
     ? `<span>✓ Tenés <strong>${mias.length} ${mias.length === 1 ? "foto comprada" : "fotos compradas"}</strong> en este torneo. ${guardadas}</span>
-    <button type="button" class="primary small" id="btnBajarMisFotos">Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}</button>`
+    <button type="button" class="primary small${archivosListos ? " listo" : ""}" id="btnBajarMisFotos">${archivosListos ? `Guardar ${archivosListos.length} en el celu` : bajarDesde && bajarDesde < mias.length ? `Preparar las siguientes (${bajarDesde + 1} a ${Math.min(bajarDesde + TANDA_CELU, mias.length)} de ${mias.length})` : `Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}`}</button>`
     : "") + credito;
   const bajar = document.getElementById("btnBajarMisFotos");
   if (bajar) bajar.onclick = (e) => bajarMisFotos(e.currentTarget, mias.map((f) => f.id));
 }
+// en el celu se guardan de a 10 en la galería (todas juntas pueden colgar el navegador del iPhone);
+// en la compu se descargan todas, una atrás de otra
+const TANDA_CELU = 10;
 async function bajarMisFotos(btn, ids) {
   if (btn.disabled) return;
-  // segundo toque en el celu: abre "Guardar imágenes" con todas juntas
-  if (archivosListos) {
-    try { await navigator.share({ files: archivosListos }); } catch (e) { if (e.name !== "AbortError") archivosListos.forEach((f) => guardarBlob(f, f.name)); }
+  if (archivosListos) { // toque para guardar la tanda ya preparada (compartir pide un toque nuevo)
+    try { await navigator.share({ files: archivosListos }); }
+    catch (e) { if (e.name !== "AbortError") toast('No se pudieron guardar. Probá de nuevo, o tocá cada foto y "Descargar original"'); return; }
+    archivosListos = null;
+    btn.classList.remove("listo");
+    btn.textContent = bajarDesde < ids.length
+      ? `Preparar las siguientes (${bajarDesde + 1} a ${Math.min(bajarDesde + TANDA_CELU, ids.length)} de ${ids.length})`
+      : "✓ Guardadas en el celu";
     return;
   }
+  const celu = !!navigator.canShare?.({ files: [new File([""], "prueba.jpg", { type: "image/jpeg" })] });
+  if (bajarDesde >= ids.length) bajarDesde = 0;
+  const lote = celu ? ids.slice(bajarDesde, bajarDesde + TANDA_CELU) : ids;
   btn.disabled = true;
   const archivos = [], fallaron = [];
   try {
-    for (let i = 0; i < ids.length; i++) {
-      btn.textContent = `Preparando ${i + 1} de ${ids.length}…`;
+    for (let i = 0; i < lote.length; i++) {
+      btn.textContent = `Preparando ${i + 1} de ${lote.length}…`;
       try {
-        const r = await fetch(await urlOriginal(ids[i]));
+        const r = await fetch(await urlOriginal(lote[i]));
         if (!r.ok) throw new Error();
-        archivos.push(new File([await r.blob()], nombreOriginal(ids[i]), { type: "image/jpeg" }));
-      } catch (e) { fallaron.push(ids[i]); }
+        archivos.push(new File([await r.blob()], nombreOriginal(lote[i]), { type: "image/jpeg" }));
+      } catch (e) { fallaron.push(lote[i]); }
     }
     if (fallaron.length) toast(`${fallaron.length} no se pudieron bajar: tocá cada una y "Descargar original"`);
-    if (!archivos.length) return;
-    if (navigator.canShare?.({ files: archivos })) { // celu: se guardan todas en la galería de una
+    if (!archivos.length) { btn.textContent = "Probar de nuevo"; return; }
+    if (celu && navigator.canShare({ files: archivos })) {
+      bajarDesde += lote.length;
       archivosListos = archivos;
-      btn.textContent = `Guardar las ${archivos.length} en el celu`;
+      btn.textContent = `Guardar ${archivos.length} en el celu` + (ids.length > TANDA_CELU ? ` (${bajarDesde - lote.length + 1} a ${bajarDesde} de ${ids.length})` : "");
       btn.classList.add("listo");
-    } else { // compu: se descargan una atrás de otra
+    } else {
       for (const f of archivos) { guardarBlob(f, f.name); await new Promise((ok) => setTimeout(ok, 350)); }
       btn.textContent = "✓ Descargadas";
     }
@@ -8793,6 +8894,49 @@ document.getElementById("btnCanjearFotos")?.addEventListener("click", async (e) 
   btn.disabled = true;
   try { await canjearCreditos(); } finally { btn.disabled = false; }
 });
+// compras sin cuenta: un link con sus números de orden (secretos) para bajarlas desde cualquier celu
+const linkMisCompras = (torneo = torneoActualId) =>
+  `${location.origin}${location.pathname}?fotos_torneo=${torneo}&ordenes=${(ordenesPagadas.length ? ordenesPagadas : ordenesFotos()).slice(0, 10).join(",")}`;
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-guardar-link]");
+  if (!b) return;
+  const link = linkMisCompras();
+  if (b.dataset.guardarLink === "wsp") { window.open("https://wa.me/?text=" + encodeURIComponent("Mis fotos de Norte Pádel (para volver a bajarlas): " + link), "_blank", "noopener"); return; }
+  try { await navigator.clipboard.writeText(link); toast("Link copiado: guardalo para volver a bajar tus fotos"); }
+  catch (err) { prompt("Copiá este link y guardalo:", link); }
+});
+// "¿Compraste y no ves tus fotos?": número de operación de Mercado Pago + email con el que pagó
+document.getElementById("formRecuperarFotos")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.currentTarget, btn = form.querySelector("button");
+  const paymentId = form.elements.operacion.value.replace(/\D/g, ""), email = form.elements.email.value.trim();
+  if (!paymentId || !email) { toast("Completá el número de operación y el email"); return; }
+  btn.disabled = true;
+  try {
+    const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "recuperar", paymentId, email } });
+    let detalle = data?.error;
+    if (error && !detalle) { try { detalle = (await error.context.json()).error; } catch (x) { detalle = error.message; } }
+    if (!data?.orden) { toast(detalle || "No se pudo recuperar la compra"); return; }
+    guardarOrdenFotos(data.orden);
+    form.reset();
+    form.closest("details")?.removeAttribute("open");
+    toast(data.aprobado ? "¡Listo! Recuperamos tu compra" : "Encontramos tu compra, pero el pago todavía no está aprobado");
+    carpetaPedidaEnLink = MIS_FOTOS;
+    if (data.torneo && data.torneo !== torneoActualId) abrirTorneo(data.torneo, "fotos");
+    else cargarFotosTorneo();
+  } finally { btn.disabled = false; }
+});
+// admin: buscar la compra de un jugador por número de operación y mandarle su link
+document.getElementById("btnBuscarCompraFotos")?.addEventListener("click", conBotonOcupado(async () => {
+  const out = document.getElementById("admCompraFotosRes");
+  const n = document.getElementById("admCompraFotosOperacion").value.replace(/\D/g, "");
+  if (!n) { toast("Poné el número de operación de Mercado Pago"); return; }
+  const { data, error } = await sb.from("compras_fotos").select("orden_id, estado, foto_id, torneo_fotos(torneo_id)").eq("mp_payment_id", n);
+  if (error) { out.textContent = "Error: " + error.message; return; }
+  if (!data?.length) { out.textContent = "No hay una compra de fotos con ese número (si el pago quedó pendiente, todavía no tiene número cargado)."; return; }
+  const torneo = data[0].torneo_fotos?.torneo_id, link = `${location.origin}${location.pathname}?fotos_torneo=${torneo}&ordenes=${data[0].orden_id}`;
+  out.innerHTML = `${data.length} ${data.length === 1 ? "foto" : "fotos"} · ${data[0].estado === "pagada" ? "pagada" : "pendiente"}. Link para el jugador: <a href="${escapeHtml(link)}" target="_blank" rel="noopener">abrir</a> · <a href="https://wa.me/?text=${encodeURIComponent("Tus fotos de Norte Pádel: " + link)}" target="_blank" rel="noopener">mandar por WhatsApp</a>`;
+}));
 // "Entrá con tu cuenta" desde fotos: al entrar vuelve a la galería (con el pedido armado)
 document.addEventListener("click", (e) => {
   if (!e.target.closest("[data-entrar-fotos]")) return;
@@ -8932,6 +9076,11 @@ document.getElementById("repetidosWrap")?.addEventListener("click", async (e) =>
 
 document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true; // un doble toque no abre dos veces la promo ni canjea dos veces
+  try { await flujoPagarFotos(btn); } finally { btn.disabled = false; }
+});
+async function flujoPagarFotos(btn) {
   await actualizarCreditos();
   if (!fotosElegidas.size) return;
   if (fotosElegidas.size <= creditosFotos) { await canjearCreditos(); return; } // le alcanza con el crédito
@@ -8940,10 +9089,13 @@ document.getElementById("btnPagarFotos")?.addEventListener("click", async (e) =>
   if (eleccion === "entrar") { volverTrasLogin = { hash: location.hash, hasta: Date.now() + 15 * 60000 }; cambiarVista("perfil"); return; }
   if (eleccion !== "pagar") return;
   if (creditosFotos && !(await canjearCreditos())) return; // primero el crédito, después se cobra el resto
-  pagarFotos([...fotosElegidas.keys()], btn);
-});
+  btn.disabled = false; // pagarFotos lo maneja solo
+  await pagarFotos([...fotosElegidas.keys()], btn);
+}
+const MAX_FOTOS_PEDIDO = 300; // la Edge Function cobra hasta esta cantidad en un pedido
 async function pagarFotos(ids, btn) {
   if (btn.disabled || !ids.length) return;
+  if (ids.length > MAX_FOTOS_PEDIDO) { toast(`Podés pagar hasta ${MAX_FOTOS_PEDIDO} fotos por vez: sacá algunas del pedido y pagalas después`); return; }
   btn.disabled = true;
   try {
     const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "crear", fotoIds: ids } });
@@ -8951,6 +9103,8 @@ async function pagarFotos(ids, btn) {
     if (error && !detalle) { try { detalle = (await error.context.json()).error; } catch (x) { detalle = error.message; } }
     if (!data?.link) { toast(detalle || "No se pudo iniciar el pago"); return; }
     guardarOrdenFotos(data.orden);
+    // si vuelve sin pagar (canceló o lo rechazaron), el pedido sigue armado
+    try { sessionStorage.setItem("np_pedido_fotos", JSON.stringify({ torneo: torneoActualId, fotos: [...fotosElegidas] })); } catch (e) { /* sin almacenamiento */ }
     location.assign(data.link); // Checkout de Mercado Pago
   } finally { btn.disabled = false; }
 }
@@ -8976,7 +9130,7 @@ async function cargarAvisoFotos() {
 async function cargarVistaFotos() {
   const grid = document.getElementById("fotosTorneosGrid");
   if (!grid) return;
-  const { data } = await sb.from("torneo_fotos").select("torneo_id, thumb_url, url").order("created_at", { ascending: false }).limit(5000);
+  const { data } = await todasLasFilas(() => sb.from("torneo_fotos").select("torneo_id, thumb_url, url").order("created_at", { ascending: false }).order("id"));
   const porTorneo = new Map();
   (data || []).forEach((f) => {
     const t = porTorneo.get(f.torneo_id) || { cuantas: 0, portada: urlSegura(f.thumb_url || f.url) };
@@ -9004,10 +9158,19 @@ async function volverDeMercadoPago() {
   const torneo = q.get("fotos_torneo");
   if (!torneo) return;
   guardarOrdenFotos(q.get("orden") || q.get("external_reference"));
+  // link "mis fotos" que se guardó el comprador sin cuenta (WhatsApp / copiado)
+  const delLink = (q.get("ordenes") || "").split(",").filter(Boolean).slice(0, 10);
+  delLink.forEach(guardarOrdenFotos);
   const pago = q.get("payment_id") || q.get("collection_id");
   const estado = q.get("status") || q.get("collection_status");
   history.replaceState(null, "", location.pathname + `#/torneo/${torneo}/fotos`);
   fotosElegidas.clear();
+  let pedido = null;
+  try { pedido = JSON.parse(sessionStorage.getItem("np_pedido_fotos") || "null"); sessionStorage.removeItem("np_pedido_fotos"); } catch (e) { /* sin almacenamiento */ }
+  if (pedido?.torneo === torneo && estado !== "approved" && estado !== "pending" && estado !== "in_process") {
+    torneoDelPedido = torneo; // que la carga de la galería no lo vacíe
+    (pedido.fotos || []).slice(0, MAX_FOTOS_PEDIDO).forEach(([id, precio]) => fotosElegidas.set(id, Number(precio)));
+  }
   if (pago && pago !== "null") {
     // la confirmación la hace igual el aviso de Mercado Pago; esto solo la adelanta
     await sb.functions.invoke("mp-fotos", { body: { accion: "verificar", paymentId: pago } }).catch(() => {});
@@ -9015,14 +9178,16 @@ async function volverDeMercadoPago() {
       : estado === "pending" || estado === "in_process" ? "Tu pago está pendiente: cuando se acredite, vas a poder descargar las fotos"
       : "El pago no se completó");
   }
-  if (estado === "approved") carpetaPedidaEnLink = MIS_FOTOS;
+  if (estado === "approved" || (delLink.length && !pago)) carpetaPedidaEnLink = MIS_FOTOS;
   abrirTorneo(torneo, "fotos");
+  // pagó sin cuenta: que guarde su link antes de irse (si no, puede perder las fotos)
+  if (estado === "approved" && !currentUser) setTimeout(() => document.getElementById("guardarLinkFotos")?.showModal?.(), 1500);
 }
 
 async function cargarFotosTorneoAdmin() {
   const cont = document.getElementById("admFotosLista");
   if (!cont || !torneoGestionId) return;
-  const { data } = await sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false });
+  const { data } = await todasLasFilas(() => sb.from("torneo_fotos").select("*").eq("torneo_id", torneoGestionId).order("created_at", { ascending: false }).order("id"));
   const fotos = vistasFotosTorneo(data || []);
   const avisar = document.getElementById("admFotosAvisar");
   if (avisar) {
@@ -9062,9 +9227,13 @@ async function cargarFotosTorneoAdmin() {
       btn.disabled = true;
       try {
         const foto = (data || []).find((f) => f.id === btn.dataset.id);
+        const { count: vendidas } = await sb.from("compras_fotos").select("id", { count: "exact", head: true }).eq("foto_id", btn.dataset.id).eq("estado", "pagada");
+        if (!confirm(vendidas ? `¿Borrar esta foto? Ya la compraron ${vendidas} ${vendidas === 1 ? "vez" : "veces"}: esa gente no la va a poder volver a bajar.` : "¿Borrar esta foto?")) return;
         const { error } = await sb.from("torneo_fotos").delete().eq("id", btn.dataset.id);
         if (error) { toast("Error: " + error.message); return; }
         if (foto?.original_path) await sb.storage.from("fotos-venta").remove([foto.original_path]);
+        const vistas = [rutaFotoTorneo(foto?.url), rutaFotoTorneo(foto?.thumb_url)].filter(Boolean);
+        if (vistas.length) await sb.storage.from("fotos-torneos").remove(vistas);
         toast("Foto eliminada");
         cargarFotosTorneoAdmin();
         if (torneoActualId === torneoGestionId) cargarFotosTorneo();
@@ -9242,11 +9411,13 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
     const carpeta = document.getElementById("admFotosCarpeta")?.value.trim().slice(0, 40) || null;
     const genero = document.getElementById("admFotosGenero")?.value || null;
     const prepararSelfie = document.getElementById("admFotosSelfie")?.checked;
+    const torneoSubida = torneoGestionId; // si mientras sube se cambia de torneo en Gestión, igual van a este
     let listas = 0;
     btn.textContent = `Subiendo 0/${archivos.length}...`;
     const subirUna = async (archivo) => {
-      const nombreBase = archivo.name.replace(/\.[^.]+$/, "");
-      const path = `${torneoGestionId}/${Date.now()}-${nombreBase}.jpg`;
+      // sin tildes, ñ, espacios ni # (Storage rechaza esos nombres)
+      const nombreBase = archivo.name.replace(/\.[^.]+$/, "").normalize("NFD").replace(/[^\w-]+/g, "_").slice(0, 60);
+      const path = `${torneoSubida}/${Date.now()}-${nombreBase}.jpg`;
       // a la venta: vista chica con marca de agua + original aparte (bucket privado)
       let original_path = null;
       if (precio != null) {
@@ -9271,10 +9442,10 @@ document.getElementById("btnSubirFotosTorneo").addEventListener("click", async (
       if (upErr) { toast("Error subiendo " + archivo.name + ": " + upErr.message); return; }
       const { data: pub } = sb.storage.from("fotos-torneos").getPublicUrl(path);
       const thumb_url = upMini ? null : sb.storage.from("fotos-torneos").getPublicUrl(pathMini).data.publicUrl;
-      const { data: nueva, error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoGestionId, url: pub.publicUrl, thumb_url, original_path, precio, genero, carpeta }).select("id").single();
+      const { data: nueva, error } = await sb.from("torneo_fotos").insert({ torneo_id: torneoSubida, url: pub.publicUrl, thumb_url, original_path, precio, genero, carpeta }).select("id").single();
       if (error) { toast("Error guardando " + archivo.name + ": " + error.message); return; }
       // búsqueda por selfie: se prepara con la foto original (si falla, se puede hacer después con el botón)
-      if (prepararSelfie && nueva?.id) await indexarFoto(nueva.id, archivo).catch(() => {});
+      if (prepararSelfie && nueva?.id) await indexarFoto(nueva.id, archivo, torneoSubida).catch(() => {});
     };
     // de a 3 a la vez: con muchas fotos tarda bastante menos
     const cola = [...archivos];
@@ -9731,12 +9902,18 @@ function mostrarFotoGrande(el) {
   const btnPedir = document.getElementById("fotoGrandePedir");
   btnPedir.hidden = !pedir;
   btnPedir.dataset.pedirFoto = pedir ? pedir.dataset.pedirFoto : "";
-  document.getElementById("fotoGrandeContador").textContent = galeriaFotos.length > 1 ? `${galeriaPos + 1} / ${galeriaFotos.length}` : "";
+  const total = galeriaTorneo && document.getElementById("dtFotosGaleria")?.contains(el) ? galeriaTorneo.total() : galeriaFotos.length;
+  document.getElementById("fotoGrandeContador").textContent = galeriaFotos.length > 1 ? `${galeriaPos + 1} / ${total}` : "";
   const siguiente = galeriaFotos[galeriaPos + 1];
   if (siguiente) new Image().src = siguiente.dataset.fotoGrande; // precarga la próxima
 }
 function moverGaleria(paso) {
   if (galeriaFotos.length < 2) return;
+  const cont = document.getElementById("dtFotosGaleria");
+  // galería del torneo: cerca del final de lo cargado, se cargan las siguientes (no vuelve a la primera)
+  if (paso > 0 && galeriaTorneo && cont?.contains(galeriaFotos[0]) && galeriaPos + paso >= galeriaFotos.length - 3 && galeriaTorneo.agregar()) {
+    galeriaFotos = [...cont.querySelectorAll("[data-foto-grande]")];
+  }
   galeriaPos = (galeriaPos + paso + galeriaFotos.length) % galeriaFotos.length;
   mostrarFotoGrande(galeriaFotos[galeriaPos]);
 }
@@ -9855,6 +10032,7 @@ document.getElementById("fotoGrandeOverlay").addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (document.getElementById("fotoGrandeOverlay").style.display === "none") return;
+  if (document.querySelector("dialog[open]")) return; // hay un cartel encima (ej. la promo): las teclas son de él
   if (e.key === "Escape") cerrarFotoGrande();
   else if (e.key === "ArrowLeft") moverGaleria(-1);
   else if (e.key === "ArrowRight") moverGaleria(1);
@@ -9862,9 +10040,12 @@ document.addEventListener("keydown", (e) => {
 document.getElementById("fotoGrandeAnterior").addEventListener("click", () => moverGaleria(-1));
 document.getElementById("fotoGrandeSiguiente").addEventListener("click", () => moverGaleria(1));
 let toqueInicioX = null;
-document.getElementById("fotoGrandeImg").addEventListener("touchstart", (e) => { toqueInicioX = e.touches[0].clientX; }, { passive: true });
+document.getElementById("fotoGrandeImg").addEventListener("touchstart", (e) => {
+  // con dos dedos (zoom) o con la foto ya agrandada, mover el dedo no cambia de foto
+  toqueInicioX = e.touches.length > 1 || (window.visualViewport?.scale || 1) > 1.05 ? null : e.touches[0].clientX;
+}, { passive: true });
 document.getElementById("fotoGrandeImg").addEventListener("touchend", (e) => {
-  if (toqueInicioX === null) return;
+  if (toqueInicioX === null || e.touches.length) { toqueInicioX = null; return; }
   const dx = e.changedTouches[0].clientX - toqueInicioX;
   toqueInicioX = null;
   if (Math.abs(dx) > 50) moverGaleria(dx < 0 ? 1 : -1);

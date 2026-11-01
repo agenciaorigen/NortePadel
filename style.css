@@ -1407,6 +1407,24 @@ button[hidden] { display: none !important; }
 .fotos-galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; margin-top: 12px; }
 #admFotosLista, .fotos-galeria-admin { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
 @media (max-width: 600px) { .fotos-galeria { grid-template-columns: repeat(2, 1fr); gap: 6px; } }
+/* galería del torneo en "Grandes": la foto entera, más grande (1 por fila en el celu) */
+.fotos-galeria.grandes { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+.fotos-galeria.grandes .foto-item { aspect-ratio: auto; min-height: 240px; }
+.fotos-galeria .foto-item { scroll-margin-top: 140px; } /* al cambiar de tamaño queda a la vista, debajo del menú fijo */
+.fotos-galeria.grandes .foto-item img { height: auto; object-fit: contain; }
+@media (max-width: 600px) { .fotos-galeria.grandes { grid-template-columns: 1fr; gap: 10px; } }
+.fotos-tamano { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+/* barra de la galería: carpetas, tamaño, cantidad y "buscarme"; queda fija arriba mientras se recorren las fotos */
+.fotos-barra { position: sticky; top: calc(68px + env(safe-area-inset-top)); z-index: 4; margin: 0 -20px; padding: 10px 20px 8px; background: var(--card); border-bottom: 1px solid var(--border); }
+.fotos-barra[hidden] { display: none; }
+.fotos-barra .pill-row { padding-bottom: 8px; margin-bottom: 0; }
+.fotos-barra-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.fotos-cuenta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#btnSelfieBarra { margin-left: auto; width: auto; }
+@media (min-width: 960px) { .fotos-barra { top: calc(var(--topbar-h) + var(--navbar-h)); } }
+@media (max-width: 600px) { .fotos-barra .fotos-tamano > span, .fotos-cuenta { display: none; } } /* en el celu, una sola fila: la cantidad ya está en cada carpeta */
+.fotos-tamano[hidden] { display: none; }
+.fotos-tamano .pill[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .foto-item { position: relative; aspect-ratio: 4 / 5; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-elev); }
 .foto-item img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; transition: transform .35s ease; }
 .foto-item:hover img { transform: scale(1.04); }
@@ -2463,6 +2481,7 @@ header.topbar button.btn-instalar-app:hover { background: var(--accent-bright); 
 #fotoGrandePedido { width: auto; margin: 0; text-transform: none; letter-spacing: 0; }
 @media (max-width: 600px) { .fotogrande-acciones { flex-wrap: wrap; justify-content: flex-end; } .fotogrande-acciones > * { white-space: normal; } }
 .fotos-carrito[hidden] { display: none; }
+@media (max-width: 959px) { .fotos-carrito { bottom: calc(90px + env(safe-area-inset-bottom)); } } /* arriba del menú de abajo, no tapada por él */
 
 /* Inicio: aviso de fotos nuevas del torneo */
 .aviso-fotos {
@@ -2627,3 +2646,8 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 .fotos-promo-social:empty { display: none; }
 .check-linea { display: flex; align-items: center; gap: 8px; font-weight: 500; margin-top: 8px; }
 .check-linea input { width: auto; }
+
+/* galería: recuperar una compra hecha sin cuenta */
+.fotos-recuperar { margin-top: 14px; font-size: 14px; }
+.fotos-recuperar summary { cursor: pointer; color: var(--accent-bright); font-weight: 700; }
+.fotos-recuperar form { max-width: 420px; }

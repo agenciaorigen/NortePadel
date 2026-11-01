@@ -407,13 +407,24 @@
         <div class="fotos-selfie-cta">
           <div><strong>Buscate con una selfie</strong><span>Sacate una selfie y te mostramos solo las fotos donde aparecés. Tu selfie no se guarda ni se sube: se analiza en tu celular.</span></div>
           <button type="button" class="primary" id="btnSelfieBuscar">Buscarme</button>
-          <input type="file" id="dtSelfieInput" accept="image/*" capture="user" hidden />
+          <input type="file" id="dtSelfieInput" accept="image/*" hidden />
         </div>
         <p class="fotos-selfie-estado" id="dtSelfieEstado" aria-live="polite"></p>
       </div>
       <div class="fotos-mias" id="dtFotosMias" hidden aria-live="polite"></div>
       <p class="fotos-promo" id="dtFotosPromo" hidden></p>
-      <div class="pill-row fotos-carpetas" id="dtFotosCarpetas" role="group" aria-label="Carpetas de fotos" hidden></div>
+      <div class="fotos-barra" id="dtFotosBarra" hidden>
+        <div class="pill-row fotos-carpetas" id="dtFotosCarpetas" role="group" aria-label="Carpetas de fotos" hidden></div>
+        <div class="fotos-barra-fila">
+          <div class="fotos-tamano" id="dtFotosTamano" role="group" aria-label="Tamaño de las fotos" hidden>
+            <span>Ver fotos</span>
+            <button type="button" class="pill" data-tamano-fotos="chico" aria-pressed="true">Chicas</button>
+            <button type="button" class="pill" data-tamano-fotos="grande" aria-pressed="false">Grandes</button>
+          </div>
+          <span class="fotos-cuenta" id="dtFotosCuenta"></span>
+          <button type="button" class="secondary small" id="btnSelfieBarra" aria-label="Buscarme en las fotos con una selfie" hidden>Buscarme</button>
+        </div>
+      </div>
       <div id="dtFotosGaleria" class="fotos-galeria"></div>
       <div class="fotos-login" id="dtFotosLogin" style="display:none">
         <p class="match-meta">Las fotos del torneo son para los jugadores del circuito. Iniciá sesión para verlas y descargarlas.</p>
@@ -425,6 +436,17 @@
         <button type="button" class="primary" id="btnCanjearFotos" hidden>Usar mis créditos</button>
         <button type="button" class="primary" id="btnPagarFotos">Pagar con Mercado Pago</button>
       </div>
+      <details class="fotos-recuperar">
+        <summary>¿Compraste fotos y no las ves? Recuperalas</summary>
+        <form id="formRecuperarFotos">
+          <p class="match-meta">El número de operación está en el mail que te mandó Mercado Pago y en tu actividad de Mercado Pago.</p>
+          <label for="recOperacion">Número de operación</label>
+          <input id="recOperacion" name="operacion" inputmode="numeric" autocomplete="off" placeholder="Ej: 123456789" required />
+          <label for="recEmail">Email con el que pagaste</label>
+          <input id="recEmail" name="email" type="email" autocomplete="email" required />
+          <button type="submit" class="secondary small" style="margin-top:8px">Recuperar mis fotos</button>
+        </form>
+      </details>
       <p class="match-meta fotos-aviso">¿Aparecés en una foto y preferís que no esté publicada? Escribinos por WhatsApp y la sacamos. Más info en <a href="privacidad.html#imagenes" target="_blank" rel="noopener">Privacidad</a>.</p>
     </div>
   </section>
@@ -986,7 +1008,7 @@
       <div class="adm-panel-accesos">
         <button type="button" class="adm-acceso" data-area="torneos"><strong>Torneos</strong><span>Crear, inscripciones, partidos</span></button>
         <button type="button" class="adm-acceso" data-area="club"><strong>Club</strong><span>Jugadores, sedes, categorías</span></button>
-        <button type="button" class="adm-acceso" data-area="contenido"><strong>Contenido</strong><span>Noticias, auspiciantes, redes</span></button>
+        <button type="button" class="adm-acceso" data-area="contenido"><strong>Contenido</strong><span>Noticias, promos de fotos, redes</span></button>
       </div>
     </div>
 
@@ -1211,24 +1233,7 @@
         <label for="admFotosPrecio">Precio por foto en $ (vacío = gratis, como antes)</label>
         <input type="number" id="admFotosPrecio" min="1" step="1" inputmode="numeric" placeholder="Ej: 3000" />
         <p class="match-meta">Con precio: se publica una vista chica con marca de agua y el original solo se baja pagando con Mercado Pago.</p>
-        <label for="admComboCantidad">Combo (vacío = sin combo)</label>
-        <div class="row" style="gap:8px;align-items:center">
-          <input type="number" id="admComboCantidad" min="2" step="1" inputmode="numeric" placeholder="10" aria-label="Cantidad de fotos del combo" style="flex:0 1 90px" />
-          <span>fotos por $</span>
-          <input type="number" id="admComboPrecio" min="1" step="1" inputmode="numeric" placeholder="5000" aria-label="Precio del combo" style="flex:0 1 130px" />
-        </div>
-        <label for="admPackCantidad">Pack "todas tus fotos" (vacío = sin pack)</label>
-        <div class="row" style="gap:8px;align-items:center">
-          <span>hasta</span>
-          <input type="number" id="admPackCantidad" min="2" step="1" inputmode="numeric" placeholder="30" aria-label="Hasta cuántas fotos entra el pack" style="flex:0 1 90px" />
-          <span>fotos por $</span>
-          <input type="number" id="admPackPrecio" min="1" step="1" inputmode="numeric" placeholder="8000" aria-label="Precio del pack" style="flex:0 1 130px" />
-        </div>
-        <label for="admPromoHasta">Promo hasta (opcional: se muestra "promo hasta el …")</label>
-        <div class="row" style="gap:8px;align-items:center">
-          <input type="date" id="admPromoHasta" style="flex:0 1 180px" />
-          <button type="button" class="secondary small" id="btnGuardarCombo">Guardar promos</button>
-        </div>
+        <p class="match-meta">Combo y fechas de promo: <button type="button" class="link-mas" data-ir-promos-fotos>cambiarlas en Promos de fotos</button> (valen para todos los torneos).</p>
         <label class="check-linea"><input type="checkbox" id="admFotosSelfie" checked /> Preparar para la búsqueda por selfie al subir (tarda un poco más)</label>
         <button class="secondary small" id="btnSubirFotosTorneo" style="margin-top:8px">Subir</button>
         <button type="button" class="secondary small" id="btnPrepararSelfie" style="margin-top:8px">Preparar búsqueda por selfie</button>
@@ -1410,6 +1415,35 @@
       <label for="cfgYoutubeEnVivo">Link de YouTube en vivo (pegalo cuando arranques a transmitir con OBS, borralo cuando termines)</label>
       <input id="cfgYoutubeEnVivo" placeholder="https://www.youtube.com/watch?v=..." />
       <button class="secondary small" id="btnGuardarConfig" style="margin-top:10px">Guardar</button>
+    </div>
+
+    <div class="card card-accent" id="admCfgPromosFotos">
+      <h2>Promos de fotos</h2>
+      <p class="match-meta">Valen para las fotos a la venta de todos los torneos y se aplican en el momento: no hace falta volver a subir fotos.</p>
+      <label for="admComboCantidad">Combo (vacío = sin combo)</label>
+      <div class="row" style="gap:8px;align-items:center">
+        <input type="number" id="admComboCantidad" min="2" step="1" inputmode="numeric" placeholder="10" aria-label="Cantidad de fotos del combo" style="flex:0 1 90px" />
+        <span>fotos por $</span>
+        <input type="number" id="admComboPrecio" min="1" step="1" inputmode="numeric" placeholder="5000" aria-label="Precio del combo" style="flex:0 1 130px" />
+      </div>
+      <label for="admPackCantidad">Pack "todas tus fotos" (vacío = sin pack)</label>
+      <div class="row" style="gap:8px;align-items:center">
+        <span>hasta</span>
+        <input type="number" id="admPackCantidad" min="2" step="1" inputmode="numeric" placeholder="30" aria-label="Hasta cuántas fotos entra el pack" style="flex:0 1 90px" />
+        <span>fotos por $</span>
+        <input type="number" id="admPackPrecio" min="1" step="1" inputmode="numeric" placeholder="8000" aria-label="Precio del pack" style="flex:0 1 130px" />
+      </div>
+      <label for="admPromoHasta">Promo hasta (opcional: se muestra "promo hasta el …")</label>
+      <div class="row" style="gap:8px;align-items:center">
+        <input type="date" id="admPromoHasta" style="flex:0 1 180px" />
+        <button type="button" class="secondary small" id="btnGuardarCombo">Guardar promos</button>
+      </div>
+      <label for="admCompraFotosOperacion" style="margin-top:16px">Buscar la compra de un jugador (si no encuentra sus fotos)</label>
+      <div class="row" style="gap:8px;align-items:center">
+        <input id="admCompraFotosOperacion" inputmode="numeric" placeholder="Número de operación de Mercado Pago" style="flex:1 1 220px" />
+        <button type="button" class="secondary small" id="btnBuscarCompraFotos">Buscar</button>
+      </div>
+      <p class="match-meta" id="admCompraFotosRes" aria-live="polite"></p>
     </div>
 
     <div id="admCfgComplejos">
@@ -1659,6 +1693,16 @@
 </dialog>
 
 <!-- antes de cobrar: recordatorio de la promo de fotos (combo) -->
+<dialog id="guardarLinkFotos" class="promo-fotos" aria-labelledby="guardarLinkFotosTitulo">
+  <form method="dialog">
+    <p class="promo-fotos-eyebrow">¡Pago aprobado!</p>
+    <h3 id="guardarLinkFotosTitulo">Guardá el link de tus fotos</h3>
+    <p>Compraste sin cuenta: tus fotos quedan guardadas solo en este navegador. Con el link las volvés a bajar desde cualquier celu.</p>
+    <button type="button" class="primary" data-guardar-link="wsp">Mandármelo por WhatsApp</button>
+    <button type="button" class="secondary" data-guardar-link="copiar">Copiar el link</button>
+    <button type="submit" class="secondary" value="cerrar">Ahora no</button>
+  </form>
+</dialog>
 <dialog id="promoFotos" class="promo-fotos" aria-labelledby="promoFotosTitulo">
   <form method="dialog">
     <p class="promo-fotos-eyebrow">Aprovechá la promo</p>
