@@ -1693,6 +1693,17 @@
 </dialog>
 
 <!-- antes de cobrar: recordatorio de la promo de fotos (combo) -->
+<dialog id="fotosUnaPorUna" class="fotos-una-dialog" aria-labelledby="fotosUnaPorUnaTitulo">
+  <form method="dialog">
+    <div class="fotos-una-head">
+      <h3 id="fotosUnaPorUnaTitulo">Tus fotos en alta calidad</h3>
+      <button type="submit" class="secondary small" value="cerrar">Cerrar</button>
+    </div>
+    <p id="fotosUnaPorUnaAyuda"></p>
+    <p class="match-meta" id="fotosUnaPorUnaApp" hidden>Estás dentro de Instagram o Facebook: para bajarlas todas juntas, tocá los 3 puntitos y elegí "Abrir en el navegador".</p>
+    <div class="fotos-una-lista" id="fotosUnaPorUnaLista" aria-live="polite"></div>
+  </form>
+</dialog>
 <dialog id="guardarLinkFotos" class="promo-fotos" aria-labelledby="guardarLinkFotosTitulo">
   <form method="dialog">
     <p class="promo-fotos-eyebrow">¡Pago aprobado!</p>

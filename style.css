@@ -2651,3 +2651,13 @@ body:not(.is-admin) .menu-mas-admin { display: none; }
 .fotos-recuperar { margin-top: 14px; font-size: 14px; }
 .fotos-recuperar summary { cursor: pointer; color: var(--accent-bright); font-weight: 700; }
 .fotos-recuperar form { max-width: 420px; }
+
+/* plan B para guardar las fotos compradas: en grande, para mantenerlas apretadas */
+.fotos-una-dialog { width: min(720px, calc(100% - 24px)); max-height: calc(100dvh - 24px); padding: 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--text); }
+.fotos-una-dialog::backdrop { background: rgba(0,0,0,.75); }
+.fotos-una-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -16px; padding: 8px 0; background: var(--card); }
+.fotos-una-head h3 { margin: 0; }
+.fotos-una-head button { width: auto; }
+.fotos-una-lista { display: grid; gap: 12px; }
+.fotos-una-lista img { width: 100%; height: auto; border-radius: 10px; -webkit-touch-callout: default; user-select: auto; }
+.fotos-mias .fotos-una-por-una { flex-basis: 100%; text-align: left; font-size: 13px; }

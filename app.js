@@ -8777,51 +8777,63 @@ function renderMisFotos(mias) {
     : "";
   caja.innerHTML = (mias.length
     ? `<span>✓ Tenés <strong>${mias.length} ${mias.length === 1 ? "foto comprada" : "fotos compradas"}</strong> en este torneo. ${guardadas}</span>
-    <button type="button" class="primary small${archivosListos ? " listo" : ""}" id="btnBajarMisFotos">${archivosListos ? `Guardar ${archivosListos.length} en el celu` : bajarDesde && bajarDesde < mias.length ? `Preparar las siguientes (${bajarDesde + 1} a ${Math.min(bajarDesde + TANDA_CELU, mias.length)} de ${mias.length})` : `Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}`}</button>`
+    <button type="button" class="primary small${archivosListos ? " listo" : ""}" id="btnBajarMisFotos">${archivosListos ? `Guardar ${archivosListos.length} en Fotos` : bajarDesde && bajarDesde < mias.length ? `Preparar las siguientes (${bajarDesde + 1} a ${Math.min(bajarDesde + TANDA_CELU, mias.length)} de ${mias.length})` : `Descargar ${mias.length === 1 ? "mi foto" : `mis ${mias.length} fotos`}`}</button>
+    <button type="button" class="link-mas fotos-una-por-una" data-una-por-una>¿No se descargan? Abrilas una por una</button>`
     : "") + credito;
+  caja.querySelector("[data-una-por-una]")?.addEventListener("click", () => abrirFotosUnaPorUna(mias.map((f) => f.id)));
   const bajar = document.getElementById("btnBajarMisFotos");
   if (bajar) bajar.onclick = (e) => bajarMisFotos(e.currentTarget, mias.map((f) => f.id));
 }
-// en el celu se guardan de a 10 en la galería (todas juntas pueden colgar el navegador del iPhone);
-// en la compu se descargan todas, una atrás de otra
+// "Descargar mis fotos": iPhone las guarda en Fotos de a 10 (2 toques por tanda: preparar y guardar);
+// Android y compu las descargan directo, una atrás de otra; si el navegador no deja, se muestran para guardar a mano
 const TANDA_CELU = 10;
 async function bajarMisFotos(btn, ids) {
   if (btn.disabled) return;
-  if (archivosListos) { // toque para guardar la tanda ya preparada (compartir pide un toque nuevo)
+  if (enNavegadorDeApp || (esIOS && !puedeCompartirFotos())) { abrirFotosUnaPorUna(ids); return; }
+  if (!esIOS) { // Android y compu: descarga directa
+    btn.disabled = true;
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        btn.textContent = `Descargando ${i + 1} de ${ids.length}…`;
+        try { descargarDirecto(await urlOriginal(ids[i])); } catch (e) { /* sigue */ }
+        await new Promise((ok) => setTimeout(ok, 700)); // el navegador no corta descargas seguidas
+      }
+      btn.textContent = "✓ Descargadas (fijate en Descargas o en la galería)";
+    } finally { btn.disabled = false; }
+    return;
+  }
+  if (archivosListos) { // iPhone, segundo toque: "Guardar imágenes" con la tanda preparada
     try { await navigator.share({ files: archivosListos }); }
-    catch (e) { if (e.name !== "AbortError") toast('No se pudieron guardar. Probá de nuevo, o tocá cada foto y "Descargar original"'); return; }
+    catch (e) { if (e.name !== "AbortError") abrirFotosUnaPorUna(ids); return; }
     archivosListos = null;
     btn.classList.remove("listo");
     btn.textContent = bajarDesde < ids.length
       ? `Preparar las siguientes (${bajarDesde + 1} a ${Math.min(bajarDesde + TANDA_CELU, ids.length)} de ${ids.length})`
-      : "✓ Guardadas en el celu";
+      : "✓ Guardadas en Fotos";
     return;
   }
-  const celu = !!navigator.canShare?.({ files: [new File([""], "prueba.jpg", { type: "image/jpeg" })] });
   if (bajarDesde >= ids.length) bajarDesde = 0;
-  const lote = celu ? ids.slice(bajarDesde, bajarDesde + TANDA_CELU) : ids;
+  const lote = ids.slice(bajarDesde, bajarDesde + TANDA_CELU);
   btn.disabled = true;
-  const archivos = [], fallaron = [];
   try {
-    for (let i = 0; i < lote.length; i++) {
-      btn.textContent = `Preparando ${i + 1} de ${lote.length}…`;
-      try {
-        const r = await fetch(await urlOriginal(lote[i]));
-        if (!r.ok) throw new Error();
-        archivos.push(new File([await r.blob()], nombreOriginal(lote[i]), { type: "image/jpeg" }));
-      } catch (e) { fallaron.push(lote[i]); }
-    }
-    if (fallaron.length) toast(`${fallaron.length} no se pudieron bajar: tocá cada una y "Descargar original"`);
+    let hechas = 0;
+    btn.textContent = `Preparando 0 de ${lote.length}…`;
+    // de a 3 a la vez: tarda bastante menos
+    const archivos = (await Promise.all([0, 1, 2].map(async (k) => {
+      const mias = [];
+      for (let i = k; i < lote.length; i += 3) {
+        try { mias.push([i, await archivoOriginal(lote[i])]); } catch (e) { /* sigue */ }
+        btn.textContent = `Preparando ${++hechas} de ${lote.length}…`;
+      }
+      return mias;
+    }))).flat().sort((a, b) => a[0] - b[0]).map(([, f]) => f);
+    if (archivos.length < lote.length) toast(`${lote.length - archivos.length} no se pudieron preparar: probá de nuevo`);
     if (!archivos.length) { btn.textContent = "Probar de nuevo"; return; }
-    if (celu && navigator.canShare({ files: archivos })) {
-      bajarDesde += lote.length;
-      archivosListos = archivos;
-      btn.textContent = `Guardar ${archivos.length} en el celu` + (ids.length > TANDA_CELU ? ` (${bajarDesde - lote.length + 1} a ${bajarDesde} de ${ids.length})` : "");
-      btn.classList.add("listo");
-    } else {
-      for (const f of archivos) { guardarBlob(f, f.name); await new Promise((ok) => setTimeout(ok, 350)); }
-      btn.textContent = "✓ Descargadas";
-    }
+    bajarDesde += lote.length;
+    archivosListos = archivos;
+    btn.textContent = `Guardar ${archivos.length} en Fotos` + (ids.length > TANDA_CELU ? ` (${bajarDesde - lote.length + 1} a ${bajarDesde} de ${ids.length})` : "");
+    btn.classList.add("listo");
+    toast('Listas: tocá "Guardar en Fotos" y elegí "Guardar imágenes"');
   } finally { btn.disabled = false; }
 }
 const comboFotos = () => ({ cantidad: Number(configApp.foto_combo_cantidad) || 0, precio: Number(configApp.foto_combo_precio) || 0 });
@@ -8975,8 +8987,9 @@ async function marcarWO(e) {
 }
 
 // ---------- descarga de originales comprados ----------
-async function urlOriginal(fotoId) {
-  const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId, ordenes: ordenesFotos() } });
+// ver = true: link para MIRAR la foto (no la descarga): para guardarla manteniéndola apretada
+async function urlOriginal(fotoId, ver = false) {
+  const { data, error } = await sb.functions.invoke("mp-fotos", { body: { accion: "descargar", fotoId, ver, ordenes: ordenesFotos() } });
   if (error || !data?.url) throw new Error(data?.error || "No se pudo descargar la foto");
   return data.url;
 }
@@ -8990,14 +9003,58 @@ function guardarBlob(blob, nombre) {
   if (!esIOS) setTimeout(() => URL.revokeObjectURL(u), 60000); // si se libera al toque, algunos navegadores cortan la descarga
 }
 // una foto: la baja sin salir de la página (si el navegador no deja, la abre)
+// Cómo se guarda una foto según el celu:
+//  - iPhone: con "Compartir → Guardar imagen" va directo a Fotos (la descarga común la manda a Archivos,
+//    y ahí nadie la encuentra). Compartir pide un toque nuevo, por eso son 2 toques: preparar y guardar.
+//  - Android y compu: descarga directa (el "compartir" de Android no tiene "guardar en la galería").
+//  - Navegadores de Instagram/Facebook u otros que no dejan ninguna de las dos: se muestran para guardarlas a mano.
+const puedeCompartirFotos = () => !!navigator.canShare?.({ files: [new File([""], "prueba.jpg", { type: "image/jpeg" })] });
+const enNavegadorDeApp = /instagram|fban|fbav|fb_iab|line\/|wv\)/i.test(navigator.userAgent);
+const fotosPreparadas = new Map(); // fotoId -> File listo para "Guardar en Fotos" (iPhone)
+function descargarDirecto(url) {
+  const a = document.createElement("a");
+  a.href = url; a.rel = "noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function archivoOriginal(fotoId) {
+  const r = await fetch(await urlOriginal(fotoId));
+  if (!r.ok) throw new Error("No se pudo bajar la foto");
+  return new File([await r.blob()], nombreOriginal(fotoId), { type: "image/jpeg" });
+}
+// devuelve "preparada" cuando en iPhone falta el segundo toque ("Guardar en Fotos")
 async function bajarOriginal(fotoId) {
-  const url = await urlOriginal(fotoId);
-  if (esIOS) { location.assign(url); return; } // el link ya viene como descarga: Safari pregunta y no sale de la página
-  try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error();
-    guardarBlob(await r.blob(), nombreOriginal(fotoId));
-  } catch (e) { location.assign(url); }
+  if (esIOS && puedeCompartirFotos()) {
+    const listo = fotosPreparadas.get(fotoId);
+    if (listo) {
+      try { await navigator.share({ files: [listo] }); fotosPreparadas.delete(fotoId); }
+      catch (e) { if (e.name !== "AbortError") abrirFotosUnaPorUna([fotoId]); }
+      return "";
+    }
+    fotosPreparadas.set(fotoId, await archivoOriginal(fotoId));
+    toast('Lista: tocá "Guardar en Fotos" y elegí "Guardar imagen"');
+    return "preparada";
+  }
+  if (enNavegadorDeApp || (esIOS && !puedeCompartirFotos())) { abrirFotosUnaPorUna([fotoId]); return ""; }
+  descargarDirecto(await urlOriginal(fotoId)); // viene como descarga: no sale de la página
+  return "";
+}
+// plan B que funciona en cualquier navegador: las fotos en grande para guardarlas manteniéndolas apretadas
+async function abrirFotosUnaPorUna(ids) {
+  const dlg = document.getElementById("fotosUnaPorUna"), lista = document.getElementById("fotosUnaPorUnaLista");
+  if (!dlg?.showModal || !lista) return;
+  document.getElementById("fotosUnaPorUnaAyuda").textContent = esIOS
+    ? 'Mantené apretada cada foto y elegí "Guardar en Fotos".'
+    : 'Mantené apretada cada foto y elegí "Descargar imagen".';
+  document.getElementById("fotosUnaPorUnaApp").hidden = !enNavegadorDeApp;
+  lista.innerHTML = "";
+  dlg.showModal();
+  for (const id of ids) {
+    if (!dlg.open) return;
+    try {
+      const url = urlSegura(await urlOriginal(id, true));
+      if (url) lista.insertAdjacentHTML("beforeend", `<img src="${url}" alt="Tu foto en alta calidad" loading="lazy" decoding="async" />`);
+    } catch (e) { /* sigue con la próxima */ }
+  }
 }
 
 // elegir/sacar del carrito y descargar originales (galería del torneo y de Gestión)
@@ -9008,7 +9065,8 @@ document.addEventListener("click", async (e) => {
   if (bajar && !bajar.disabled) {
     bajar.disabled = true;
     try {
-      await bajarOriginal(bajar.dataset.descargarFoto);
+      const estado = await bajarOriginal(bajar.dataset.descargarFoto);
+      bajar.textContent = estado === "preparada" ? "Guardar en Fotos" : "Descargar original";
     } catch (err) { toast(err.message); } finally { bajar.disabled = false; }
   }
 });
@@ -9894,7 +9952,7 @@ function mostrarFotoGrande(el) {
   if (aLaVenta && btnOriginal && btnPedido) {
     btnOriginal.dataset.fotoId = id;
     const conCredito = !el.dataset.comprada && creditosFotos > 0 && !!el.closest("#dtFotosGaleria");
-    btnOriginal.textContent = el.dataset.comprada ? "Descargar original" : conCredito ? "Original con 1 crédito (sin pagar)" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
+    btnOriginal.textContent = el.dataset.comprada ? (fotosPreparadas.has(id) ? "Guardar en Fotos" : "Descargar original") : conCredito ? "Original con 1 crédito (sin pagar)" : `Original en alta calidad (${precioTexto(el.dataset.precio)})`;
     btnPedido.textContent = fotosElegidas.has(id) ? "✓ En tu pedido (quitar)" : "Sumar al pedido";
     btnPedido.setAttribute("aria-pressed", fotosElegidas.has(id));
   }
@@ -9929,10 +9987,10 @@ document.getElementById("fotoGrandeOriginal")?.addEventListener("click", async (
     if (btn.disabled) return;
     btn.disabled = true;
     try {
-      const texto = btn.textContent;
-      btn.textContent = "Descargando…";
-      await bajarOriginal(btn.dataset.fotoId).finally(() => { btn.textContent = texto; });
-    } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+      btn.textContent = fotosPreparadas.has(btn.dataset.fotoId) ? "Guardando…" : "Preparando…";
+      const estado = await bajarOriginal(btn.dataset.fotoId);
+      btn.textContent = estado === "preparada" ? "Guardar en Fotos" : "Descargar original";
+    } catch (err) { toast(err.message); btn.textContent = "Descargar original"; } finally { btn.disabled = false; }
     return;
   }
   if (creditosFotos > 0 && el?.closest("#dtFotosGaleria")) { // tiene crédito: la canjea sin pagar
